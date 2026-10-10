@@ -100,14 +100,23 @@ test('a pass settles the unit: the next one starts empty, and a file changed dur
   assert.deepEqual(stateOf(session)?.unit.intents, [])
 })
 
-test('with report headings declared, a turn that ends without them checks nothing and leaves the unit open', async () => {
-  const project = declaration({ finish: { headings: ['Request', 'To validate'] } })
+test('with headings declared, a turn that ends without them checks nothing; the agent is told once how to end, by the skill when there is one', async () => {
+  const project = declaration({ finish: { headings: ['Request', 'To validate'], skill: '.agents/skills/wv-finish.md' } })
   const checks = stubChecks([PASSING])
 
   prompt(session, 'change it')
   agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
 
-  assert.match((await finishWith(session, checks, project, 'Which name do you prefer?')).systemMessage ?? '', /Checks pending/)
+  const told = await finishWith(session, checks, project, 'Which name do you prefer?')
+
+  assert.equal(told.decision, 'block')
+  assert.equal(
+    told.reason,
+    '[weaver] This unit of work has changed files, and your last message does not end it. If the work is finished, end with a message that has these sections: ## Request, ## To validate. How to write them is in .agents/skills/wv-finish.md. If you are waiting for the owner, say so and stop: this is said once.',
+  )
+  assert.match((await finishWith(session, checks, project, 'I am waiting for your answer.')).systemMessage ?? '', /Checks pending/)
+  prompt(session, 'call it b')
+  assert.equal((await finishWith(session, checks, project, 'Done, I think.')).decision, 'block', 'a new request may be told again')
   assert.equal(checks.calls.count, 0)
 
   await finishWith(session, checks, project, '## request\n\ndone\n\n## To Validate ##\n\nnothing\n')

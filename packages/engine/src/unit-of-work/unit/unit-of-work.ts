@@ -16,7 +16,7 @@ export class UnitOfWork {
       openedAt: new Date().toISOString(),
       files: {},
       intents: [],
-      check: { rounds: 0, result: null },
+      check: { rounds: 0, result: null, reminded: false },
       unattributed: [],
     })
   }
@@ -31,6 +31,10 @@ export class UnitOfWork {
 
   get rounds(): number {
     return this.record.check.rounds
+  }
+
+  get reminded(): boolean {
+    return this.record.check.reminded
   }
 
   get unattributed(): readonly string[] {
@@ -49,11 +53,19 @@ export class UnitOfWork {
     const { intents, check } = this.record
     const known = intents.some((earlier) => earlier.text === intent.text)
 
-    return new UnitOfWork({ ...this.record, intents: known ? intents : [...intents, intent], check: { ...check, rounds: 0 } })
+    return new UnitOfWork({
+      ...this.record,
+      intents: known ? intents : [...intents, intent],
+      check: { ...check, rounds: 0, reminded: false },
+    })
   }
 
   withFailedRound(): UnitOfWork {
-    return new UnitOfWork({ ...this.record, check: { rounds: this.rounds + 1, result: 'fail' } })
+    return new UnitOfWork({ ...this.record, check: { ...this.record.check, rounds: this.rounds + 1, result: 'fail' } })
+  }
+
+  withReminder(): UnitOfWork {
+    return new UnitOfWork({ ...this.record, check: { ...this.record.check, reminded: true } })
   }
 
   withFiles(files: Files): UnitOfWork {

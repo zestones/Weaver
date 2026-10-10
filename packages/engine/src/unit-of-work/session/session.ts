@@ -72,6 +72,15 @@ export class Session {
     return new UnitOfWork(this.reconciled((record) => ({ ...record, lastReply: lastMessage })).unit)
   }
 
+  // True the first time for the request in progress: the agent is told once how to end its work.
+  remind(): boolean {
+    return this.store.transact((latest) => {
+      const unit = new UnitOfWork(latest.unit)
+
+      return unit.reminded ? { record: latest, value: false } : { record: { ...latest, unit: unit.withReminder().record }, value: true }
+    }).value
+  }
+
   failRound(): number {
     return this.store.update((latest) => ({ ...latest, unit: new UnitOfWork(latest.unit).withFailedRound().record })).unit.check.rounds
   }

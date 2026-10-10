@@ -32,6 +32,11 @@
           "items": { "type": "string", "minLength": 1 },
           "description": "The headings of the final message that declares the work finished. Without them, every end of turn does."
         },
+        "skill": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The file that tells the agent how to write the final message, relative to the repository root. Weaver guards it, and names it to an agent that stops with changed files and without the headings."
+        },
         "maxRounds": {
           "type": "integer",
           "minimum": 1,

@@ -192,7 +192,11 @@ test('a turn that ends on a question checks nothing; a shell command is charged 
   hook('UserPromptSubmit', { prompt: 'generate d' })
   tool('Bash', { command: 'echo "export const d = 4" > src/d.js' }, () => writeFiles(repo.top, { 'src/d.js': 'export const d = 4\n' }))
 
-  assert.match(stop('Should I also export it from the index?').systemMessage ?? '', /Checks pending/)
+  assert.match(
+    stop('Should I also export it from the index?').reason ?? '',
+    /end with a message that has these sections: ## Request, ## To validate\. If you are waiting/,
+  )
+  assert.match(stop('I am waiting for your answer.').systemMessage ?? '', /Checks pending/)
   assert.match(stop().systemMessage ?? '', /passed on 1 changed file/)
 })
 

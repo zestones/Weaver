@@ -12,7 +12,10 @@ export class ProjectGuards {
   private readonly guards: readonly Guard[]
 
   constructor(declaration: Declaration, repo: Repository) {
-    this.guards = [new EngineGuard(repo), ...declaration.guards.flatMap((declared) => this.guardsOf(declared, declaration, repo))]
+    this.guards = [
+      new EngineGuard(repo, declaration.finish.skill),
+      ...declaration.guards.flatMap((declared) => this.guardsOf(declared, declaration, repo)),
+    ]
   }
 
   refusal(call: ToolCall): Refusal | null {

@@ -8,7 +8,7 @@ export interface Transaction<Value> {
   readonly value: Value
 }
 
-const VERSION = 1
+const VERSION = 2
 const LOCK_WAIT_MS = 5000
 const LOCK_POLL_MS = 20
 

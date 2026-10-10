@@ -31,6 +31,7 @@ export class DoctorCommand implements Command {
     const runtimes = new RuntimeCatalog().settings(project.top, this.link, [])
     const findings = [
       this.configuration(project),
+      ...this.finishSkill(project),
       this.hook(),
       ...runtimes.map((runtime) => this.runtime(runtime)),
       this.anyRuntime(runtimes),
@@ -58,6 +59,26 @@ export class DoctorCommand implements Command {
     } catch (error) {
       return { state: 'problem', text: error instanceof Error ? error.message : String(error) }
     }
+  }
+
+  // The agent is pointed to the skill, and the configuration waits for the headings the skill shows.
+  private finishSkill(project: Project): Finding[] {
+    const skill = project.finishSkill()
+
+    if (skill === null) return []
+    if (!skill.exists)
+      return [{ state: 'problem', text: `${skill.path} is missing, and agents are pointed to it. Run weaver install to write a template.` }]
+
+    const missing = skill.missingHeadings()
+
+    return missing.length === 0
+      ? [{ state: 'ok', text: `the finish skill: ${skill.path}` }]
+      : [
+          {
+            state: 'problem',
+            text: `${skill.path} does not show ${missing.map((heading) => `## ${heading}`).join(', ')}, which the configuration waits for.`,
+          },
+        ]
   }
 
   private hook(): Finding {

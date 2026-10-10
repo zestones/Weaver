@@ -42,6 +42,7 @@ test('after install everything is alive; a runtime left out is only noted', () =
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines, [
     'ok      weaver.config.json: 0 rule(s), 0 check(s), 0 guard(s)',
+    'ok      the finish skill: .agents/skills/wv-finish.md',
     `ok      the hook starts: ${link.hook}`,
     'ok      Claude Code: wired in .claude/settings.local.json',
     '-       Codex: not wired',
@@ -61,6 +62,28 @@ test('hooks that point to a Weaver that is no longer there are a problem, and so
   assert.ok(stale.lines.includes('PROBLEM Codex: the hooks in .codex/hooks.json point somewhere else. Run weaver install.'))
   assert.equal(dead.status, 1)
   assert.ok(dead.lines.includes(`PROBLEM the hook does not start: ${moved.hook}. Build Weaver with pnpm build.`))
+})
+
+test('a finish skill that is missing, or that no longer shows a heading the configuration waits for, is a problem', () => {
+  weaver(top, ['install', 'claude'])
+  writeFileSync(join(top, '.agents/skills/wv-finish.md'), '## Request\n\n## To validate\n')
+
+  assert.ok(
+    weaver(top, ['doctor']).lines.includes(
+      'PROBLEM .agents/skills/wv-finish.md does not show ## Found along the way, which the configuration waits for.',
+    ),
+  )
+
+  rmSync(join(top, '.agents'), { recursive: true })
+
+  const missing = weaver(top, ['doctor'])
+
+  assert.equal(missing.status, 1)
+  assert.ok(
+    missing.lines.includes(
+      'PROBLEM .agents/skills/wv-finish.md is missing, and agents are pointed to it. Run weaver install to write a template.',
+    ),
+  )
 })
 
 test('a configuration that cannot be read is a problem, with what is wrong in it', () => {

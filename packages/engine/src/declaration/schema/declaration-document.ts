@@ -27,6 +27,7 @@ export interface DeclarationDocument {
   readonly scope: { readonly exclude: readonly string[] }
   readonly finish: {
     readonly headings?: readonly string[]
+    readonly skill?: string
     readonly maxRounds: number
     readonly deadlineSeconds: number
     readonly concurrency: number

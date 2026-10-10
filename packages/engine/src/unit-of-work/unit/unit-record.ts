@@ -18,6 +18,8 @@ export interface UnitFile {
 interface CheckProgress {
   readonly rounds: number
   readonly result: 'pass' | 'fail' | null
+  // The agent was told how to end the work, for the request in progress.
+  readonly reminded: boolean
 }
 
 export interface UnitRecord {

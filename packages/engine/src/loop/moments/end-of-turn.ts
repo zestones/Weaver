@@ -35,13 +35,18 @@ export class EndOfTurn implements Moment {
   private async finish(session: Session, declaration: Declaration, lastMessage: string | null): Promise<Answer> {
     const unit = session.endTurn(lastMessage)
 
-    if (!declaration.finish.declaresFinished(lastMessage)) return unit.isEmpty ? Answer.empty() : Answer.saying(PENDING)
+    if (!declaration.finish.declaresFinished(lastMessage)) return unit.isEmpty ? Answer.empty() : this.pending(session, declaration)
     if (!unit.isEmpty) return this.check(session, declaration, unit)
 
     // A turn that changed no file still ends its unit, so the next request starts with nothing of this one.
     if (unit.hasRequests) session.settle({})
 
     return Answer.empty()
+  }
+
+  // The only way to speak to an agent that has stopped is to refuse its stop.
+  private pending(session: Session, declaration: Declaration): Answer {
+    return session.remind() ? Answer.blocking(declaration.finish.reminder()) : Answer.saying(PENDING)
   }
 
   private async check(session: Session, declaration: Declaration, unit: UnitOfWork): Promise<Answer> {

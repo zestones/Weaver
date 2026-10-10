@@ -21,6 +21,7 @@ interface Settings {
 const CLAUDE = '.claude/settings.local.json'
 const CODEX = '.codex/hooks.json'
 const CONFIG = 'weaver.config.json'
+const SKILL = '.agents/skills/wv-finish.md'
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-install-'))
 const link = new EngineLink()
 let top: string
@@ -55,6 +56,12 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
 
   assert.equal(readJson<{ $schema: string }>(top, CONFIG).$schema, link.schema)
   assert.deepEqual(DeclarationFile.in(top).load()?.rules, [])
+  assert.deepEqual(DeclarationFile.in(top).load()?.finish.headings, ['Request', 'To validate', 'Found along the way'])
+  assert.match(
+    readFileSync(join(top, SKILL), 'utf8'),
+    /## Request\n\nWhat you did for the request[^]*## To validate\n\n[^]*## Found along the way\n\n/,
+  )
+  assert.ok(lines.includes(`${SKILL} created: it tells the agent how to end a task. Adapt it to your project.`))
   assert.ok(lines.some((line) => line.includes(`${CLAUDE} is not ignored by git`)))
   assert.ok(lines.some((line) => line.includes('This is temporary')))
 })
@@ -89,6 +96,19 @@ test('install twice wires once, and leaves what the owner put in the files', () 
 
   assert.deepEqual(JSON.parse(readFileSync(join(top, CONFIG), 'utf8')), JSON.parse(declared))
   assert.ok(lines.includes(`${CONFIG} kept as it is.`))
+  assert.equal(existsSync(join(top, SKILL)), false, 'a project that names no skill gets none')
+})
+
+test('a skill the configuration names is written once with its headings, and never written over', () => {
+  writeJson(top, CONFIG, { version: 1, finish: { headings: ['Ta demande', 'À valider'], skill: 'docs/fin.md' } })
+  weaver(top, ['install', 'claude'])
+
+  const written = readFileSync(join(top, 'docs/fin.md'), 'utf8')
+
+  assert.match(written, /## Ta demande\n\nSay here what this section must hold\.\n\n## À valider\n\nSay here/)
+  writeJson(top, 'docs/fin.md', 'mine now')
+  assert.ok(!weaver(top, ['install', 'claude']).lines.some((line) => line.includes('docs/fin.md created')))
+  assert.equal(readJson<string>(top, 'docs/fin.md'), 'mine now')
 })
 
 test('install may name the runtimes to wire, and refuses a name it does not know', () => {

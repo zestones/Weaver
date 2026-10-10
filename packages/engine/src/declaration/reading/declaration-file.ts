@@ -49,13 +49,13 @@ export class DeclarationFile {
         }),
     )
     const guards = Object.entries(document.guards).map(([id, guard]): DeclaredGuard => ({ ...guard, id }))
-    const problems = this.bindingProblems(checks, guards, rules)
+    const problems = [...this.bindingProblems(checks, guards, rules), ...this.finishProblems(finish)]
 
     if (problems.length > 0) throw new DeclarationError(this.path, problems)
 
     return new Declaration({
       exclude: scope.exclude,
-      finish: new FinishPolicy({ ...finish, headings: finish.headings ?? null }),
+      finish: new FinishPolicy({ ...finish, headings: finish.headings ?? null, skill: finish.skill ?? null }),
       commands,
       checks,
       guards,
@@ -78,6 +78,12 @@ export class DeclarationFile {
     } catch (error) {
       throw new DeclarationError(this.path, [error instanceof Error ? error.message : String(error)])
     }
+  }
+
+  private finishProblems(finish: DeclarationDocument['finish']): string[] {
+    return finish.skill !== undefined && finish.headings === undefined
+      ? ['finish.skill is set without finish.headings: no final message ends a unit of work, so the skill explains nothing']
+      : []
   }
 
   // A schema describes the shape of each entry, not what ties one entry to another.

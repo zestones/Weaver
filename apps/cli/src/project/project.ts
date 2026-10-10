@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DeclarationFile, Repository, type Declaration } from '@weaver/engine'
+import { DeclarationError, DeclarationFile, Repository, type Declaration } from '@weaver/engine'
+import { FinishSkill } from './finish-skill.ts'
 
 export class Project {
   readonly top: string
@@ -31,9 +32,24 @@ export class Project {
 
     if (existsSync(path)) return false
 
-    writeFileSync(path, `${JSON.stringify({ $schema: schema, version: 1, rules: {}, checks: {}, guards: {} }, null, 2)}\n`)
+    const finish = { headings: FinishSkill.HEADINGS, skill: FinishSkill.PATH }
+
+    writeFileSync(path, `${JSON.stringify({ $schema: schema, version: 1, finish, rules: {}, checks: {}, guards: {} }, null, 2)}\n`)
 
     return true
+  }
+
+  // null when the project names no skill, or when its configuration cannot be read: the doctor says why.
+  finishSkill(): FinishSkill | null {
+    try {
+      const finish = this.declaration()?.finish
+
+      return finish?.skill == null ? null : new FinishSkill(this.top, finish.skill, finish.headings ?? [])
+    } catch (error) {
+      if (error instanceof DeclarationError) return null
+
+      throw error
+    }
   }
 
   ignores(path: string): boolean {

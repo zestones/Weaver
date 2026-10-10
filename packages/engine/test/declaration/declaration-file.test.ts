@@ -38,7 +38,10 @@ test('a declaration is read with its defaults', () => {
   const config = parse(VALID)
 
   assert.deepEqual(config.exclude, ['design/lab'])
-  assert.deepEqual({ ...config.finish }, { headings: ['Request', 'To validate'], maxRounds: 2, deadlineSeconds: 1200, concurrency: 3 })
+  assert.deepEqual(
+    { ...config.finish },
+    { headings: ['Request', 'To validate'], skill: null, maxRounds: 2, deadlineSeconds: 1200, concurrency: 3 },
+  )
   assert.deepEqual(config.checks[1], {
     id: 'markers',
     run: ['node', 'tools/markers.mjs'],
@@ -137,6 +140,10 @@ test('a project says when its work is finished: with headings, a final message t
   assert.equal(finish.declaresFinished('## Request\n\nWhich name do you prefer?'), false)
   assert.equal(finish.declaresFinished(null), false)
   assert.equal(parse({ version: 1 }).finish.declaresFinished(null), true, 'without headings every end of turn does')
+  assert.equal(parse({ version: 1, finish: { headings: ['Done'], skill: 'docs/finish.md' } }).finish.skill, 'docs/finish.md')
+  assert.deepEqual(problemsOf({ version: 1, finish: { skill: 'docs/finish.md' } }), [
+    'finish.skill is set without finish.headings: no final message ends a unit of work, so the skill explains nothing',
+  ])
 })
 
 test('a guard enforces a rule that exists and that a program may enforce, and refuses something', () => {

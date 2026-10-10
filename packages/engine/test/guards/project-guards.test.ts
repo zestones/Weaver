@@ -118,11 +118,30 @@ test('Weaver’s configuration, its state and the agent’s hook settings are gu
     )
   }
 
+  assert.match(
+    refusal('Edit', { file_path: join(repo.top, 'weaver.config.json') }) ?? '',
+    /^\[weaver weaver:protected\] Writing weaver\.config\.json is refused/,
+  )
   assert.match(refusal('Bash', { command: 'rm -rf .git/weaver' }) ?? '', /weaver:protected/)
   assert.match(refusal('Bash', { command: 'rm -rf .git' }) ?? '', /weaver:protected/, 'a removed folder takes Weaver’s state with it')
   assert.match(refusal('Bash', { command: 'echo {} > weaver.config.json' }) ?? '', /weaver:protected/)
   assert.equal(refusal('Write', { file_path: join(repo.top, '.claude/notes.md') }), null)
   assert.equal(refusal('Bash', { command: 'git status' }), null)
+})
+
+test('the skill that says how a task ends is guarded as soon as the configuration names it', () => {
+  const declared = new DeclarationFile('weaver.config.json').parse(
+    '{"version":1,"finish":{"headings":["Done"],"skill":".agents/skills/wv-finish.md"}}',
+  )
+  const { call } = catalog
+    .fromArguments([])
+    .read(new Payload({ cwd: repo.top, tool_name: 'Edit', tool_input: { file_path: join(repo.top, '.agents/skills/wv-finish.md') } }))
+
+  assert.match(
+    (call === null ? null : new ProjectGuards(declared, repo).refusal(call)?.reason) ?? '',
+    /Writing \.agents\/skills\/wv-finish\.md is refused by the guard weaver/,
+  )
+  assert.equal(call === null ? null : guards.refusal(call), null, 'not guarded when no configuration names it')
 })
 
 test('the state of a linked worktree is guarded where it lives, outside the working tree', () => {
