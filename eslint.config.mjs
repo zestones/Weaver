@@ -2,6 +2,50 @@ import js from '@eslint/js'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import tseslint from 'typescript-eslint'
 
+const WORKSPACE_EXPORTS = {
+  group: ['@weaver/*/src/**', '@weaver/*/dist/**', '**/packages/*/src/**', '**/apps/*/src/**'],
+  message: 'Consume workspace packages through their declared public exports.',
+}
+
+const MODULE_FUNCTIONS = [
+  'Program > FunctionDeclaration',
+  'Program > ExportNamedDeclaration > FunctionDeclaration',
+  'Program > ExportDefaultDeclaration > FunctionDeclaration',
+  'Program > VariableDeclaration > VariableDeclarator > :matches(ArrowFunctionExpression, FunctionExpression)',
+  'Program > ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > :matches(ArrowFunctionExpression, FunctionExpression)',
+]
+
+// The layers of the engine, top first. A file imports from its own folder and from the layers below, never from a layer
+// above; folders listed together are side by side and do not import each other.
+const ENGINE_LAYERS = [['bin'], ['loop'], ['checks'], ['unit-of-work', 'declaration', 'agents'], ['lib']]
+
+const engineLayers = ENGINE_LAYERS.flatMap((layer, depth) =>
+  layer.flatMap((folder) => {
+    const closed = [...ENGINE_LAYERS.slice(0, depth).flat(), ...layer.filter((other) => other !== folder)]
+
+    // The top layer may import from every other.
+    if (closed.length === 0) return []
+
+    return {
+      files: [`packages/engine/src/${folder}/**/*.ts`],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              WORKSPACE_EXPORTS,
+              {
+                group: closed.map((other) => `**/${other}/**`),
+                message: `${folder}/ imports only from itself and from the layers below it (see ENGINE_LAYERS in eslint.config.mjs).`,
+              },
+            ],
+          },
+        ],
+      },
+    }
+  }),
+)
+
 export default defineConfig(
   globalIgnores(['**/node_modules/**', '**/dist/**', '**/coverage/**', '.cache/**']),
   {
@@ -26,17 +70,29 @@ export default defineConfig(
     files: ['**/*.{js,mjs,ts,tsx}'],
     linterOptions: { reportUnusedDisableDirectives: 'error' },
     rules: {
-      'no-restricted-imports': [
+      'no-restricted-imports': ['error', { patterns: [WORKSPACE_EXPORTS] }],
+    },
+  },
+  {
+    files: ['packages/*/src/**/*.ts'],
+    rules: {
+      'max-classes-per-file': ['error', 1],
+      '@typescript-eslint/no-extraneous-class': 'error',
+    },
+  },
+  {
+    files: ['packages/*/src/**/*.ts'],
+    ignores: ['packages/*/src/lib/**'],
+    rules: {
+      'no-restricted-syntax': [
         'error',
         {
-          patterns: [
-            {
-              group: ['@weaver/*/src/**', '@weaver/*/dist/**', '**/packages/*/src/**', '**/apps/*/src/**'],
-              message: 'Consume workspace packages through their declared public exports.',
-            },
-          ],
+          selector: MODULE_FUNCTIONS.join(', '),
+          message:
+            'Outside lib/, behavior lives in classes: make this a method of the class it serves, or move it to lib/ if it is a pure transformation that knows nothing of the package’s concepts.',
         },
       ],
     },
   },
+  ...engineLayers,
 )

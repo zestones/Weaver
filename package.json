@@ -11,7 +11,7 @@
     "test": "pnpm -r --workspace-concurrency=1 --if-present run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm knip && pnpm build"
+    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm knip && pnpm build && pnpm test"
   },
   "keywords": [],
   "author": "",

@@ -1,0 +1,27 @@
+{
+  "name": "@weaver/engine",
+  "version": "0.0.0",
+  "description": "The engine of the unit-of-work loop: it reads what a project declares and what an agent does, and decides when the work may end",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "weaver-hook": "./dist/bin/hook.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "unbash": "2.2.0"
+  },
+  "devDependencies": {
+    "vitest": "5.0.3"
+  }
+}

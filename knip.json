@@ -3,6 +3,10 @@
   "workspaces": {
     ".": {
       "project": ["*.{js,mjs,ts}"]
+    },
+    "packages/engine": {
+      "entry": ["src/index.ts", "src/bin/hook.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
     }
   }
 }
