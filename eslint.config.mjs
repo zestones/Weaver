@@ -15,35 +15,40 @@ const MODULE_FUNCTIONS = [
   'Program > ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > :matches(ArrowFunctionExpression, FunctionExpression)',
 ]
 
-// The layers of the engine, top first. A file imports from its own folder and from the layers below, never from a layer
-// above; folders listed together are side by side and do not import each other.
-const ENGINE_LAYERS = [['bin'], ['loop'], ['checks', 'guards'], ['unit-of-work', 'declaration', 'agents'], ['lib']]
+// The layers of each package, top first. A file imports from its own folder and from the layers below, never from a
+// layer above; folders listed together are side by side and do not import each other.
+const LAYERS = {
+  'packages/engine': [['bin'], ['loop'], ['checks', 'guards'], ['unit-of-work', 'declaration', 'agents'], ['lib']],
+  'apps/cli': [['bin'], ['commands'], ['runtimes', 'project'], ['link', 'output']],
+}
 
-const engineLayers = ENGINE_LAYERS.flatMap((layer, depth) =>
-  layer.flatMap((folder) => {
-    const closed = [...ENGINE_LAYERS.slice(0, depth).flat(), ...layer.filter((other) => other !== folder)]
+const layerRules = Object.entries(LAYERS).flatMap(([root, layers]) =>
+  layers.flatMap((layer, depth) =>
+    layer.flatMap((folder) => {
+      const closed = [...layers.slice(0, depth).flat(), ...layer.filter((other) => other !== folder)]
 
-    // The top layer may import from every other.
-    if (closed.length === 0) return []
+      // The top layer may import from every other.
+      if (closed.length === 0) return []
 
-    return {
-      files: [`packages/engine/src/${folder}/**/*.ts`],
-      rules: {
-        'no-restricted-imports': [
-          'error',
-          {
-            patterns: [
-              WORKSPACE_EXPORTS,
-              {
-                group: closed.map((other) => `**/${other}/**`),
-                message: `${folder}/ imports only from itself and from the layers below it (see ENGINE_LAYERS in eslint.config.mjs).`,
-              },
-            ],
-          },
-        ],
-      },
-    }
-  }),
+      return {
+        files: [`${root}/src/${folder}/**/*.ts`],
+        rules: {
+          'no-restricted-imports': [
+            'error',
+            {
+              patterns: [
+                WORKSPACE_EXPORTS,
+                {
+                  group: closed.map((other) => `**/${other}/**`),
+                  message: `${folder}/ imports only from itself and from the layers below it (see LAYERS in eslint.config.mjs).`,
+                },
+              ],
+            },
+          ],
+        },
+      }
+    }),
+  ),
 )
 
 export default defineConfig(
@@ -74,14 +79,14 @@ export default defineConfig(
     },
   },
   {
-    files: ['packages/*/src/**/*.ts'],
+    files: ['packages/*/src/**/*.ts', 'apps/cli/src/**/*.ts'],
     rules: {
       'max-classes-per-file': ['error', 1],
       '@typescript-eslint/no-extraneous-class': 'error',
     },
   },
   {
-    files: ['packages/*/src/**/*.ts'],
+    files: ['packages/*/src/**/*.ts', 'apps/cli/src/**/*.ts'],
     ignores: ['packages/*/src/lib/**'],
     rules: {
       'no-restricted-syntax': [
@@ -94,5 +99,5 @@ export default defineConfig(
       ],
     },
   },
-  ...engineLayers,
+  ...layerRules,
 )

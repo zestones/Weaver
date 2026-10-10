@@ -31,6 +31,10 @@ export class Loop {
     ])
   }
 
+  handles(eventName: string): boolean {
+    return this.moments.has(eventName)
+  }
+
   async handle(eventName: string, argv: readonly string[], stdin: string): Promise<Answer> {
     const agent = this.agents.fromArguments(argv)
     const event = agent.read(Payload.parse(stdin))

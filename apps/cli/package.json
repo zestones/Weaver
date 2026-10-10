@@ -1,0 +1,21 @@
+{
+  "name": "@weaver/cli",
+  "version": "0.0.0",
+  "description": "The owner's commands: plug Weaver into a project, unplug it, and check that it is alive there",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "weaver": "./dist/bin/weaver.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@weaver/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "5.0.3"
+  }
+}

@@ -15,7 +15,7 @@ Use the Node.js version in `.node-version` and the pnpm version recorded in `pac
 | `pnpm test`         | Run package test scripts sequentially.                                                                 |
 | `pnpm format`       | Format repository files.                                                                               |
 | `pnpm format:check` | Check formatting without writing.                                                                      |
-| `pnpm check`        | Run formatting, types, lint, unused-code analysis, builds and tests sequentially.                      |
+| `pnpm check`        | Run formatting, builds, types, lint, unused-code analysis and tests sequentially.                      |
 
 Checks run locally through `pnpm check`; no GitHub Actions workflow is configured. Recursive package commands use one workspace slot. Each package must configure its own test runner with one worker and no parallel test files. These limits reduce concurrent work; they are not a hard memory quota.
 
@@ -62,8 +62,18 @@ Write only the comments a reader could not do without: a reason the code cannot 
 | Rule                                                                              | Held by                                          |
 | --------------------------------------------------------------------------------- | ------------------------------------------------ |
 | No module-level function outside `lib/`, one class per file, no static-only class | ESLint, for `packages/*/src`                     |
-| Layer order of the engine                                                         | ESLint, `ENGINE_LAYERS` in `eslint.config.mjs`   |
+| Layer order of each package                                                       | ESLint, `LAYERS` in `eslint.config.mjs`          |
 | No folder with both files and sub-folders                                         | `packages/engine/test/structure/folders.test.ts` |
 | Families in sub-folders, and comments                                             | Review                                           |
 
 A new package adds its own layer list to `eslint.config.mjs` and its own copy of the folder test.
+
+### Using another package
+
+A package that uses another reads its emitted types and runs its emitted code, so `pnpm check` builds before it type-checks, lints and tests.
+
+### Running the CLI on a project
+
+`weaver install`, run at the root of a project, writes the hooks of the agent runtimes and a starter `weaver.config.json`. `weaver doctor` checks that the wiring is alive, and `weaver uninstall` removes the hooks. To have the command on this machine, build the workspace, then run `pnpm link --global` in `apps/cli`.
+
+This is temporary. Weaver is not distributed yet, so a project is wired to this checkout by absolute paths: the hooks and the `$schema` line stop working when the checkout moves or its `dist/` is removed, and they belong to one machine. The `TODO(distribution)` in `apps/cli/src/link/engine-link.ts` marks what to replace once Weaver is published.

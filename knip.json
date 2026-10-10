@@ -7,6 +7,10 @@
     "packages/engine": {
       "entry": ["src/index.ts", "src/bin/hook.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "apps/cli": {
+      "entry": ["src/bin/weaver.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
     }
   }
 }

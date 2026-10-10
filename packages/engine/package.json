@@ -8,7 +8,9 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./hook": "./dist/bin/hook.js",
+    "./weaver.config.schema.json": "./dist/declaration/schema/weaver.config.schema.json"
   },
   "bin": {
     "weaver-hook": "./dist/bin/hook.js"

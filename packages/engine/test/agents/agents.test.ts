@@ -3,6 +3,7 @@ import { test } from 'vitest'
 import { AgentCatalog } from '../../src/agents/runtimes/agent-catalog.ts'
 import { Payload } from '../../src/agents/events/payload.ts'
 import { NO_HINTS } from '../../src/lib/shell/writes/hints.ts'
+import { Loop } from '../../src/loop/dispatch/loop.ts'
 
 const TOP = '/repo'
 const catalog = new AgentCatalog()
@@ -16,6 +17,21 @@ test('a hook command names its runtime, and Claude Code is the one assumed when 
   assert.equal(codex.name, 'codex')
   assert.equal(catalog.fromArguments(['Stop']).name, 'claude')
   assert.equal(catalog.fromArguments(['Stop', '--agent=other']).name, 'claude')
+})
+
+test('every event a runtime fires for Weaver is one the loop listens to, and its tools are those it reads', () => {
+  const loop = new Loop()
+
+  for (const agent of catalog.agents)
+    assert.deepEqual(
+      agent.events.filter((event) => !loop.handles(event)),
+      [],
+      agent.name,
+    )
+
+  assert.deepEqual(claude.tools, ['Bash', 'Monitor', 'PowerShell', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit'])
+  assert.deepEqual(codex.tools, ['Bash', 'Monitor', 'PowerShell', 'apply_patch'])
+  assert.equal(codex.events.includes('PostToolUseFailure'), false)
 })
 
 test('an event is read into one shape whatever is missing from its payload', () => {

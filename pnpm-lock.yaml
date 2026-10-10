@@ -188,6 +188,16 @@ importers:
         specifier: 8.71.1
         version: 8.71.1(eslint@10.12.0(jiti@2.7.0))(typescript@6.0.3)
 
+  apps/cli:
+    dependencies:
+      '@weaver/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
+    devDependencies:
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1))
+
   packages/engine:
     dependencies:
       ajv:

@@ -6,12 +6,18 @@ import { ShellCall } from '../tool-calls/shell-call.ts'
 import type { ToolCall } from '../tool-calls/tool-call.ts'
 import type { Agent, AgentName } from './agent.ts'
 
-const SHELL_TOOLS = new Set(['Bash', 'Monitor', 'PowerShell'])
+const SHELL_TOOLS = ['Bash', 'Monitor', 'PowerShell']
 // Monitor returns while its command goes on.
 const WATCHER = 'Monitor'
 
 export abstract class AbstractAgent implements Agent {
   abstract readonly name: AgentName
+  readonly events: readonly string[] = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop']
+  protected abstract readonly editTools: readonly string[]
+
+  get tools(): readonly string[] {
+    return [...SHELL_TOOLS, ...this.editTools]
+  }
 
   read(payload: Payload): AgentEvent {
     const cwd = payload.text('cwd') ?? process.cwd()
@@ -31,7 +37,7 @@ export abstract class AbstractAgent implements Agent {
   protected abstract editCall(tool: string, input: Payload, cwd: string): EditCall | null
 
   private call(tool: string, input: Payload, cwd: string): ToolCall {
-    if (SHELL_TOOLS.has(tool)) {
+    if (SHELL_TOOLS.includes(tool)) {
       return new ShellCall(tool, input.command('command'), cwd, tool === WATCHER || input.flag('run_in_background'))
     }
 

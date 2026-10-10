@@ -6,7 +6,7 @@ const FLAG = '--agent='
 
 export class AgentCatalog {
   private readonly claude = new ClaudeCode()
-  private readonly agents: readonly Agent[] = [this.claude, new Codex()]
+  readonly agents: readonly Agent[] = [this.claude, new Codex()]
 
   fromArguments(argv: readonly string[]): Agent {
     const name = argv.find((arg) => arg.startsWith(FLAG))?.slice(FLAG.length)
