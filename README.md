@@ -1,4 +1,4 @@
-![Weaver — Let the daemons weave your codebase.](assets/weaver-banner-monogram.png)
+![Weaver — Let the daemons weave your codebase.](_docs/assets/weaver-banner-monogram.png)
 
 Weaver is a local development workbench for coding agents. It brings permissions, change tracking, automated checks, independent reviews, and project memory into one place, keeping you in control from the first action to the final diff.
 
@@ -9,6 +9,8 @@ This repository is the development environment for building Weaver as an indepen
 Weaver is in the planning stage. No engine has been extracted yet, and there is no runnable application or installation procedure in this repository.
 
 The reference harness remains operational while Weaver is developed separately. A consuming project will adopt a selected version only after its integration and historical data preservation have been validated.
+
+The [architecture and package boundaries](_docs/architecture.md) describe the proposed monorepo, the agent SDK's ports and adapters, project instruction integration, and the separation between responsibilities, capabilities, configuration and project requirements.
 
 ## Responsibilities
 
