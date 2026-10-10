@@ -1,4 +1,4 @@
-import { ToolCall } from './tool-call.ts'
+import { ToolCall, type NamedPaths } from './tool-call.ts'
 
 export class OtherCall extends ToolCall {
   constructor(name: string) {
@@ -7,5 +7,13 @@ export class OtherCall extends ToolCall {
 
   override writes(): null {
     return null
+  }
+
+  override named(): NamedPaths {
+    return { written: [], removed: [] }
+  }
+
+  override commands(): [] {
+    return []
   }
 }

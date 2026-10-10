@@ -18,7 +18,9 @@ const DECLARATION = {
     syntax: { run: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] },
     markers: { run: ['node', 'tools/markers.mjs'], when: ['src/**'], reads: 'findings' },
   },
+  guards: { tools: { writes: ['tools/**'], runs: ['git commit'], rule: 'T1' } },
   rules: {
+    T1: { level: 'gate', statement: 'The checks and the history are the owner’s.' },
     S1: { level: 'gate', statement: 'Source files parse.', check: 'syntax' },
     M1: { level: 'gate', statement: 'No FIXME in the lines a unit adds.', check: 'markers' },
     M2: { level: 'human', statement: 'A lint suppression needs the owner’s approval.', check: 'markers' },
@@ -50,6 +52,7 @@ interface Answer {
   readonly decision?: string
   readonly reason?: string
   readonly systemMessage?: string
+  readonly hookSpecificOutput?: { readonly permissionDecision: string; readonly permissionDecisionReason: string }
 }
 
 let repo: Repository
@@ -154,6 +157,24 @@ test('what the owner saves while the agent runs its tests is never charged to th
 
   assert.deepEqual(stop(), {})
   assert.deepEqual(kinds(), ['settle'])
+})
+
+test('a call a guard refuses does not run: the runtime is told to deny it, with the rule, and the journal keeps the attempt', () => {
+  hook('UserPromptSubmit', { prompt: 'loosen the check and commit' })
+
+  const edit = hook('PreToolUse', { tool_name: 'Write', tool_input: { file_path: join(repo.top, 'tools/markers.mjs') }, tool_use_id: 'e' })
+  const commit = hook('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'git commit -am done' }, tool_use_id: 'c' })
+  const own = hook('PreToolUse', { tool_name: 'Edit', tool_input: { file_path: join(repo.top, 'weaver.config.json') }, tool_use_id: 'o' })
+
+  assert.equal(edit.hookSpecificOutput?.permissionDecision, 'deny')
+  assert.equal(
+    edit.hookSpecificOutput?.permissionDecisionReason,
+    '[weaver T1] Writing tools/markers.mjs is refused by the guard tools. T1: The checks and the history are the owner’s.',
+  )
+  assert.match(commit.hookSpecificOutput?.permissionDecisionReason ?? '', /Running `git commit` is refused by the guard tools/)
+  assert.match(own.hookSpecificOutput?.permissionDecisionReason ?? '', /weaver:protected/)
+  assert.deepEqual(kinds(), ['refuse', 'refuse', 'refuse'])
+  assert.deepEqual(stop(), {}, 'nothing was written, so nothing is left to check')
 })
 
 test('a command that exits with an error is still charged with what it wrote before', () => {

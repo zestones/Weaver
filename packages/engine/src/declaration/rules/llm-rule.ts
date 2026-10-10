@@ -9,7 +9,9 @@ export class LlmRule extends Rule {
     return this.appliesTo(paths)
   }
 
-  protected override levelProblem(): string | null {
-    return this.check === null ? null : `rules.${this.id} is an llm rule and names a check: a reviewer settles it`
+  protected override levelProblem(guards: readonly string[]): string | null {
+    const enforcer = this.check === null ? guards[0] : this.check
+
+    return enforcer === undefined ? null : `rules.${this.id} is an llm rule and ${enforcer} enforces it: a reviewer settles it`
   }
 }

@@ -23,10 +23,15 @@ function inOrder(args: readonly string[], words: readonly string[]): boolean {
   return true
 }
 
-// A generator is named by words that appear in this order among its arguments: `make -C api contract` runs
-// `make contract`. Charging a command with too much is the safe side.
-export const isGenerator = (command: ShellCommand, hints: CommandHints): boolean =>
-  hints.generators.map(wordsOf).some(([program, ...words]) => command.program === program && inOrder(command.args, words))
+// A command is named by words that appear in this order among its arguments: `make -C api contract` runs
+// `make contract`. Taking a command for the one named too often is the safe side.
+export function runsAs(command: ShellCommand, entry: string): boolean {
+  const [program, ...words] = wordsOf(entry)
+
+  return command.program === program && inOrder(command.args, words)
+}
+
+export const isGenerator = (command: ShellCommand, hints: CommandHints): boolean => hints.generators.some((entry) => runsAs(command, entry))
 
 // A reader is named by the exact start of its command: a word slipped in before, such as another make target, may write.
 export const isReader = (command: ShellCommand, hints: CommandHints): boolean =>

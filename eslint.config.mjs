@@ -17,7 +17,7 @@ const MODULE_FUNCTIONS = [
 
 // The layers of the engine, top first. A file imports from its own folder and from the layers below, never from a layer
 // above; folders listed together are side by side and do not import each other.
-const ENGINE_LAYERS = [['bin'], ['loop'], ['checks'], ['unit-of-work', 'declaration', 'agents'], ['lib']]
+const ENGINE_LAYERS = [['bin'], ['loop'], ['checks', 'guards'], ['unit-of-work', 'declaration', 'agents'], ['lib']]
 
 const engineLayers = ENGINE_LAYERS.flatMap((layer, depth) =>
   layer.flatMap((folder) => {

@@ -9,6 +9,7 @@ import type { EventOf } from '../../src/unit-of-work/journal/journal-event.ts'
 import { SAMPLE_REPO, makeRepo, writeFiles } from '../fixtures/repo.ts'
 import {
   A_FILE,
+  agentRuns,
   agentWrites,
   B_FILE,
   declaration,
@@ -115,7 +116,7 @@ test('with report headings declared, a turn that ends without them checks nothin
   assert.deepEqual(unitFiles(session), [])
 })
 
-test('what waits for the owner is counted, listed in the report and never blocks the agent', async () => {
+test('what waits for the owner is counted, listed in the report and never blocks the agent; a script that rewrote the configuration is caught there', async () => {
   const finding = { rule: 'S1', file: A_FILE, line: 1, message: 'eslint-disable added' }
   const project = declaration({
     checks: { lint: { run: ['true'] }, markers: { run: ['true'], reads: 'findings' } },
@@ -130,7 +131,9 @@ test('what waits for the owner is counted, listed in the report and never blocks
   prompt(session, 'change it')
   agentWrites(session, { [A_FILE]: '// eslint-disable-next-line\nexport const a = 2\n' })
   writeFiles(session.repo.top, { 'weaver.config.json': '{}\n' })
-  agentWrites(session, { 'weaver.config.json': '{"version":1}\n' })
+  agentRuns(session, "python3 -c \"open('weaver.config.json', 'w').write('{}')\"", () => {
+    writeFiles(session.repo.top, { 'weaver.config.json': '{"version":1}\n' })
+  })
 
   const markers = new CheckOutcome({ ...PASSING, id: 'markers', rules: ['S1'], toValidate: [finding] })
   const output = await finishWith(session, stubChecks([PASSING, markers]), project)

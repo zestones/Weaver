@@ -1,7 +1,14 @@
+interface ToolDenial {
+  readonly hookEventName: 'PreToolUse'
+  readonly permissionDecision: 'deny'
+  readonly permissionDecisionReason: string
+}
+
 export interface AnswerBody {
   readonly decision?: 'block'
   readonly reason?: string
   readonly systemMessage?: string
+  readonly hookSpecificOutput?: ToolDenial
 }
 
 export class Answer {
@@ -26,6 +33,10 @@ export class Answer {
 
   static blocking(reason: string): Answer {
     return new Answer({ decision: 'block', reason })
+  }
+
+  static refusing(reason: string): Answer {
+    return new Answer({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } })
   }
 
   after(alert: string | null): Answer {

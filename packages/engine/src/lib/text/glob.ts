@@ -32,3 +32,10 @@ const globToRegExp = (glob: string): RegExp => new RegExp(`^${toSource(glob)}$`)
 export function matchesAny(globs: readonly string[], path: string): boolean {
   return globs.some((glob) => globToRegExp(glob).test(path))
 }
+
+// The folder a glob lies under: `tools/**` is under tools, `client/tsconfig*.json` under client.
+export function globRoot(glob: string): string {
+  const star = glob.search(/[*?]/)
+
+  return star === -1 ? glob : glob.slice(0, Math.max(0, glob.lastIndexOf('/', star)))
+}

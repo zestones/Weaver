@@ -149,14 +149,23 @@ function redirected(command: ShellCommand): Written[] {
     }))
 }
 
-export function writtenPaths(command: ShellCommand, root: string): { readonly paths: readonly string[]; readonly unplaced: boolean } {
-  const written = [...redirected(command), ...(WRITERS[command.program]?.(command, positional(command)) ?? [])].flatMap(
-    (each) => each.paths,
-  )
-  const placed = written.filter((path) => path !== null && (command.cwd !== null || isAbsolute(path)) && !SILENT.test(path))
+export interface WrittenPaths {
+  readonly paths: readonly string[]
+  readonly removed: readonly string[]
+  readonly unplaced: boolean
+}
+
+export function writtenPaths(command: ShellCommand, root: string): WrittenPaths {
+  const writes = [...redirected(command), ...(WRITERS[command.program]?.(command, positional(command)) ?? [])]
+  const written = writes.flatMap((each) => each.paths)
+  const placed = (paths: Files): string[] =>
+    paths
+      .filter((path) => path !== null && (command.cwd !== null || isAbsolute(path)) && !SILENT.test(path))
+      .map((path) => resolve(command.cwd ?? root, path ?? ''))
 
   return {
-    paths: placed.map((path) => resolve(command.cwd ?? root, path ?? '')),
+    paths: placed(written),
+    removed: placed(writes.filter((each) => each.removes).flatMap((each) => each.paths)),
     unplaced: written.some((path) => path === null || (command.cwd === null && !isAbsolute(path))),
   }
 }

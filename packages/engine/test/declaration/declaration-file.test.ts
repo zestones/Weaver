@@ -63,11 +63,11 @@ test('the smallest declaration supervises a repository without checking anything
 
 test('a level says who settles a rule, so it says whether a program may stand behind it', () => {
   assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'gate', statement: 'x' } } }), [
-    'rules.T1 is a gate rule and names no check: a program must settle it',
+    'rules.T1 is a gate rule and nothing enforces it: it needs a check or a guard',
   ])
   assert.deepEqual(
     problemsOf({ version: 1, checks: { c: { run: ['true'] } }, rules: { N1: { level: 'llm', statement: 'x', check: 'c' } } }),
-    ['rules.N1 is an llm rule and names a check: a reviewer settles it'],
+    ['rules.N1 is an llm rule and c enforces it: a reviewer settles it'],
   )
   assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'machine', statement: 'x' } } }), [
     'rules.T1.level must be one of gate, llm, human',
@@ -137,4 +137,24 @@ test('a project says when its work is finished: with headings, a final message t
   assert.equal(finish.declaresFinished('## Request\n\nWhich name do you prefer?'), false)
   assert.equal(finish.declaresFinished(null), false)
   assert.equal(parse({ version: 1 }).finish.declaresFinished(null), true, 'without headings every end of turn does')
+})
+
+test('a guard enforces a rule that exists and that a program may enforce, and refuses something', () => {
+  const rules = { H5: { level: 'gate', statement: 'Tool configuration is the owner’s.' }, N1: { level: 'llm', statement: 'x' } }
+  const guarded = parse({ version: 1, guards: { config: { writes: ['eslint.config.js'], rule: 'H5' } }, rules: { H5: rules.H5 } })
+
+  assert.deepEqual(
+    guarded.guards,
+    [{ id: 'config', rule: 'H5', writes: ['eslint.config.js'], runs: [] }],
+    'a guard is enough for a gate rule',
+  )
+  assert.deepEqual(problemsOf({ version: 1, guards: { g: { runs: ['git commit'], rule: 'H7' } } }), [
+    'guards.g.rule names H7, which is not a rule',
+  ])
+  assert.deepEqual(problemsOf({ version: 1, guards: { g: { rule: 'H5' } }, rules: { H5: rules.H5 } }), [
+    'guards.g refuses nothing: it needs writes or runs',
+  ])
+  assert.deepEqual(problemsOf({ version: 1, guards: { g: { runs: ['claude'], rule: 'N1' } }, rules: { N1: rules.N1 } }), [
+    'rules.N1 is an llm rule and g enforces it: a reviewer settles it',
+  ])
 })

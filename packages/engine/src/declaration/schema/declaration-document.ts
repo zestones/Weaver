@@ -7,6 +7,12 @@ interface DocumentCheck {
   readonly after?: string
 }
 
+interface DocumentGuard {
+  readonly rule: string
+  readonly writes: readonly string[]
+  readonly runs: readonly string[]
+}
+
 interface DocumentRule {
   readonly level: 'gate' | 'llm' | 'human'
   readonly statement: string
@@ -27,5 +33,6 @@ export interface DeclarationDocument {
   }
   readonly commands: { readonly generators: readonly string[]; readonly readers: readonly string[] }
   readonly checks: Readonly<Record<string, DocumentCheck>>
+  readonly guards: Readonly<Record<string, DocumentGuard>>
   readonly rules: Readonly<Record<string, DocumentRule>>
 }

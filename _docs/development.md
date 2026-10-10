@@ -51,7 +51,7 @@ Shapes written to disk or read from another program, such as a saved state or a 
 
 A folder holds sub-folders or files, never both. `src/index.ts`, the entry of a package, is the one file allowed beside folders. As soon as files form a family, such as a base class and its subclasses, they get a sub-folder of their own.
 
-The folders of a package are layers, read from the top: a file imports from its own layer and from those below it, never from one above. In the engine these are `bin`, then `loop`, then `checks`, then `unit-of-work`, `declaration` and `agents` side by side, then `lib`. Start reading at `loop/dispatch/loop.ts`.
+The folders of a package are layers, read from the top: a file imports from its own layer and from those below it, never from one above. In the engine these are `bin`, then `loop`, then `checks` and `guards` side by side, then `unit-of-work`, `declaration` and `agents` side by side, then `lib`. Start reading at `loop/dispatch/loop.ts`.
 
 ### Comments
 

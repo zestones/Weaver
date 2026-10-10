@@ -1,4 +1,4 @@
-import { ToolCall, type CallWrites } from './tool-call.ts'
+import { ToolCall, type CallWrites, type NamedPaths } from './tool-call.ts'
 
 export class EditCall extends ToolCall {
   private readonly paths: readonly string[]
@@ -10,5 +10,13 @@ export class EditCall extends ToolCall {
 
   override writes(top: string): CallWrites {
     return { targets: this.inside(top, this.paths), scope: 'all' }
+  }
+
+  override named(): NamedPaths {
+    return { written: this.paths, removed: [] }
+  }
+
+  override commands(): [] {
+    return []
   }
 }

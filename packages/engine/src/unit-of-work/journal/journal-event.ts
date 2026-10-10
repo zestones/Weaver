@@ -42,6 +42,14 @@ interface HeadMovedEvent {
   readonly to: string | null
 }
 
-export type EventBody = TouchEvent | CheckEvent | SettleEvent | HeadMovedEvent
+interface RefuseEvent {
+  readonly kind: 'refuse'
+  readonly tool: string
+  readonly guard: string
+  readonly rule: string
+  readonly what: string
+}
+
+export type EventBody = TouchEvent | CheckEvent | SettleEvent | HeadMovedEvent | RefuseEvent
 export type JournalEvent = EventBase & EventBody
 export type EventOf<Kind extends EventBody['kind']> = Extract<JournalEvent, { kind: Kind }>

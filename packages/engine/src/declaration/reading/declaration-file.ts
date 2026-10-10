@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Declaration } from '../content/declaration.ts'
 import type { DeclaredCheck } from '../content/declared-check.ts'
+import type { DeclaredGuard } from '../content/declared-guard.ts'
 import { FinishPolicy } from '../content/finish-policy.ts'
 import { GateRule } from '../rules/gate-rule.ts'
 import { HumanRule } from '../rules/human-rule.ts'
@@ -47,7 +48,8 @@ export class DeclarationFile {
           check: rule.check ?? null,
         }),
     )
-    const problems = this.bindingProblems(checks, rules)
+    const guards = Object.entries(document.guards).map(([id, guard]): DeclaredGuard => ({ ...guard, id }))
+    const problems = this.bindingProblems(checks, guards, rules)
 
     if (problems.length > 0) throw new DeclarationError(this.path, problems)
 
@@ -56,6 +58,7 @@ export class DeclarationFile {
       finish: new FinishPolicy({ ...finish, headings: finish.headings ?? null }),
       commands,
       checks,
+      guards,
       rules,
     })
   }
@@ -78,12 +81,19 @@ export class DeclarationFile {
   }
 
   // A schema describes the shape of each entry, not what ties one entry to another.
-  private bindingProblems(checks: readonly DeclaredCheck[], rules: readonly Rule[]): string[] {
+  private bindingProblems(checks: readonly DeclaredCheck[], guards: readonly DeclaredGuard[], rules: readonly Rule[]): string[] {
     const known = new Set(checks.map((check) => check.id))
     const enforced = new Set(rules.flatMap((rule) => rule.check ?? []))
+    const guardsOf = (rule: Rule): string[] => guards.filter((guard) => guard.rule === rule.id).map((guard) => guard.id)
 
     return [
-      ...rules.flatMap((rule) => rule.bindingProblem(known) ?? []),
+      ...rules.flatMap((rule) => rule.bindingProblem(known, guardsOf(rule)) ?? []),
+      ...guards.flatMap((guard) => {
+        if (!rules.some((rule) => rule.id === guard.rule)) return [`guards.${guard.id}.rule names ${guard.rule}, which is not a rule`]
+        if (guard.writes.length + guard.runs.length === 0) return [`guards.${guard.id} refuses nothing: it needs writes or runs`]
+
+        return []
+      }),
       ...checks.flatMap((check) => {
         if (!enforced.has(check.id)) return [`checks.${check.id} enforces no rule`]
         if (check.after !== null && !known.has(check.after)) return [`checks.${check.id}.after names ${check.after}, which is not a check`]

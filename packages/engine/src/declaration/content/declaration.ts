@@ -1,6 +1,7 @@
 import type { CommandHints } from '../../lib/shell/writes/hints.ts'
 import type { Rule } from '../rules/rule.ts'
 import type { DeclaredCheck } from './declared-check.ts'
+import type { DeclaredGuard } from './declared-guard.ts'
 import type { FinishPolicy } from './finish-policy.ts'
 
 export interface DeclarationFields {
@@ -8,6 +9,7 @@ export interface DeclarationFields {
   readonly finish: FinishPolicy
   readonly commands: CommandHints
   readonly checks: readonly DeclaredCheck[]
+  readonly guards: readonly DeclaredGuard[]
   readonly rules: readonly Rule[]
 }
 
@@ -16,6 +18,7 @@ export class Declaration {
   readonly finish: FinishPolicy
   readonly commands: CommandHints
   readonly checks: readonly DeclaredCheck[]
+  readonly guards: readonly DeclaredGuard[]
   readonly rules: readonly Rule[]
 
   constructor(fields: DeclarationFields) {
@@ -23,6 +26,7 @@ export class Declaration {
     this.finish = fields.finish
     this.commands = fields.commands
     this.checks = fields.checks
+    this.guards = fields.guards
     this.rules = fields.rules
   }
 

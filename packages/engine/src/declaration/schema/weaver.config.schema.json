@@ -74,6 +74,13 @@
       "propertyNames": { "$ref": "#/definitions/identifier" },
       "additionalProperties": { "$ref": "#/definitions/check" }
     },
+    "guards": {
+      "type": "object",
+      "default": {},
+      "description": "What is refused before a tool runs. Each key is the identifier of a guard.",
+      "propertyNames": { "$ref": "#/definitions/identifier" },
+      "additionalProperties": { "$ref": "#/definitions/guard" }
+    },
     "rules": {
       "type": "object",
       "default": {},
@@ -119,6 +126,30 @@
         }
       }
     },
+    "guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule"],
+      "properties": {
+        "rule": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The rule the guard enforces. Its statement is the reason given to the agent."
+        },
+        "writes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": [],
+          "description": "Paths the agent may not write, create, move or remove, as globs relative to the repository root. Only what a call names is refused before it runs: a script that writes one of them is not seen."
+        },
+        "runs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": [],
+          "description": "Commands the agent may not run. Each entry is a command and words that appear in that order among its arguments: `git commit` also refuses `git -C api commit`."
+        }
+      }
+    },
     "rule": {
       "type": "object",
       "additionalProperties": false,
@@ -146,7 +177,7 @@
         "check": {
           "type": "string",
           "minLength": 1,
-          "description": "The check that observes the rule. A gate rule needs one; an llm rule has none."
+          "description": "The check that observes the rule. A gate rule needs a check or a guard; an llm rule has neither."
         }
       }
     }

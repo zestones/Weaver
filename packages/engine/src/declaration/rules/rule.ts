@@ -31,10 +31,10 @@ export abstract class Rule {
 
   abstract isReviewCriterion(paths: readonly string[]): boolean
 
-  bindingProblem(checks: ReadonlySet<string>): string | null {
+  bindingProblem(checks: ReadonlySet<string>, guards: readonly string[]): string | null {
     if (this.check !== null && !checks.has(this.check)) return `rules.${this.id}.check names ${this.check}, which is not a check`
 
-    return this.levelProblem()
+    return this.levelProblem(guards)
   }
 
   protected appliesTo(paths: readonly string[]): boolean {
@@ -43,5 +43,5 @@ export abstract class Rule {
     return paths.length > 0 && (scope === null || paths.some((path) => matchesAny(scope, path)))
   }
 
-  protected abstract levelProblem(): string | null
+  protected abstract levelProblem(guards: readonly string[]): string | null
 }
