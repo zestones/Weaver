@@ -8,7 +8,7 @@
     "weaver": "./dist/bin/weaver.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && chmod +x dist/bin/weaver.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
