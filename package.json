@@ -1,11 +1,17 @@
 {
-  "name": "Weaver",
+  "name": "weaver",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "A local development workbench for coding agents",
   "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "pnpm -r --workspace-concurrency=1 --if-present run build",
+    "typecheck": "pnpm -r --workspace-concurrency=1 --if-present run typecheck",
+    "lint": "eslint . --max-warnings 0",
+    "knip": "knip",
+    "test": "pnpm -r --workspace-concurrency=1 --if-present run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && pnpm typecheck && pnpm lint && pnpm knip && pnpm build"
   },
   "keywords": [],
   "author": "",
@@ -18,13 +24,16 @@
   },
   "packageManager": "pnpm@12.10.1",
   "type": "module",
+  "engines": {
+    "node": ">=24.13.0 <25"
+  },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/node": "26.6.4",
+    "@types/node": "24.19.2",
     "eslint": "10.12.0",
+    "knip": "6.41.0",
     "prettier": "3.9.9",
-    "typescript": "7.0.2",
-    "typescript-eslint": "8.71.1",
-    "vitest": "5.0.3"
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1"
   }
 }

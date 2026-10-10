@@ -7,7 +7,7 @@ This document records the proposed extraction structure. These packages and appl
 ## Repository structure
 
 | Path                        | Purpose                                                     |
-|-----------------------------|-------------------------------------------------------------|
+| --------------------------- | ----------------------------------------------------------- |
 | `apps/cli/`                 | Commands for the project owner.                             |
 | `apps/hooks/`               | Agent event entry points and enforcement of decisions.      |
 | `apps/workbench/server/`    | Local API, conversation orchestration and event delivery.   |
@@ -26,7 +26,7 @@ Start with coordinated releases and private workspace packages. A package bounda
 ## Package responsibilities
 
 | Package           | Owns                                                                                                                   | Boundary                                                                                   |
-|-------------------|------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------|
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `agent-sdk`       | Runtime communication, normalized events, interruption and capability discovery, including model and effort options.   | Does not decide project policy or completion requirements.                                 |
 | `project-context` | Loading declared project instructions, resolving their scope and supplying applicable sources to agents and reviewers. | Does not judge whether code complies with those instructions.                              |
 | `action-control`  | Interpreting requested actions, evaluating permissions and producing explained decisions.                              | Does not judge the quality of the work.                                                    |
@@ -42,7 +42,7 @@ Each domain owns its data model and public operations. Consumers use those opera
 All provider integrations live in one SDK. Provider names identify internal adapters rather than separate packages.
 
 | SDK path                     | Role                                                                    |
-|------------------------------|-------------------------------------------------------------------------|
+| ---------------------------- | ----------------------------------------------------------------------- |
 | `agent-sdk/ports/`           | Focused contracts for conversation, execution and capability discovery. |
 | `agent-sdk/adapters/codex/`  | Translation of the Codex runtime protocol into those contracts.         |
 | `agent-sdk/adapters/claude/` | Translation of the Claude runtime protocol into those contracts.        |
@@ -57,7 +57,7 @@ Provider differences remain explicit. Unsupported operations have an unavailable
 The consuming project owns its development conventions, instruction documents, permissions, validation tools and retained data. Weaver owns the mechanisms that load, apply and verify them.
 
 | Project requirement                                     | Weaver responsibility                                                             |
-|---------------------------------------------------------|-----------------------------------------------------------------------------------|
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Backend, frontend, SQL and documentation conventions    | `project-context` loads the declared sources and selects applicable instructions. |
 | Protected paths and permitted agent actions             | `action-control` evaluates requests against configured permissions.               |
 | Test commands, check thresholds and review requirements | `validation` runs applicable checks and evaluates completion requirements.        |
@@ -76,7 +76,7 @@ Project permissions, development instructions and completion requirements are di
 ## Responsibilities, features, capabilities and configuration
 
 | Concept             | Meaning                                            | Example                                        |
-|---------------------|----------------------------------------------------|------------------------------------------------|
+| ------------------- | -------------------------------------------------- | ---------------------------------------------- |
 | Responsibility      | Ownership of behavior and state.                   | Validation owns the review lifecycle.          |
 | Feature             | An operation exposed to the user.                  | Request an independent review.                 |
 | Capability          | A mechanism available in the current environment.  | An available provider can execute that review. |

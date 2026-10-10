@@ -1,4 +1,6 @@
 packages:
-  - "apps/*"
-  - "apps/workbench/*"
-  - "packages/*"
+  - 'apps/*'
+  - 'apps/workbench/*'
+  - 'packages/*'
+minimumReleaseAgeExclude:
+  - '@types/node@24.19.2'

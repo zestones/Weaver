@@ -6,18 +6,20 @@ This repository is the development environment for building Weaver as an indepen
 
 ## Project status
 
-Weaver is in the planning stage. No engine has been extracted yet, and there is no runnable application or installation procedure in this repository.
+Weaver has an initial development toolchain. No engine has been extracted yet, and there is no runnable application or application installation procedure in this repository.
 
 The reference harness remains operational while Weaver is developed separately. A consuming project will adopt a selected version only after its integration and historical data preservation have been validated.
 
 The [architecture and package boundaries](_docs/architecture.md) describe the proposed monorepo, the agent SDK's ports and adapters, project instruction integration, and the separation between responsibilities, capabilities, configuration and project requirements.
+
+The [development guide](_docs/development.md) documents the local workspace checks, TypeScript configuration, package exports, unused-code analysis and test resource limits.
 
 ## Responsibilities
 
 Weaver is organized around six responsibilities. These are architectural boundaries to establish, not a description of modules already implemented here.
 
 | Responsibility                 | Purpose                                                                                                                  |
-|--------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | Agent action control           | Identify the actor, interpret actions, evaluate permissions and explain refusals.                                        |
 | Session tracking               | Retain owner requests, attribute changes to sessions and maintain snapshots and units of work.                           |
 | Validation and task completion | Run configured checks, coordinate independent reviews, handle findings and determine whether a unit can finish.          |
@@ -111,7 +113,7 @@ flowchart TB
 ```
 
 | Relationship                                                | Interface and responsibility                                                                                    |
-|-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | UI to local server                                          | HTTP requests and SSE updates over loopback; presentation invokes domain operations.                            |
 | Local server to agent runtimes                              | Native provider protocols for sending messages, streaming, interruption and resumption.                         |
 | Agent runtimes to hooks                                     | Process invocation with JSON event input; decisions and feedback are returned through the hook protocol.        |
@@ -174,7 +176,7 @@ A review failure is retained explicitly and never represented as a clean review.
 Weaver owns the mechanisms. Each project owns its requirements, validation tools, integration settings and retained data.
 
 | Weaver owns                                                   | The project owns                                                                |
-|---------------------------------------------------------------|---------------------------------------------------------------------------------|
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | Policy evaluation and enforcement mechanisms                  | Enabled restrictions, protected paths and project-specific exceptions           |
 | Session attribution and snapshot mechanisms                   | Repository scopes and actual session records                                    |
 | Check scheduling, execution observation and review lifecycle  | Check commands, thresholds, review criteria and development-stack configuration |
