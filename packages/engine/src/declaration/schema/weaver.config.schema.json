@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver project configuration",
+  "description": "What a project declares to Weaver: its rules, the checks that observe them, and what the engine cannot guess about it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1, "description": "The version of this format." },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": [],
+          "description": "Folders no check and no review looks at, relative to the repository root."
+        }
+      }
+    },
+    "finish": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "When a unit of work is finished, and how long the checks may hold the agent.",
+      "properties": {
+        "headings": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The headings of the final message that declares the work finished. Without them, every end of turn does."
+        },
+        "maxRounds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "How many times in a row the checks may refuse the end of a turn. After that the agent may stop, its unit of work still open."
+        },
+        "deadlineSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1200,
+          "description": "How long one run of all the checks may take."
+        },
+        "concurrency": { "type": "integer", "minimum": 1, "default": 3, "description": "How many checks run at once." }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "What the project knows of its own commands and the engine cannot guess. Each entry is a command and its first words, such as `npm run api:types`.",
+      "properties": {
+        "generators": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": [],
+          "description": "Commands that write files they do not name: everything that changes while one runs is the agent's work."
+        },
+        "readers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": [],
+          "description": "Commands that only read: what changes while one runs is never the agent's work."
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "default": {},
+      "description": "The project's own programs, run on the diff of a unit of work. Each key is the identifier of a check.",
+      "propertyNames": { "$ref": "#/definitions/identifier" },
+      "additionalProperties": { "$ref": "#/definitions/check" }
+    },
+    "rules": {
+      "type": "object",
+      "default": {},
+      "description": "The rules of the project. Each key is the identifier of a rule.",
+      "propertyNames": { "$ref": "#/definitions/identifier" },
+      "additionalProperties": { "$ref": "#/definitions/rule" }
+    }
+  },
+  "definitions": {
+    "identifier": { "type": "string", "pattern": "^[A-Za-z][\\w.-]*$" },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "properties": {
+        "run": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The command and its arguments. An argument `{files}` becomes the changed files the check is about."
+        },
+        "cwd": {
+          "type": "string",
+          "minLength": 1,
+          "default": ".",
+          "description": "Where the command runs, relative to the repository root."
+        },
+        "when": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The changed paths that make the check run, as globs. Without it, any change does."
+        },
+        "reads": {
+          "enum": ["exit", "findings"],
+          "default": "exit",
+          "description": "How the verdict is read. `exit`: from the exit status. `findings`: from the last line printed, `{\"findings\": [...]}`, where each finding gives a `rule`, a `file`, a `message` and optionally a `line`."
+        },
+        "timeoutSeconds": { "type": "integer", "minimum": 1, "default": 600 },
+        "after": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The check that must be done before this one starts, for a check that reads another's output."
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "statement"],
+      "properties": {
+        "level": {
+          "enum": ["gate", "llm", "human"],
+          "description": "Who settles the rule. `gate`: a program, and a failure holds the agent. `llm`: an independent reviewer. `human`: the owner."
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the rule says, as it is told to whoever broke it."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The guide the rule comes from, relative to the repository root."
+        },
+        "scope": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Where the rule applies, as globs. Without it, everywhere."
+        },
+        "check": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The check that observes the rule. A gate rule needs one; an llm rule has none."
+        }
+      }
+    }
+  }
+}

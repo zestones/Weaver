@@ -3,7 +3,7 @@ import { test } from 'vitest'
 import { DeclarationError } from '../../src/declaration/reading/declaration-error.ts'
 import { DeclarationFile } from '../../src/declaration/reading/declaration-file.ts'
 
-const parse = (value: unknown) => new DeclarationFile('weaver.json').parse(JSON.stringify(value))
+const parse = (value: unknown) => new DeclarationFile('weaver.config.json').parse(JSON.stringify(value))
 
 function problemsOf(value: unknown): readonly string[] {
   try {
@@ -74,30 +74,50 @@ test('a level says who settles a rule, so it says whether a program may stand be
   ])
 })
 
-test('a check that enforces no rule, a rule that names no known check and a typo are all refused', () => {
+test('what ties entries together is checked: a check enforces a rule, and a name used for a check is one', () => {
+  const gate = { level: 'gate', statement: 'x', check: 'c' }
+
   assert.deepEqual(problemsOf({ version: 1, checks: { lint: { run: ['true'] } } }), ['checks.lint enforces no rule'])
   assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'gate', statement: 'x', check: 'types' } } }), [
     'rules.T1.check names types, which is not a check',
   ])
-  assert.deepEqual(problemsOf({ version: 1, chekcs: {} }), ['the declaration.chekcs is not a known field'])
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { run: ['true'], after: 'd' } }, rules: { T1: gate } }), [
+    'checks.c.after names d, which is not a check',
+  ])
+})
+
+test('everything wrong with the shape of the file is reported at once, in words that name the field', () => {
+  assert.deepEqual(problemsOf({ version: 2, finish: { maxRounds: 0 }, chekcs: {}, rules: { '9x': {}, T1: { level: 'machine' } } }), [
+    'chekcs is not a known field',
+    'version must be 1',
+    'finish.maxRounds must be at least 1',
+    'rules.9x is not a valid identifier',
+    'rules.9x.level is missing',
+    'rules.9x.statement is missing',
+    'rules.T1.statement is missing',
+    'rules.T1.level must be one of gate, llm, human',
+  ])
   assert.deepEqual(
     problemsOf({
       version: 1,
-      checks: { c: { run: 'npm test', after: 'd' } },
-      rules: { T1: { level: 'gate', statement: 'x', check: 'c' } },
+      checks: { c: { run: [], reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } },
+      rules: { T1: { level: 'gate', statement: '' } },
     }),
     [
-      'checks.c.run must be a list of non-empty strings',
-      'checks.c.run must name a command',
-      'checks.c.after names d, which is not a check',
+      'checks.c.run must not be empty',
+      'checks.c.reads must be one of exit, findings',
+      'checks.c.timeoutSeconds must be a whole number',
+      'rules.T1.statement must not be empty',
     ],
+    'the links between entries are judged once the shape is right',
   )
+  assert.deepEqual(problemsOf('['), ['the file must be an object'])
+  assert.deepEqual(problemsOf({}), ['version is missing'])
 })
 
-test('every problem is reported at once, and a file that is not JSON says so', () => {
-  assert.equal(problemsOf({ version: 2, finish: { maxRounds: 0 }, rules: { '9x': {}, T1: {} } }).length, 5)
-  assert.match(problemsOf('[')[0] ?? '', /must be an object/)
-  assert.throws(() => new DeclarationFile('weaver.json').parse('{'), /weaver\.json is not a valid project declaration/)
+test('a file that is not JSON says so, and a file may name the schema it follows', () => {
+  assert.throws(() => new DeclarationFile('weaver.config.json').parse('{'), /weaver\.config\.json is not a valid project declaration/)
+  assert.deepEqual(parse({ $schema: './weaver.config.schema.json', version: 1 }).rules, [])
 })
 
 test('each level is its own kind of rule: who a failure holds, who a finding waits for, who reviews', () => {

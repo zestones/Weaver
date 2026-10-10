@@ -34,7 +34,7 @@ beforeEach(() => {
 const reporter = (findings: unknown, exit = 0): string[] => ['node', 'reporter.mjs', JSON.stringify(findings), String(exit)]
 
 async function run(declaration: Record<string, unknown>): Promise<Record<string, CheckOutcome>> {
-  const project = new DeclarationFile('weaver.json').parse(JSON.stringify({ version: 1, ...declaration }))
+  const project = new DeclarationFile('weaver.config.json').parse(JSON.stringify({ version: 1, ...declaration }))
   const { dir } = new Session(repo, 's', 'claude')
   const base = git(repo.top, ['rev-parse', 'HEAD^{tree}'])
   const head = new WorkingTreeSnapshot(repo, dir).tree()

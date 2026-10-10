@@ -30,7 +30,7 @@ const FINISHED = '## Request\n\nDone.\n\n## To validate\n\nNothing.\n'
 const AGENTS = new AgentCatalog()
 
 export const declaration = (extra: Raw = {}): Declaration =>
-  new DeclarationFile('weaver.json').parse(
+  new DeclarationFile('weaver.config.json').parse(
     JSON.stringify({
       version: 1,
       checks: { lint: { run: ['true'] } },

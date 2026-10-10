@@ -129,8 +129,8 @@ test('what waits for the owner is counted, listed in the report and never blocks
 
   prompt(session, 'change it')
   agentWrites(session, { [A_FILE]: '// eslint-disable-next-line\nexport const a = 2\n' })
-  writeFiles(session.repo.top, { 'weaver.json': '{}\n' })
-  agentWrites(session, { 'weaver.json': '{"version":1}\n' })
+  writeFiles(session.repo.top, { 'weaver.config.json': '{}\n' })
+  agentWrites(session, { 'weaver.config.json': '{"version":1}\n' })
 
   const markers = new CheckOutcome({ ...PASSING, id: 'markers', rules: ['S1'], toValidate: [finding] })
   const output = await finishWith(session, stubChecks([PASSING, markers]), project)
@@ -139,7 +139,7 @@ test('what waits for the owner is counted, listed in the report and never blocks
   assert.match(output.systemMessage ?? '', /2 item\(s\) to validate\./)
   assert.match(
     report,
-    /## To validate\n\n- S1 src\/a\.ts:1: eslint-disable added\n- weaver:declaration weaver\.json: the unit changed the project's declaration/,
+    /## To validate\n\n- S1 src\/a\.ts:1: eslint-disable added\n- weaver:declaration weaver\.config\.json: the unit changed the project's declaration/,
   )
   assert.match(
     report,

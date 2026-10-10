@@ -63,7 +63,7 @@ afterAll(() => {
 beforeEach(() => {
   counter += 1
   repo = makeRepo(join(scratch, `repo-${String(counter)}`), {
-    'weaver.json': JSON.stringify(DECLARATION, null, 2),
+    'weaver.config.json': JSON.stringify(DECLARATION, null, 2),
     'tools/parse.mjs': PARSE,
     'tools/markers.mjs': MARKERS,
     'src/a.js': 'export const a = 1\n// FIXME an old one, not this unit’s\n',
@@ -196,14 +196,14 @@ test('the owner’s commit of the agent’s work settles it without a check', ()
 })
 
 test('a repository that declares nothing is left alone, and a declaration that cannot be read says so to the owner', () => {
-  rmSync(join(repo.top, 'weaver.json'))
+  rmSync(join(repo.top, 'weaver.config.json'))
   hook('UserPromptSubmit', { prompt: 'add h' })
   write('src/h.js', 'export const h = ;\n')
 
   assert.deepEqual(stop(), {})
   assert.equal(existsSync(repo.stateDir), false)
 
-  writeFiles(repo.top, { 'weaver.json': '{"version":1,"checks":{"lint":{"run":["true"]}}}' })
+  writeFiles(repo.top, { 'weaver.config.json': '{"version":1,"checks":{"lint":{"run":["true"]}}}' })
 
   assert.match(stop().systemMessage ?? '', /Nothing is checked: .*checks\.lint enforces no rule/)
 })

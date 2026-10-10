@@ -8,8 +8,6 @@ export interface FinishFields {
 }
 
 export class FinishPolicy {
-  static readonly DEFAULTS: FinishFields = { headings: null, maxRounds: 3, deadlineSeconds: 20 * 60, concurrency: 3 }
-
   readonly headings: readonly string[] | null
   readonly maxRounds: number
   readonly deadlineSeconds: number
