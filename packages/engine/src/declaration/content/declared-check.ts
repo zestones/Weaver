@@ -1,6 +1,7 @@
 export interface DeclaredCheck {
   readonly id: string
   readonly run: readonly string[]
+  readonly fix: readonly string[] | null
   readonly cwd: string
   readonly when: readonly string[] | null
   readonly reads: 'exit' | 'findings'

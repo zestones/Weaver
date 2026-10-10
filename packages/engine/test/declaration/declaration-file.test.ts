@@ -45,6 +45,7 @@ test('a declaration is read with its defaults', () => {
   assert.deepEqual(config.checks[1], {
     id: 'markers',
     run: ['node', 'tools/markers.mjs'],
+    fix: null,
     cwd: '.',
     when: null,
     reads: 'findings',
@@ -164,4 +165,15 @@ test('a guard enforces a rule that exists and that a program may enforce, and re
   assert.deepEqual(problemsOf({ version: 1, guards: { g: { runs: ['claude'], rule: 'N1' } }, rules: { N1: rules.N1 } }), [
     'rules.N1 is an llm rule and g enforces it: a reviewer settles it',
   ])
+})
+
+test('a check may carry the command that repairs before it judges', () => {
+  const [check] = parse({
+    version: 1,
+    checks: { format: { fix: ['npx', 'prettier', '--write', '{files}'], run: ['npx', 'prettier', '--check', '{files}'] } },
+    rules: { L19: { level: 'gate', statement: 'Prettier decides formatting.', check: 'format' } },
+  }).checks
+
+  assert.deepEqual(check?.fix, ['npx', 'prettier', '--write', '{files}'])
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { run: ['true'], fix: [] } }, rules: {} }), ['checks.c.fix must not be empty'])
 })

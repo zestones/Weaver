@@ -31,21 +31,17 @@ export abstract class Check {
 
     if (files.length === 0) return this.skipped('the unit changed none of the files it is about')
 
-    const present = files.filter((file) => file.status !== 'D').map((file) => file.path)
+    const result = await this.launch(this.declared.run, files, unit, env, timeoutMs)
 
-    if (this.declared.run.includes(FILES) && present.length === 0) return this.skipped('the files it is about were all deleted')
-
-    const [command = '', ...args] = this.declared.run
-    const cwd = join(unit.repo.top, this.declared.cwd)
-    const result = await runProcess(
-      command,
-      args.flatMap((arg) => (arg === FILES ? present.map((path) => relative(cwd, join(unit.repo.top, path))) : [arg])),
-      { cwd, env, timeoutMs: Math.min(timeoutMs, this.declared.timeoutSeconds * 1000) },
-    )
-
+    if (result === null) return this.skipped('the files it is about were all deleted')
     if (result.code === TIMED_OUT) return this.outcome({ status: 'timeout', blocking: true, ms: result.ms, output: result.output })
 
     return this.read(result)
+  }
+
+  // The repair is an attempt and `run` gives the verdict: what the repair prints or how it exits decides nothing.
+  async repair(unit: UnitDiff, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<void> {
+    if (this.declared.fix !== null) await this.launch(this.declared.fix, this.concerned(unit.files), unit, env, timeoutMs)
   }
 
   skipped(reason: string): CheckOutcome {
@@ -61,6 +57,28 @@ export abstract class Check {
 
   protected outcome(fields: Omit<OutcomeFields, 'id' | 'rules'>): CheckOutcome {
     return new CheckOutcome({ ...fields, id: this.id, rules: this.rules.map((rule) => rule.id) })
+  }
+
+  // null when the command is about files and none of them is left.
+  private launch(
+    line: readonly string[],
+    files: readonly ChangedFile[],
+    unit: UnitDiff,
+    env: NodeJS.ProcessEnv,
+    timeoutMs: number,
+  ): Promise<ProcessResult> | null {
+    const present = files.filter((file) => file.status !== 'D').map((file) => file.path)
+
+    if (files.length === 0 || (line.includes(FILES) && present.length === 0)) return null
+
+    const [command = '', ...args] = line
+    const cwd = join(unit.repo.top, this.declared.cwd)
+
+    return runProcess(
+      command,
+      args.flatMap((arg) => (arg === FILES ? present.map((path) => relative(cwd, join(unit.repo.top, path))) : [arg])),
+      { cwd, env, timeoutMs: Math.min(timeoutMs, this.declared.timeoutSeconds * 1000) },
+    )
   }
 
   private concerned(files: readonly ChangedFile[]): ChangedFile[] {

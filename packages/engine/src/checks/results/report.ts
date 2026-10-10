@@ -35,6 +35,7 @@ export class Report {
       `[weaver] The checks fail on this unit of work (round ${String(round)} of ${String(maxRounds)}): fix what follows, then finish again.`,
       '',
       ...blocking.flatMap((outcome) => this.failureBlock(outcome)),
+      ...this.repairedLines(),
       `Report: ${reportPath}`,
     ].join('\n')
   }
@@ -48,6 +49,8 @@ export class Report {
     if (diff.excluded.length > 0) {
       parts.push(`Not looked at: ${diff.excluded.map(({ folder, files }) => `${String(files)} file(s) under ${folder}/`).join(', ')}.`)
     }
+
+    parts.push(...this.repairedLines())
 
     if (unattributed.length > 0) parts.push(`Changed during its commands, not charged: ${unattributed.join(', ')}.`)
     if (waiting > 0) parts.push(`${String(waiting)} item(s) to validate.`)
@@ -70,6 +73,10 @@ export class Report {
         verdict.unattributed.map((path) => `- ${path}`),
       ),
       ...this.section(
+        'Rewritten by a repair before the checks',
+        verdict.repaired.map((path) => `- ${path}`),
+      ),
+      ...this.section(
         'Checks',
         verdict.outcomes.flatMap((outcome) => this.checkLines(outcome)),
       ),
@@ -85,6 +92,15 @@ export class Report {
       ),
       '',
     ].join('\n')
+  }
+
+  // The agent wrote these files otherwise: what it remembers of them is no longer what they hold.
+  private repairedLines(): string[] {
+    const { repaired } = this.verdict
+
+    return repaired.length === 0
+      ? []
+      : [`Rewritten by a repair before the checks, read them again before you edit them: ${repaired.join(', ')}.`]
   }
 
   private section(title: string, lines: readonly string[]): string[] {

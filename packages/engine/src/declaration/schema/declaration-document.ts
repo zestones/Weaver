@@ -1,5 +1,6 @@
 interface DocumentCheck {
   readonly run: readonly string[]
+  readonly fix?: readonly string[]
   readonly cwd: string
   readonly when?: readonly string[]
   readonly reads: 'exit' | 'findings'

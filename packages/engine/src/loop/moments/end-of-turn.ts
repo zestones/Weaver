@@ -44,16 +44,26 @@ export class EndOfTurn implements Moment {
     return Answer.empty()
   }
 
+  private async repair(session: Session, declaration: Declaration, unit: UnitOfWork): Promise<readonly string[]> {
+    if (!this.checks.repairs(declaration)) return []
+
+    const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
+
+    return session.repair(() => this.checks.repair(declaration, diff))
+  }
+
   // The only way to speak to an agent that has stopped is to refuse its stop.
   private pending(session: Session, declaration: Declaration): Answer {
     return session.remind() ? Answer.blocking(declaration.finish.reminder()) : Answer.saying(PENDING)
   }
 
-  private async check(session: Session, declaration: Declaration, unit: UnitOfWork): Promise<Answer> {
-    const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
+  private async check(session: Session, declaration: Declaration, finished: UnitOfWork): Promise<Answer> {
     const startedAt = Date.now()
+    const repaired = await this.repair(session, declaration, finished)
+    const unit = repaired.length === 0 ? finished : session.unit()
+    const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
     const outcomes = await this.checks.run(declaration, diff)
-    const verdict = new UnitVerdict({ unit, maxRounds: declaration.finish.maxRounds, diff, outcomes, ms: Date.now() - startedAt })
+    const verdict = new UnitVerdict({ unit, maxRounds: declaration.finish.maxRounds, diff, outcomes, repaired, ms: Date.now() - startedAt })
     const report = new Report(declaration, verdict)
     const reportPath = report.write(session.dir)
 

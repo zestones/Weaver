@@ -35,6 +35,7 @@ export class DeclarationFile {
     const checks = Object.entries(document.checks).map(([id, check]): DeclaredCheck => ({
       ...check,
       id,
+      fix: check.fix ?? null,
       when: check.when ?? null,
       after: check.after ?? null,
     }))

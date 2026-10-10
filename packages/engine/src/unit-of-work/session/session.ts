@@ -12,6 +12,8 @@ import type { UnitFile } from '../unit/unit-record.ts'
 import type { SessionRecord } from './session-record.ts'
 import { SessionStore, type Transaction } from './session-store.ts'
 
+const REPAIR = 'fix'
+
 export class Session {
   readonly repo: Repository
   readonly id: string
@@ -66,6 +68,20 @@ export class Session {
         .sort(([, older], [, newer]) => older.at.localeCompare(newer.at))
         .map(([id]) => id),
     )
+  }
+
+  unit(): UnitOfWork {
+    const record = this.state()
+
+    return record === null ? UnitOfWork.fresh(1) : new UnitOfWork(record.unit)
+  }
+
+  // The repairs of the project's checks run as one call of the session: what they rewrite stays the agent's work.
+  async repair(repairs: () => Promise<void>): Promise<readonly string[]> {
+    this.watch(REPAIR, { tool: REPAIR, targets: null, scope: 'all', untilStop: false })
+    await repairs()
+
+    return this.closeCall(REPAIR).flatMap((touch) => touch.paths)
   }
 
   endTurn(lastMessage: string | null): UnitOfWork {

@@ -114,6 +114,8 @@ export function stubChecks(outcomes: readonly CheckOutcome[], during: () => Prom
   return {
     calls,
     seen,
+    repairs: () => false,
+    repair: () => Promise.resolve(),
     run: async (_declaration, unit) => {
       calls.count += 1
       seen.push(unit.paths)

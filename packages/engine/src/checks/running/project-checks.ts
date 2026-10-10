@@ -10,6 +10,19 @@ import type { CheckRunner } from './check-runner.ts'
 const MIN_TIMEOUT_MS = 1000
 
 export class ProjectChecks implements CheckRunner {
+  repairs(declaration: Declaration): boolean {
+    return declaration.checks.some((declared) => declared.fix !== null)
+  }
+
+  // One after the other: two repairs at once could rewrite the same file.
+  async repair(declaration: Declaration, unit: UnitDiff): Promise<void> {
+    const env = unit.environment()
+
+    for (const declared of declaration.checks) {
+      await this.checkOf(declaration, declared).repair(unit, env, declaration.finish.deadlineSeconds * 1000)
+    }
+  }
+
   async run(declaration: Declaration, unit: UnitDiff): Promise<CheckOutcome[]> {
     const { concurrency, deadlineSeconds } = declaration.finish
     const deadline = Date.now() + deadlineSeconds * 1000

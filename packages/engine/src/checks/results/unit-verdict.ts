@@ -9,6 +9,7 @@ export interface VerdictFields {
   readonly maxRounds: number
   readonly diff: UnitDiff
   readonly outcomes: readonly CheckOutcome[]
+  readonly repaired: readonly string[]
   readonly ms: number
 }
 
@@ -22,6 +23,8 @@ export class UnitVerdict {
   readonly diff: UnitDiff
   readonly unattributed: readonly string[]
   readonly outcomes: readonly CheckOutcome[]
+  // The files the repairs of the checks rewrote before the verdict.
+  readonly repaired: readonly string[]
   readonly ms: number
 
   constructor(fields: VerdictFields) {
@@ -31,6 +34,7 @@ export class UnitVerdict {
     this.diff = fields.diff
     this.unattributed = fields.unit.unattributed
     this.outcomes = fields.outcomes
+    this.repaired = fields.repaired
     this.ms = fields.ms
   }
 

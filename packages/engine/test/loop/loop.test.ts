@@ -188,6 +188,49 @@ test('a command that exits with an error is still charged with what it wrote bef
   assert.match(stop().systemMessage ?? '', /passed on 1 changed file\(s\)\. Changed during its commands, not charged: notes\.md\./)
 })
 
+test('a check may repair before it judges: what it rewrites stays the unit’s work, and the agent is told to read it again', () => {
+  const tidy = `import { readFileSync, writeFileSync } from 'node:fs'
+const [mode, ...rest] = process.argv.slice(2)
+const judging = mode === '--check'
+let untidy = false
+for (const file of judging ? rest : [mode, ...rest]) {
+  const text = readFileSync(file, 'utf8')
+  const tidied = text.replace(/[ \\t]+$/gm, '')
+  untidy ||= tidied !== text
+  if (!judging) writeFileSync(file, tidied)
+}
+process.exitCode = judging && untidy ? 1 : 0
+`
+  const declared = {
+    version: 1,
+    checks: {
+      tidy: { fix: ['node', 'tools/tidy.mjs', '{files}'], run: ['node', 'tools/tidy.mjs', '--check', '{files}'], when: ['src/**/*.js'] },
+      syntax: { run: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] },
+    },
+    rules: {
+      F1: { level: 'gate', statement: 'No space at the end of a line.', check: 'tidy' },
+      S1: { level: 'gate', statement: 'Source files parse.', check: 'syntax' },
+    },
+  }
+
+  writeFiles(repo.top, { 'weaver.config.json': JSON.stringify(declared), 'tools/tidy.mjs': tidy })
+  hook('UserPromptSubmit', { prompt: 'add t' })
+  write('src/t.js', 'export const t = 1   \nexport const u = ;  \n')
+
+  const refused = stop()
+
+  assert.equal(readFileSync(join(repo.top, 'src/t.js'), 'utf8'), 'export const t = 1\nexport const u = ;\n', 'repaired')
+  assert.match(refused.reason ?? '', /FAIL syntax/, 'a repair hides nothing: the other checks judge what it left')
+  assert.doesNotMatch(refused.reason ?? '', /FAIL tidy/)
+  assert.match(refused.reason ?? '', /Rewritten by a repair before the checks, read them again before you edit them: src\/t\.js\./)
+
+  write('src/t.js', 'export const t = 1\nexport const u = 2\n')
+
+  assert.match(stop().systemMessage ?? '', /2 check\(s\) passed on 1 changed file\(s\)\. Report/)
+  assert.deepEqual(kinds(), ['touch', 'touch', 'check', 'touch', 'check', 'settle'])
+  assert.deepEqual(stop(), {}, 'what the repair rewrote settled with the unit')
+})
+
 test('a turn that ends on a question checks nothing; a shell command is charged with the file it names', () => {
   hook('UserPromptSubmit', { prompt: 'generate d' })
   tool('Bash', { command: 'echo "export const d = 4" > src/d.js' }, () => writeFiles(repo.top, { 'src/d.js': 'export const d = 4\n' }))
