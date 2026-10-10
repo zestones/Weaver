@@ -1,6 +1,6 @@
 import type { ShellCommand } from '../syntax/command.ts'
 import { analyzeShell } from '../syntax/parse.ts'
-import { isGenerator, isReader, NO_HINTS, type CommandHints } from './hints.ts'
+import { isWriter, isReader, NO_HINTS, type ScriptHints } from './hints.ts'
 import { pythonEntry } from './python.ts'
 
 // sed, awk, env and command are left out: a sed `w`, an awk redirect or the program env runs may write anywhere.
@@ -87,11 +87,11 @@ function toolReads(command: ShellCommand): boolean | null {
   return null
 }
 
-function commandReads(command: ShellCommand, hints: CommandHints): boolean {
+function commandReads(command: ShellCommand, hints: ScriptHints): boolean {
   const { program, args } = command
   const writing = WRITING_FLAGS[program]
 
-  if (writesThroughRedirect(command) || isGenerator(command, hints)) return false
+  if (writesThroughRedirect(command) || isWriter(command, hints)) return false
   if (isReader(command, hints)) return true
   if (program === 'git') return GIT_READS.has(gitSubcommand(args) ?? '') && !args.some((arg) => arg.startsWith('--output'))
   if (program === 'npm') return npmReads(args)
@@ -102,7 +102,7 @@ function commandReads(command: ShellCommand, hints: CommandHints): boolean {
   return READERS.has(program) && (writing === undefined || !args.some((arg) => writing.test(arg)))
 }
 
-export function readsOnly(line: string, cwd: string, hints: CommandHints = NO_HINTS): boolean {
+export function readsOnly(line: string, cwd: string, hints: ScriptHints = NO_HINTS): boolean {
   const analysis = analyzeShell(line, cwd)
   const runners = new Set(['npx', 'bunx'])
 

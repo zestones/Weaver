@@ -171,7 +171,7 @@ test('a shell command is charged with what it certainly writes; the rest that ch
 })
 
 test('a script the project declares as a generator is charged with what it wrote', () => {
-  const project = declaration({ commands: { generators: ['node generate.js'] } })
+  const project = declaration({ scripts: { writers: ['node generate.js'] } })
 
   prompt(session, 'generate it')
   agentRuns(
@@ -196,7 +196,7 @@ test('a command made of a writer and a reader is charged with what the writer na
 })
 
 test('a command run in the background keeps its window until the turn ends', () => {
-  const project = declaration({ commands: { generators: ['npm run api:types'] } })
+  const project = declaration({ scripts: { writers: ['npm run api:types'] } })
 
   prompt(session, 'run the codegen in the background')
   startTool(session, bashCall('npm run api:types', { run_in_background: true }), project)()

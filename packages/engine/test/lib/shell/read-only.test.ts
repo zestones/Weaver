@@ -74,7 +74,7 @@ test('linters are read-only only when their write modes are excluded', () => {
 })
 
 test('what the project declares about its own commands wins over what the engine guesses', () => {
-  const hints = { generators: ['npm run lint'], readers: ['make verify'] }
+  const hints = { writers: ['npm run lint'], readers: ['make verify'] }
 
   assert.equal(readsOnly('npm run lint', CWD, hints), false)
   assert.equal(readsOnly('make verify', CWD, hints), true)

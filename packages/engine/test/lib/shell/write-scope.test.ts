@@ -40,7 +40,7 @@ test('formatters that write account for all their writes', () => {
 })
 
 test('a generator the project declares may write anything, and one it does not declare nothing that can be told', () => {
-  const hints = { generators: ['npm run api:types', 'make contract', 'python -m openapi_document'], readers: [] }
+  const hints = { writers: ['npm run api:types', 'make contract', 'python -m openapi_document'], readers: [] }
 
   for (const command of [
     'npm run api:types',
@@ -54,7 +54,7 @@ test('a generator the project declares may write anything, and one it does not d
 })
 
 test('a checker the project declares as a reader only reads', () => {
-  const hints = { generators: [], readers: ['python -m tools.lint'] }
+  const hints = { writers: [], readers: ['python -m tools.lint'] }
 
   assert.equal(shellWrites('python -m tools.lint --all', ROOT, ROOT, hints), null)
   assert.equal(of('python -m tools.lint --all'), 'none')

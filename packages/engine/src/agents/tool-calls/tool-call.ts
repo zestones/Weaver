@@ -1,6 +1,6 @@
 import { isAbsolute, relative } from 'node:path'
 import type { ShellCommand } from '../../lib/shell/syntax/command.ts'
-import type { CommandHints } from '../../lib/shell/writes/hints.ts'
+import type { ScriptHints } from '../../lib/shell/writes/hints.ts'
 import type { WriteScope } from '../../lib/shell/writes/write-scope.ts'
 
 export interface CallWrites {
@@ -23,7 +23,7 @@ export abstract class ToolCall {
     this.background = background
   }
 
-  abstract writes(top: string, hints: CommandHints): CallWrites | null
+  abstract writes(top: string, hints: ScriptHints): CallWrites | null
 
   abstract named(): NamedPaths
 

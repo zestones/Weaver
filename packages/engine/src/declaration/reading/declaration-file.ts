@@ -31,7 +31,7 @@ export class DeclarationFile {
   }
 
   parse(text: string): Declaration {
-    const { scope, finish, commands, ...document } = this.document(text)
+    const { scope, finish, scripts, ...document } = this.document(text)
     const checks = Object.entries(document.checks).map(([id, check]): DeclaredCheck => ({
       ...check,
       id,
@@ -56,7 +56,7 @@ export class DeclarationFile {
     return new Declaration({
       exclude: scope.exclude,
       finish: new FinishPolicy({ ...finish, headings: finish.headings ?? null, skill: finish.skill ?? null }),
-      commands,
+      scripts,
       checks,
       guards,
       rules,

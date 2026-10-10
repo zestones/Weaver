@@ -19,7 +19,7 @@ export class BeforeCall implements Moment {
       return Answer.refusing(refusal.reason)
     }
 
-    const writes = call.writes(turn.repo.top, turn.declaration.commands)
+    const writes = call.writes(turn.repo.top, turn.declaration.scripts)
 
     if (writes !== null && callId !== null) turn.session()?.watch(callId, { tool: call.name, ...writes, untilStop: call.background })
 

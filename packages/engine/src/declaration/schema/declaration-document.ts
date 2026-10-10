@@ -32,7 +32,7 @@ export interface DeclarationDocument {
     readonly deadlineSeconds: number
     readonly concurrency: number
   }
-  readonly commands: { readonly generators: readonly string[]; readonly readers: readonly string[] }
+  readonly scripts: { readonly writers: readonly string[]; readonly readers: readonly string[] }
   readonly checks: Readonly<Record<string, DocumentCheck>>
   readonly guards: Readonly<Record<string, DocumentGuard>>
   readonly rules: Readonly<Record<string, DocumentRule>>

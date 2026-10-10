@@ -1,7 +1,7 @@
 import { relative } from 'node:path'
 import type { ShellCommand } from '../syntax/command.ts'
 import { analyzeShell } from '../syntax/parse.ts'
-import { isGenerator, NO_HINTS, type CommandHints } from './hints.ts'
+import { isWriter, NO_HINTS, type ScriptHints } from './hints.ts'
 import { pythonEntry } from './python.ts'
 import { readsOnly } from './read-only.ts'
 import { writtenPaths } from './written-paths.ts'
@@ -78,8 +78,8 @@ function writingTool(command: ShellCommand): boolean | null {
   return null
 }
 
-function runsGenerator(command: ShellCommand, hints: CommandHints): boolean {
-  if (isGenerator(command, hints)) return true
+function runsGenerator(command: ShellCommand, hints: ScriptHints): boolean {
+  if (isWriter(command, hints)) return true
   const tool = writingTool(command)
 
   if (tool !== null) return tool
@@ -89,14 +89,14 @@ function runsGenerator(command: ShellCommand, hints: CommandHints): boolean {
   return GENERATORS.has(command.program) || (command.program === 'git' && sub === 'apply')
 }
 
-function writesBroadly(command: ShellCommand, root: string, hints: CommandHints): boolean {
+function writesBroadly(command: ShellCommand, root: string, hints: ScriptHints): boolean {
   const code = inlineCode(command)
 
   return (code !== null && codeWrites(code)) || runsGenerator(command, hints) || writtenPaths(command, root).unplaced
 }
 
 // null when the command line only reads.
-export function shellWrites(line: string, cwd: string, root: string, hints: CommandHints = NO_HINTS): WriteScope | null {
+export function shellWrites(line: string, cwd: string, root: string, hints: ScriptHints = NO_HINTS): WriteScope | null {
   const analysis = analyzeShell(line, cwd)
 
   if (readsOnly(line, cwd, hints)) return null

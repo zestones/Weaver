@@ -21,7 +21,7 @@ const VALID = {
   version: 1,
   scope: { exclude: ['design/lab'] },
   finish: { headings: ['Request', 'To validate'], maxRounds: 2 },
-  commands: { generators: ['npm run api:types'], readers: ['make verify'] },
+  scripts: { writers: ['npm run api:types'], readers: ['make verify'] },
   checks: {
     types: { run: ['npx', 'tsc', '--noEmit'], when: ['src/**/*.ts'], cwd: 'client', timeoutSeconds: 120 },
     markers: { run: ['node', 'tools/markers.mjs'], reads: 'findings', after: 'types' },

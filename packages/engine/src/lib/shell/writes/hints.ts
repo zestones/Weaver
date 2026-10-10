@@ -1,11 +1,11 @@
 import type { ShellCommand } from '../syntax/command.ts'
 
-export interface CommandHints {
-  readonly generators: readonly string[]
+export interface ScriptHints {
+  readonly writers: readonly string[]
   readonly readers: readonly string[]
 }
 
-export const NO_HINTS: CommandHints = { generators: [], readers: [] }
+export const NO_HINTS: ScriptHints = { writers: [], readers: [] }
 
 const wordsOf = (entry: string): string[] => entry.trim().split(/\s+/)
 
@@ -31,10 +31,10 @@ export function runsAs(command: ShellCommand, entry: string): boolean {
   return command.program === program && inOrder(command.args, words)
 }
 
-export const isGenerator = (command: ShellCommand, hints: CommandHints): boolean => hints.generators.some((entry) => runsAs(command, entry))
+export const isWriter = (command: ShellCommand, hints: ScriptHints): boolean => hints.writers.some((entry) => runsAs(command, entry))
 
 // A reader is named by the exact start of its command: a word slipped in before, such as another make target, may write.
-export const isReader = (command: ShellCommand, hints: CommandHints): boolean =>
+export const isReader = (command: ShellCommand, hints: ScriptHints): boolean =>
   hints.readers
     .map(wordsOf)
     .some(([program, ...words]) => command.program === program && words.every((word, index) => command.args[index] === word))

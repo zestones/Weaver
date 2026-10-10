@@ -52,23 +52,23 @@
         "concurrency": { "type": "integer", "minimum": 1, "default": 3, "description": "How many checks run at once." }
       }
     },
-    "commands": {
+    "scripts": {
       "type": "object",
       "additionalProperties": false,
       "default": {},
-      "description": "What the project knows of its own commands and the engine cannot guess. Each entry is a command and its first words, such as `npm run api:types`.",
+      "description": "The project's own scripts, which Weaver cannot guess whether they write files. Each entry is a command and its first words, such as `npm run api:types`. What is declared here wins over what Weaver guesses.",
       "properties": {
-        "generators": {
+        "writers": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "default": [],
-          "description": "Commands that write files they do not name: everything that changes while one runs is the agent's work."
+          "description": "Scripts that write files, such as a generator: everything that changes while one runs is the agent's work, and is checked."
         },
         "readers": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "default": [],
-          "description": "Commands that only read: what changes while one runs is never the agent's work."
+          "description": "Scripts that only read, such as a check of the project's own: what changes while one runs is never the agent's work."
         }
       }
     },
