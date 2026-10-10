@@ -7,5 +7,5 @@ export interface CheckRunner {
   repairs(declaration: Declaration): boolean
   repair(declaration: Declaration, unit: UnitDiff): Promise<void>
 
-  run(declaration: Declaration, unit: UnitDiff): Promise<readonly CheckOutcome[]>
+  verify(declaration: Declaration, unit: UnitDiff): Promise<readonly CheckOutcome[]>
 }

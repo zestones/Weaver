@@ -23,8 +23,8 @@ const VALID = {
   finish: { headings: ['Request', 'To validate'], maxRounds: 2 },
   scripts: { writers: ['npm run api:types'], readers: ['make verify'] },
   checks: {
-    types: { run: ['npx', 'tsc', '--noEmit'], when: ['src/**/*.ts'], cwd: 'client', timeoutSeconds: 120 },
-    markers: { run: ['node', 'tools/markers.mjs'], reads: 'findings', after: 'types' },
+    types: { verify: ['npx', 'tsc', '--noEmit'], when: ['src/**/*.ts'], cwd: 'client', timeoutSeconds: 120 },
+    markers: { verify: ['node', 'tools/markers.mjs'], reads: 'findings', after: 'types' },
   },
   rules: {
     T1: { level: 'gate', statement: 'The code type-checks.', check: 'types' },
@@ -44,7 +44,7 @@ test('a declaration is read with its defaults', () => {
   )
   assert.deepEqual(config.checks[1], {
     id: 'markers',
-    run: ['node', 'tools/markers.mjs'],
+    verify: ['node', 'tools/markers.mjs'],
     fix: null,
     cwd: '.',
     when: null,
@@ -70,7 +70,7 @@ test('a level says who settles a rule, so it says whether a program may stand be
     'rules.T1 is a gate rule and nothing enforces it: it needs a check or a guard',
   ])
   assert.deepEqual(
-    problemsOf({ version: 1, checks: { c: { run: ['true'] } }, rules: { N1: { level: 'llm', statement: 'x', check: 'c' } } }),
+    problemsOf({ version: 1, checks: { c: { verify: ['true'] } }, rules: { N1: { level: 'llm', statement: 'x', check: 'c' } } }),
     ['rules.N1 is an llm rule and c enforces it: a reviewer settles it'],
   )
   assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'machine', statement: 'x' } } }), [
@@ -81,11 +81,11 @@ test('a level says who settles a rule, so it says whether a program may stand be
 test('what ties entries together is checked: a check enforces a rule, and a name used for a check is one', () => {
   const gate = { level: 'gate', statement: 'x', check: 'c' }
 
-  assert.deepEqual(problemsOf({ version: 1, checks: { lint: { run: ['true'] } } }), ['checks.lint enforces no rule'])
+  assert.deepEqual(problemsOf({ version: 1, checks: { lint: { verify: ['true'] } } }), ['checks.lint enforces no rule'])
   assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'gate', statement: 'x', check: 'types' } } }), [
     'rules.T1.check names types, which is not a check',
   ])
-  assert.deepEqual(problemsOf({ version: 1, checks: { c: { run: ['true'], after: 'd' } }, rules: { T1: gate } }), [
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { verify: ['true'], after: 'd' } }, rules: { T1: gate } }), [
     'checks.c.after names d, which is not a check',
   ])
 })
@@ -104,11 +104,11 @@ test('everything wrong with the shape of the file is reported at once, in words 
   assert.deepEqual(
     problemsOf({
       version: 1,
-      checks: { c: { run: [], reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } },
+      checks: { c: { verify: [], reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } },
       rules: { T1: { level: 'gate', statement: '' } },
     }),
     [
-      'checks.c.run must not be empty',
+      'checks.c.verify must not be empty',
       'checks.c.reads must be one of exit, findings',
       'checks.c.timeoutSeconds must be a whole number',
       'rules.T1.statement must not be empty',
@@ -170,10 +170,10 @@ test('a guard enforces a rule that exists and that a program may enforce, and re
 test('a check may carry the command that repairs before it judges', () => {
   const [check] = parse({
     version: 1,
-    checks: { format: { fix: ['npx', 'prettier', '--write', '{files}'], run: ['npx', 'prettier', '--check', '{files}'] } },
+    checks: { format: { fix: ['npx', 'prettier', '--write', '{files}'], verify: ['npx', 'prettier', '--check', '{files}'] } },
     rules: { L19: { level: 'gate', statement: 'Prettier decides formatting.', check: 'format' } },
   }).checks
 
   assert.deepEqual(check?.fix, ['npx', 'prettier', '--write', '{files}'])
-  assert.deepEqual(problemsOf({ version: 1, checks: { c: { run: ['true'], fix: [] } }, rules: {} }), ['checks.c.fix must not be empty'])
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { verify: ['true'], fix: [] } }, rules: {} }), ['checks.c.fix must not be empty'])
 })

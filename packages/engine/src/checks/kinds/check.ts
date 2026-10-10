@@ -26,12 +26,12 @@ export abstract class Check {
     return this.declared.after
   }
 
-  async run(unit: UnitDiff, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<CheckOutcome> {
+  async verify(unit: UnitDiff, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<CheckOutcome> {
     const files = this.concerned(unit.files)
 
     if (files.length === 0) return this.skipped('the unit changed none of the files it is about')
 
-    const result = await this.launch(this.declared.run, files, unit, env, timeoutMs)
+    const result = await this.launch(this.declared.verify, files, unit, env, timeoutMs)
 
     if (result === null) return this.skipped('the files it is about were all deleted')
     if (result.code === TIMED_OUT) return this.outcome({ status: 'timeout', blocking: true, ms: result.ms, output: result.output })
@@ -39,7 +39,7 @@ export abstract class Check {
     return this.read(result)
   }
 
-  // The repair is an attempt and `run` gives the verdict: what the repair prints or how it exits decides nothing.
+  // The repair is an attempt and `verify` gives the verdict: what the repair prints or how it exits decides nothing.
   async repair(unit: UnitDiff, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<void> {
     if (this.declared.fix !== null) await this.launch(this.declared.fix, this.concerned(unit.files), unit, env, timeoutMs)
   }

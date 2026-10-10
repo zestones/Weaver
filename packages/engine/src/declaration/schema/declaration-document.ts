@@ -1,5 +1,5 @@
 interface DocumentCheck {
-  readonly run: readonly string[]
+  readonly verify: readonly string[]
   readonly fix?: readonly string[]
   readonly cwd: string
   readonly when?: readonly string[]

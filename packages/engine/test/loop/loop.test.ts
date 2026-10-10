@@ -15,8 +15,8 @@ const DECLARATION = {
   version: 1,
   finish: { headings: ['Request', 'To validate'], maxRounds: 2 },
   checks: {
-    syntax: { run: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] },
-    markers: { run: ['node', 'tools/markers.mjs'], when: ['src/**'], reads: 'findings' },
+    syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] },
+    markers: { verify: ['node', 'tools/markers.mjs'], when: ['src/**'], reads: 'findings' },
   },
   guards: { tools: { writes: ['tools/**'], runs: ['git commit'], rule: 'T1' } },
   rules: {
@@ -159,7 +159,7 @@ test('what the owner saves while the agent runs its tests is never charged to th
   assert.deepEqual(kinds(), ['settle'])
 })
 
-test('a call a guard refuses does not run: the runtime is told to deny it, with the rule, and the journal keeps the attempt', () => {
+test('a call a guard refuses does not verify: the runtime is told to deny it, with the rule, and the journal keeps the attempt', () => {
   hook('UserPromptSubmit', { prompt: 'loosen the check and commit' })
 
   const edit = hook('PreToolUse', { tool_name: 'Write', tool_input: { file_path: join(repo.top, 'tools/markers.mjs') }, tool_use_id: 'e' })
@@ -204,8 +204,8 @@ process.exitCode = judging && untidy ? 1 : 0
   const declared = {
     version: 1,
     checks: {
-      tidy: { fix: ['node', 'tools/tidy.mjs', '{files}'], run: ['node', 'tools/tidy.mjs', '--check', '{files}'], when: ['src/**/*.js'] },
-      syntax: { run: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] },
+      tidy: { fix: ['node', 'tools/tidy.mjs', '{files}'], verify: ['node', 'tools/tidy.mjs', '--check', '{files}'], when: ['src/**/*.js'] },
+      syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] },
     },
     rules: {
       F1: { level: 'gate', statement: 'No space at the end of a line.', check: 'tidy' },
@@ -271,7 +271,7 @@ test('a repository that declares nothing is left alone, and a declaration that c
   assert.deepEqual(stop(), {})
   assert.equal(existsSync(repo.stateDir), false)
 
-  writeFiles(repo.top, { 'weaver.config.json': '{"version":1,"checks":{"lint":{"run":["true"]}}}' })
+  writeFiles(repo.top, { 'weaver.config.json': '{"version":1,"checks":{"lint":{"verify":["true"]}}}' })
 
   assert.match(stop().systemMessage ?? '', /Nothing is checked: .*checks\.lint enforces no rule/)
 })

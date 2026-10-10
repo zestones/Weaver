@@ -62,7 +62,7 @@ export class EndOfTurn implements Moment {
     const repaired = await this.repair(session, declaration, finished)
     const unit = repaired.length === 0 ? finished : session.unit()
     const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
-    const outcomes = await this.checks.run(declaration, diff)
+    const outcomes = await this.checks.verify(declaration, diff)
     const verdict = new UnitVerdict({ unit, maxRounds: declaration.finish.maxRounds, diff, outcomes, repaired, ms: Date.now() - startedAt })
     const report = new Report(declaration, verdict)
     const reportPath = report.write(session.dir)

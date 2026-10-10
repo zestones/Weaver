@@ -39,7 +39,7 @@ async function run(declaration: Record<string, unknown>): Promise<Record<string,
   const base = git(repo.top, ['rev-parse', 'HEAD^{tree}'])
   const head = new WorkingTreeSnapshot(repo, dir).tree()
   const files = new TreeDiff(repo, base, head).files([])
-  const outcomes = await new ProjectChecks().run(project, new UnitDiff({ repo, dir, base, head, files, excluded: [] }))
+  const outcomes = await new ProjectChecks().verify(project, new UnitDiff({ repo, dir, base, head, files, excluded: [] }))
 
   return Object.fromEntries(outcomes.map((outcome) => [outcome.id, outcome]))
 }
@@ -51,7 +51,7 @@ test('the exit status of a check is its verdict, and its rules say whether a fai
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
 
   const outcomes = await run({
-    checks: { ok: { run: ['true'] }, broken: { run: ['sh', '-c', 'echo boom >&2; exit 3'] }, advisory: { run: ['false'] } },
+    checks: { ok: { verify: ['true'] }, broken: { verify: ['sh', '-c', 'echo boom >&2; exit 3'] }, advisory: { verify: ['false'] } },
     rules: { G1: gate('ok'), G2: gate('broken'), H1: human('advisory') },
   })
 
@@ -66,9 +66,9 @@ test('a check runs only when the unit changed a file it is about, and is handed 
 
   const outcomes = await run({
     checks: {
-      names: { run: ['sh', '-c', 'echo "$@"; exit 1', 'sh', '{files}'], when: ['src/**/*.js'], cwd: 'src' },
-      sql: { run: ['false'], when: ['**/*.sql'] },
-      docs: { run: ['false', '{files}'], when: ['docs/**'] },
+      names: { verify: ['sh', '-c', 'echo "$@"; exit 1', 'sh', '{files}'], when: ['src/**/*.js'], cwd: 'src' },
+      sql: { verify: ['false'], when: ['**/*.sql'] },
+      docs: { verify: ['false', '{files}'], when: ['docs/**'] },
     },
     rules: { G1: gate('names'), G2: gate('sql'), G3: gate('docs') },
   })
@@ -89,8 +89,8 @@ test('each finding goes where the level of its rule sends it', async () => {
   }
   const outcomes = await run({
     checks: {
-      mixed: { run: reporter(findings), reads: 'findings' },
-      advisory: { run: reporter({ findings: [findings.findings[1]] }), reads: 'findings' },
+      mixed: { verify: reporter(findings), reads: 'findings' },
+      advisory: { verify: reporter({ findings: [findings.findings[1]] }), reads: 'findings' },
     },
     rules: { M1: gate('mixed'), M2: human('mixed'), M3: human('advisory') },
   })
@@ -105,7 +105,7 @@ test('findings only the owner settles pass the check and wait for them', async (
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
 
   const finding = { rule: 'M2', file: 'src/a.js', message: 'eslint-disable added' }
-  const outcomes = await run({ checks: { c: { run: reporter({ findings: [finding] }), reads: 'findings' } }, rules: { M2: human('c') } })
+  const outcomes = await run({ checks: { c: { verify: reporter({ findings: [finding] }), reads: 'findings' } }, rules: { M2: human('c') } })
 
   assert.deepEqual([outcomes.c?.status, outcomes.c?.blocking, outcomes.c?.toValidate], ['pass', false, [finding]])
 })
@@ -115,10 +115,10 @@ test('a check that cannot give its verdict fails: no output, no JSON, a crash or
 
   const outcomes = await run({
     checks: {
-      silent: { run: ['true'], reads: 'findings' },
-      shapeless: { run: reporter({ findings: [{ rule: 'G2' }] }), reads: 'findings' },
-      crashed: { run: reporter({ findings: [] }, 2), reads: 'findings' },
-      missing: { run: ['weaver-no-such-command'] },
+      silent: { verify: ['true'], reads: 'findings' },
+      shapeless: { verify: reporter({ findings: [{ rule: 'G2' }] }), reads: 'findings' },
+      crashed: { verify: reporter({ findings: [] }, 2), reads: 'findings' },
+      missing: { verify: ['weaver-no-such-command'] },
     },
     rules: { G1: gate('silent'), G2: gate('shapeless'), G3: gate('crashed'), G4: gate('missing') },
   })
@@ -135,7 +135,7 @@ test('a check that outlives its deadline times out, and the check that reads its
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
 
   const outcomes = await run({
-    checks: { reader: { run: ['true'], after: 'slow' }, slow: { run: ['sleep', '30'], timeoutSeconds: 1 } },
+    checks: { reader: { verify: ['true'], after: 'slow' }, slow: { verify: ['sleep', '30'], timeoutSeconds: 1 } },
     rules: { G1: gate('reader'), G2: gate('slow') },
   })
 
@@ -148,7 +148,7 @@ test('a check is told the two trees and reads the diff of the unit as a file, ad
 
   const script =
     "const diff = JSON.parse(require('fs').readFileSync(process.env.WEAVER_UNIT_DIFF)); console.log(JSON.stringify([diff, process.env.WEAVER_BASE_TREE, process.env.WEAVER_HEAD_TREE]))"
-  const outcomes = await run({ checks: { c: { run: ['node', '-e', script] } }, rules: { G1: gate('c') } })
+  const outcomes = await run({ checks: { c: { verify: ['node', '-e', script] } }, rules: { G1: gate('c') } })
   const [diff, base, head] = JSON.parse(outcomes.c?.output ?? '') as [unknown, string, string]
 
   assert.deepEqual(diff, [{ status: 'M', path: 'src/a.js', oldPath: 'src/a.js', added: [[2, 2]] }])
@@ -160,7 +160,7 @@ test('checks that wait for each other in a loop are reported, never waited for',
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
 
   const outcomes = await run({
-    checks: { one: { run: ['true'], after: 'two' }, two: { run: ['true'], after: 'one' } },
+    checks: { one: { verify: ['true'], after: 'two' }, two: { verify: ['true'], after: 'one' } },
     rules: { G1: gate('one'), G2: gate('two') },
   })
 

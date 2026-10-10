@@ -128,7 +128,7 @@ test('with headings declared, a turn that ends without them checks nothing; the 
 test('what waits for the owner is counted, listed in the report and never blocks the agent; a script that rewrote the configuration is caught there', async () => {
   const finding = { rule: 'S1', file: A_FILE, line: 1, message: 'eslint-disable added' }
   const project = declaration({
-    checks: { lint: { run: ['true'] }, markers: { run: ['true'], reads: 'findings' } },
+    checks: { lint: { verify: ['true'] }, markers: { verify: ['true'], reads: 'findings' } },
     rules: {
       L1: { level: 'gate', statement: 'The code passes the linter.', check: 'lint' },
       S1: { level: 'human', statement: 'A suppression needs approval.', check: 'markers' },

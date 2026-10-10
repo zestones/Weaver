@@ -23,7 +23,7 @@ export class ProjectChecks implements CheckRunner {
     }
   }
 
-  async run(declaration: Declaration, unit: UnitDiff): Promise<CheckOutcome[]> {
+  async verify(declaration: Declaration, unit: UnitDiff): Promise<CheckOutcome[]> {
     const { concurrency, deadlineSeconds } = declaration.finish
     const deadline = Date.now() + deadlineSeconds * 1000
     const env = unit.environment()
@@ -80,7 +80,7 @@ export class ProjectChecks implements CheckRunner {
     if (prerequisite?.status === 'timeout') return Promise.resolve(check.skipped(`${prerequisite.id} did not finish`))
 
     return check
-      .run(unit, env, timeoutMs)
+      .verify(unit, env, timeoutMs)
       .catch((error: unknown) => check.broken(`the check crashed: ${error instanceof Error ? error.message : String(error)}`))
   }
 }

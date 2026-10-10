@@ -99,19 +99,19 @@
     "check": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["run"],
+      "required": ["verify"],
       "properties": {
-        "run": {
+        "verify": {
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 },
-          "description": "The command and its arguments. An argument `{files}` becomes the changed files the check is about."
+          "description": "The command that judges, with its arguments. An argument `{files}` becomes the changed files the check is about."
         },
         "fix": {
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 },
-          "description": "A command that repairs what it can before `run` judges what is left: a formatter, a linter's autofix. It runs on the unit's own files, and what it rewrites stays the agent's work."
+          "description": "A command that repairs what it can before `verify` judges what is left: a formatter, a linter's autofix. It runs on the unit's own files, and what it rewrites stays the agent's work."
         },
         "cwd": {
           "type": "string",

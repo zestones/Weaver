@@ -33,7 +33,7 @@ export const declaration = (extra: Raw = {}): Declaration =>
   new DeclarationFile('weaver.config.json').parse(
     JSON.stringify({
       version: 1,
-      checks: { lint: { run: ['true'] } },
+      checks: { lint: { verify: ['true'] } },
       rules: { L1: { level: 'gate', statement: 'The code passes the linter.', check: 'lint' } },
       ...extra,
     }),
@@ -116,7 +116,7 @@ export function stubChecks(outcomes: readonly CheckOutcome[], during: () => Prom
     seen,
     repairs: () => false,
     repair: () => Promise.resolve(),
-    run: async (_declaration, unit) => {
+    verify: async (_declaration, unit) => {
       calls.count += 1
       seen.push(unit.paths)
       await during()
