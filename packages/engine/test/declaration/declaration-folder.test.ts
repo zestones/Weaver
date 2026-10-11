@@ -28,6 +28,9 @@ const problems = (project: Record<string, unknown>) => problemsOf(() => parse(pr
 // What the files themselves say, when the fault is in how a file is written.
 const problemsIn = (texts: PartTexts) => problemsOf(() => new DeclarationParts('.weaver', texts).declaration())
 
+// The settings every project writes: its limits, with the values a new project starts with.
+const SETTINGS = '{"version":1,"finish":{"maxRounds":3,"deadlineSeconds":1200,"concurrency":3}}'
+
 const VALID = {
   scope: { exclude: ['design/lab'] },
   finish: { headings: ['Request', 'To validate'], maxRounds: 2 },
@@ -64,7 +67,7 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true })
 })
 
-test('a declaration is read from the files of .weaver, each part in its own, with its defaults', () => {
+test('a declaration is read from the files of .weaver, each part in its own', () => {
   const top = join(scratch, 'full')
 
   writeFiles(top, declarationFiles(VALID))
@@ -114,7 +117,7 @@ test('a repository is supervised as soon as its settings are there; every other 
 
   writeFiles(none, { '.weaver/project/checks.json': '{}' })
   writeFiles(bare, {
-    '.weaver/settings.json': '{ "$schema": "./settings.schema.json", "version": 1 }',
+    '.weaver/settings.json': `{ "$schema": "./settings.schema.json", ${SETTINGS.slice(1)}`,
     '.weaver/project/guards.json': '{ "$schema": "./guards.schema.json" }',
   })
 
@@ -141,6 +144,7 @@ test('a rule is its sentence, or an object when it says more; under a check it i
     'project/checks.json: c.rules.r must be a text or an object',
     'project/checks.json: c.rules.s must not be empty',
     'project/checks.json: c.rules.t.statement is missing',
+    'project/checks.json: c.rules.t.level is missing',
   ])
 })
 
@@ -154,7 +158,7 @@ test('what ties entries together is checked: a check stands behind a rule, a nam
   assert.deepEqual(problems({ checks: { a: lint, b: lint }, review: { runtime: 'codex', rules: { clean: 'y' } } }), [
     'the rule clean is written twice: a name stands for one rule in the whole project',
   ])
-  assert.deepEqual(problemsIn({ settings: '{"version":1}', rules: '{"r":"x"}' }), [
+  assert.deepEqual(problemsIn({ settings: SETTINGS, rules: '{"r":"x"}' }), [
     'llm/rules.json holds rules, and llm/reviewers.json is not there to say who reviews',
   ])
 })
@@ -162,10 +166,10 @@ test('what ties entries together is checked: a check stands behind a rule, a nam
 test('everything wrong with the shape of the files is reported at once, each with the file and the field', () => {
   assert.deepEqual(
     problemsIn({
-      settings: JSON.stringify({ version: 2, finish: { maxRounds: 0 }, chekcs: {} }),
+      settings: JSON.stringify({ version: 2, finish: { maxRounds: 0, deadlineSeconds: 1200, concurrency: 3 }, chekcs: {} }),
       guards: JSON.stringify({ '9x': {}, g: { statement: '' } }),
-      checks: JSON.stringify({ c: { verify: [], reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } }),
-      reviewers: JSON.stringify({ runtime: 'gemini', rules: {} }),
+      checks: JSON.stringify({ c: { verify: [], cwd: '.', reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } }),
+      reviewers: JSON.stringify({ runtime: 'gemini', experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRounds: 1, rules: {} }),
     }),
     [
       'settings.json: chekcs is not a known field',
@@ -183,11 +187,38 @@ test('everything wrong with the shape of the files is reported at once, each wit
     'the links between entries are judged once the shape is right',
   )
   assert.deepEqual(problemsIn({ settings: '[]' }), ['settings.json: the file must be an object'])
-  assert.deepEqual(problemsIn({ settings: '{}' }), ['settings.json: version is missing'])
-  assert.match(problemsIn({ settings: '{"version":1}', guards: '{' }).join(' '), /^project\/guards\.json: .*JSON/)
+  assert.deepEqual(problemsIn({ settings: '{}' }), ['settings.json: version is missing', 'settings.json: finish is missing'])
+  assert.match(problemsIn({ settings: SETTINGS, guards: '{' }).join(' '), /^project\/guards\.json: .*JSON/)
   assert.throws(
     () => new DeclarationParts('.weaver', { settings: '{' }).declaration(),
     /^DeclarationError: \.weaver is not a valid project declaration: settings\.json: /,
+  )
+})
+
+test('a file writes every limit Weaver applies: one left out is a problem, never a value the file does not show', () => {
+  const written = {
+    settings: '{"version":1,"finish":{}}',
+    checks: JSON.stringify({ c: { verify: ['true'], rules: { plain: 'x', owner: { statement: 'y' } } } }),
+    reviewers: '{"runtime":"codex"}',
+  }
+
+  assert.deepEqual(problemsIn(written), [
+    'settings.json: finish.maxRounds is missing',
+    'settings.json: finish.deadlineSeconds is missing',
+    'settings.json: finish.concurrency is missing',
+    'project/checks.json: c.cwd is missing',
+    'project/checks.json: c.reads is missing',
+    'project/checks.json: c.timeoutSeconds is missing',
+    'project/checks.json: c.rules.owner.level is missing',
+    'llm/reviewers.json: experiments is missing',
+    'llm/reviewers.json: timeoutSeconds is missing',
+    'llm/reviewers.json: waitSeconds is missing',
+    'llm/reviewers.json: maxRounds is missing',
+  ])
+  assert.deepEqual(
+    problemsIn({ settings: SETTINGS, guards: '{"g":{"statement":"x","runs":["git commit"]}}', rules: '{}' }),
+    [],
+    'what may be left out is what means none when it is: a skill, a repair, a scope, a list',
   )
 })
 
@@ -204,7 +235,7 @@ test('each level is its own kind of rule: who a failure holds, who a finding wai
 test('a project says when its work is finished in its finish skill: a final message that carries all the headings its header lists', () => {
   const { finish } = parse(VALID)
   const skilled = (skill: string) =>
-    new DeclarationParts('.weaver', { settings: '{"version":1,"finish":{"skill":"docs/finish.md"}}' }, () => skill)
+    new DeclarationParts('.weaver', { settings: SETTINGS.replace('"finish":{', '"finish":{"skill":"docs/finish.md",') }, () => skill)
 
   assert.equal(finish.declaresFinished('## request\n\ndone\n\n## To Validate ##\n\nnothing\n'), true)
   assert.equal(finish.declaresFinished('## Request\n\nWhich name do you prefer?'), false)
@@ -223,7 +254,7 @@ test('a project says when its work is finished in its finish skill: a final mess
     problemsOf(() => skilled('---\ndescription: How to end.\n---\n\n## Done\n').declaration()),
     ['docs/finish.md: its header lists no `headings`: they are what tells Weaver that a task is finished'],
   )
-  assert.deepEqual(problemsIn({ settings: '{"version":1,"finish":{"headings":["Done"]}}' }), [
+  assert.deepEqual(problemsIn({ settings: SETTINGS.replace('"finish":{', '"finish":{"headings":["Done"],') }), [
     'settings.json: finish.headings is not a known field',
   ])
 })
@@ -303,7 +334,7 @@ test('a rule of the review may name the check that lists its places, and may ask
   assert.deepEqual(problems({ checks: { c: { verify: ['true'] } }, review: review({ r: { statement: 'x', candidates: 'c' } }) }), [
     'llm/rules.json: r.candidates names c, which reads exit: a check that lists places for the reviewer reads findings',
   ])
-  assert.deepEqual(problems({ checks: { c: { verify: ['true'], rules: { r: { statement: 'x', evidence: true } } } } }), [
+  assert.deepEqual(problems({ checks: { c: { verify: ['true'], rules: { r: { statement: 'x', level: 'gate', evidence: true } } } } }), [
     'project/checks.json: c.rules.r.evidence is not a known field',
   ])
 })

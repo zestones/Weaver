@@ -28,8 +28,8 @@ interface DocumentReviewer {
   readonly effort?: string
 }
 
-// What each file of `.weaver/` holds once the defaults its schema gives are filled in. A file that names its schema
-// carries a `$schema` line, which is no entry of the file.
+// What each file of `.weaver/` holds. Every limit Weaver applies is written in the file; what may be left out is what
+// means "none" when it is. A file that names its schema carries a `$schema` line, which is no entry of the file.
 export interface SettingsDocument {
   readonly version: 1
   readonly finish: {

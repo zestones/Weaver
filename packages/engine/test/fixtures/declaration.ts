@@ -15,6 +15,10 @@ interface Split {
 }
 
 const FINISH_SKILL = '.weaver/skills/wv-finish.md'
+// A file writes every limit Weaver applies. A test gives the ones it is about, and these stand for the others.
+const LIMITS = { maxRounds: 3, deadlineSeconds: 1200, concurrency: 3 }
+const CHECK = { cwd: '.', reads: 'exit', timeoutSeconds: 600 }
+const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRounds: 1 }
 
 // A test says what a project declares as one object; here it is split into the files Weaver reads it from. The
 // headings a test gives for the final message go where a project writes them: in the header of its finish skill.
@@ -24,14 +28,17 @@ function split(project: Raw): Split {
   const skill = headings === undefined ? limits.skill : (limits.skill ?? FINISH_SKILL)
   const { rules, ...reviewers } = (review ?? {}) as Raw
   const parts: Partial<Record<PartName, unknown>> = {
-    settings: { version: 1, ...(finish === undefined ? {} : { finish: { ...limits, ...(skill === undefined ? {} : { skill }) } }) },
+    settings: { version: 1, finish: { ...LIMITS, ...limits, ...(skill === undefined ? {} : { skill }) } },
     guards,
-    checks,
+    checks:
+      checks === undefined
+        ? undefined
+        : Object.fromEntries(Object.entries(checks as Raw).map(([id, check]) => [id, { ...CHECK, ...(check as Raw) }])),
     scripts:
       scripts === undefined && scope === undefined
         ? undefined
         : { ...(scripts as Raw | undefined), ...(scope === undefined ? {} : { scope }) },
-    reviewers: review === undefined ? undefined : reviewers,
+    reviewers: review === undefined ? undefined : { ...REVIEW, ...reviewers },
     rules,
   }
   const header = headings === undefined ? null : ['---', 'headings:', ...headings.map((heading) => `  - ${heading}`), '---', ''].join('\n')

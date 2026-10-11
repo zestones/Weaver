@@ -4,7 +4,7 @@
   "description": "Who reviews a unit of work, and with what means. An agent that did not write the change judges it against the rules of `llm/rules.json` once the checks pass, and the agent that wrote it answers each finding, fixed or not fixed with a reason. A finding never holds the change by itself. The owner has four words for a request: `#no-review` asks for no review of that work, `#review` takes it back and has a review that failed tried again, `#critical` asks for the runtime that did not write the change, `#simple` for the one that did.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["runtime"],
+  "required": ["runtime", "experiments", "timeoutSeconds", "waitSeconds", "maxRounds"],
   "properties": {
     "$schema": {
       "type": "string",
@@ -52,25 +52,21 @@
     },
     "experiments": {
       "type": "boolean",
-      "default": false,
       "description": "Whether the reviewer may run commands and write files to show what it suspects. It then works in a copy of the working tree, outside the repository and removed after the review; what else it may reach, such as a running stack, is for the skill to say. Without this, it only reads."
     },
     "timeoutSeconds": {
       "type": "integer",
       "minimum": 1,
-      "default": 900,
       "description": "How long one review may take. A review that does not answer in time holds nobody: the owner is told that the rules were not judged, and `#review` in a later request has it tried again."
     },
     "waitSeconds": {
       "type": "integer",
       "minimum": 1,
-      "default": 1500,
       "description": "How long the end of a turn waits for a review. A review that runs longer goes on by itself: the unit of work stays open, and the next end of turn gives its findings."
     },
     "maxRounds": {
       "type": "integer",
       "minimum": 1,
-      "default": 1,
       "description": "How many reviews may send the agent back to work, for one request. What a later review finds waits for the owner."
     },
     "skill": {

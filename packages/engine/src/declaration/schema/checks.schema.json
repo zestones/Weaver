@@ -30,7 +30,7 @@
     "check": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["verify"],
+      "required": ["verify", "cwd", "reads", "timeoutSeconds"],
       "properties": {
         "verify": {
           "type": "array",
@@ -53,7 +53,6 @@
         "cwd": {
           "type": "string",
           "minLength": 1,
-          "default": ".",
           "description": "Where the command runs, relative to the repository root."
         },
         "when": {
@@ -66,13 +65,12 @@
         },
         "reads": {
           "enum": ["exit", "findings"],
-          "default": "exit",
           "description": "How the verdict is read. `exit`: from the exit status. `findings`: from the last line printed, `{\"findings\": [...]}`, where each finding gives the name of a `rule`, a `file`, a `message` and optionally a `line`."
         },
         "timeoutSeconds": {
           "type": "integer",
           "minimum": 1,
-          "default": 600
+          "description": "How long one run of the check may take."
         },
         "after": {
           "type": "string",
@@ -96,8 +94,8 @@
       "type": ["string", "object"],
       "minLength": 1,
       "additionalProperties": false,
-      "required": ["statement"],
-      "description": "A rule a check stands behind: the sentence told to whoever broke it, or an object when the rule says more.",
+      "required": ["statement", "level"],
+      "description": "A rule a check stands behind. Its sentence alone is a rule for the agent, which is held until it is fixed. An object says who a failure is for.",
       "properties": {
         "statement": {
           "type": "string",
@@ -106,7 +104,6 @@
         },
         "level": {
           "enum": ["gate", "human"],
-          "default": "gate",
           "description": "Who a failure is for. `gate`: the agent, which is held until it is fixed. `human`: the owner, who reads it in the report; the agent is not held."
         }
       }

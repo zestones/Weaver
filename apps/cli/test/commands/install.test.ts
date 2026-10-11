@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { DeclarationFolder } from '@weaver/engine'
 import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
-import { makeProject, readJson, weaver, writeConfig, writeJson } from '../fixtures/project.ts'
+import { LIMITS, makeProject, readJson, REVIEW, SETTINGS, weaver, writeConfig, writeJson } from '../fixtures/project.ts'
 
 interface Group {
   readonly matcher?: string
@@ -60,6 +60,11 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
     assert.equal(readJson<{ $schema: string }>(top, file).$schema, link.schemaOf(part), 'each file names the schema it follows')
   }
 
+  assert.deepEqual(
+    readJson<{ finish: unknown }>(top, CONFIG).finish,
+    { skill: SKILL, ...LIMITS },
+    'every limit Weaver applies is written in the settings, where the owner changes it',
+  )
   assert.equal(existsSync(join(top, '.weaver/llm')), false, 'who reviews is the owner’s to add')
   assert.deepEqual(DeclarationFolder.in(top).load()?.rules, [])
   assert.deepEqual(DeclarationFolder.in(top).load()?.finish.headings, ['Request', 'To validate', 'Found along the way'])
@@ -85,7 +90,7 @@ test('the command install writes is one the runtime can run as it is', () => {
 
 test('install twice wires once, and leaves what the owner put in the files', () => {
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine', timeout: 5 }] }
-  const declared = '{"version":1,"finish":{"maxRounds":5}}'
+  const declared = JSON.stringify({ version: 1, finish: { ...LIMITS, maxRounds: 5 } })
 
   writeJson(top, CLAUDE, { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine], Notification: [mine] } })
   writeJson(top, CONFIG, JSON.parse(declared))
@@ -108,7 +113,7 @@ test('install twice wires once, and leaves what the owner put in the files', () 
 })
 
 test('a skill the settings name is written once, with the headings a task ends by in its header, and never written over', () => {
-  writeJson(top, CONFIG, { version: 1, finish: { skill: 'docs/fin.md' } })
+  writeJson(top, CONFIG, { version: 1, finish: { ...LIMITS, skill: 'docs/fin.md' } })
   weaver(top, ['install', 'claude'])
 
   const written = readFileSync(join(top, 'docs/fin.md'), 'utf8')
@@ -121,7 +126,7 @@ test('a skill the settings name is written once, with the headings a task ends b
 })
 
 test('the skill of the reviewer is written the same way, where the configuration says', () => {
-  writeConfig(top, { settings: { version: 1 }, reviewers: { runtime: 'codex', skill: 'docs/review.md' } })
+  writeConfig(top, { settings: SETTINGS, reviewers: { ...REVIEW, runtime: 'codex', skill: 'docs/review.md' } })
 
   const { lines } = weaver(top, ['install', 'claude'])
 

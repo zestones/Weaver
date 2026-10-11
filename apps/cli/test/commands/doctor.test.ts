@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
 import { RuntimeCatalog } from '../../src/runtimes/runtime-catalog.ts'
-import { makeProject, weaver, writeConfig } from '../fixtures/project.ts'
+import { makeProject, REVIEW, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-doctor-'))
 const link = new EngineLink()
@@ -88,10 +88,9 @@ test('a finish skill that is missing, that lists no headings, or that no longer 
 })
 
 const RULES = { N1: 'A name says what it holds.' }
-const SETTINGS = { version: 1 }
 
 test('a reviewer that starts, with its skill and rules to judge, is alive', () => {
-  const reviewers = { runtime: 'codex', reviewers: { codex: { model: 'gpt-5.5' } }, skill: 'docs/review.md' }
+  const reviewers = { ...REVIEW, runtime: 'codex', reviewers: { codex: { model: 'gpt-5.5' } }, skill: 'docs/review.md' }
 
   writeConfig(top, { settings: SETTINGS, reviewers, rules: RULES })
   weaver(top, ['install', 'claude'])
@@ -108,7 +107,7 @@ test('a reviewer that starts, with its skill and rules to judge, is alive', () =
 })
 
 test('a reviewer whose command does not start, whose skill is missing, or that the end of a turn cannot wait for is a problem', () => {
-  const reviewers = { runtime: 'claude', skill: 'docs/review.md', waitSeconds: 3000 }
+  const reviewers = { ...REVIEW, runtime: 'claude', skill: 'docs/review.md', waitSeconds: 3000 }
 
   writeConfig(top, { settings: SETTINGS, reviewers, rules: RULES })
 
@@ -124,7 +123,7 @@ test('a reviewer whose command does not start, whose skill is missing, or that t
 })
 
 test('when either runtime may be the one that reviews, both must start', () => {
-  writeConfig(top, { settings: SETTINGS, reviewers: { runtime: 'other', experiments: true }, rules: RULES })
+  writeConfig(top, { settings: SETTINGS, reviewers: { ...REVIEW, runtime: 'other', experiments: true }, rules: RULES })
 
   assert.deepEqual(weaver(top, ['doctor']).lines.slice(1, 4), [
     'ok      the review: by the runtime that did not write the change, for 1 rule(s), in a copy of the project where the reviewer may experiment',
@@ -132,20 +131,20 @@ test('when either runtime may be the one that reviews, both must start', () => {
     'ok      the reviewer codex starts',
   ])
 
-  writeConfig(top, { settings: SETTINGS, reviewers: { runtime: 'codex', critical: { paths: ['src/auth/**'] } }, rules: RULES })
+  writeConfig(top, { settings: SETTINGS, reviewers: { ...REVIEW, runtime: 'codex', critical: { paths: ['src/auth/**'] } }, rules: RULES })
   assert.ok(
     weaver(top, ['doctor']).lines.includes('PROBLEM claude may review here, and the claude command does not start: its reviews fail.'),
   )
 })
 
 test('a review that has no rule to judge is noted', () => {
-  writeConfig(top, { settings: SETTINGS, reviewers: { runtime: 'codex' } })
+  writeConfig(top, { settings: SETTINGS, reviewers: { ...REVIEW, runtime: 'codex' } })
   assert.ok(weaver(top, ['doctor']).lines.includes('-       the review is by codex, and it has no rule: it has nothing to judge'))
 })
 
 test('a configuration that cannot be read is a problem, with what is wrong in it', () => {
   weaver(top, ['install'])
-  writeFileSync(join(top, '.weaver/settings.json'), '{"version":1,"chekcs":{}}')
+  writeFileSync(join(top, '.weaver/settings.json'), JSON.stringify({ ...SETTINGS, chekcs: {} }))
 
   const { status, lines } = weaver(top, ['doctor'])
 

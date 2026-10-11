@@ -52,7 +52,7 @@ export class DeclarationParts {
   }
 
   declaration(): Declaration {
-    const settings = this.part<SettingsDocument>('settings', { version: 1 })
+    const settings = this.part<SettingsDocument>('settings', {})
     const guardsOf = this.part<GuardsDocument>('guards', {})
     const checksOf = this.part<ChecksDocument>('checks', {})
     const scripts = this.part<ScriptsDocument>('scripts', {})
@@ -95,7 +95,7 @@ export class DeclarationParts {
     })
   }
 
-  // A part that was not written is read as an empty one, so that it comes out with the defaults of its schema.
+  // A part that was not written is read as an empty one: what its schema requires is then reported as missing.
   private part<Shape>(name: PartName, empty: object): Shape {
     const file = DeclarationParts.FILES[name]
     const schema = new PartSchema(name)

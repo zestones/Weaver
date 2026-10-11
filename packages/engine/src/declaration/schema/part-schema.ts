@@ -18,7 +18,7 @@ export class PartSchema {
     this.validate = new Ajv({ allErrors: true, useDefaults: true, allowUnionTypes: true }).compile(SCHEMAS[part])
   }
 
-  // An accepted value comes out with the defaults it left out filled in.
+  // An accepted value comes out with an empty list or map where it left one out.
   accepts(value: unknown): boolean {
     return this.validate(value)
   }
