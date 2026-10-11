@@ -1,8 +1,10 @@
+import type { ExecutionCatalog } from '@weaver/agent-sdk'
+import type { Declaration, ReviewPolicy, ReviewerName } from '@weaver/engine'
 import type { EngineLink } from '../link/engine-link.ts'
 import type { Output } from '../output/output.ts'
 import { Project } from '../project/project.ts'
 import { RuntimeCatalog } from '../runtimes/runtime-catalog.ts'
-import type { RuntimeSettings } from '../runtimes/runtime-settings.ts'
+import { RuntimeSettings } from '../runtimes/runtime-settings.ts'
 import type { Command } from './command.ts'
 
 interface Finding {
@@ -11,6 +13,11 @@ interface Finding {
 }
 
 const MARKS = { ok: 'ok     ', problem: 'PROBLEM', note: '-      ' }
+const REVIEWERS: readonly ReviewerName[] = ['claude', 'codex']
+const WHO: Readonly<Record<string, string>> = {
+  same: 'the runtime that wrote the change',
+  other: 'the runtime that did not write the change',
+}
 
 export class DoctorCommand implements Command {
   readonly name = 'doctor'
@@ -19,11 +26,13 @@ export class DoctorCommand implements Command {
   private readonly cwd: string
   private readonly output: Output
   private readonly link: EngineLink
+  private readonly executions: ExecutionCatalog
 
-  constructor(cwd: string, output: Output, link: EngineLink) {
+  constructor(cwd: string, output: Output, link: EngineLink, executions: ExecutionCatalog) {
     this.cwd = cwd
     this.output = output
     this.link = link
+    this.executions = executions
   }
 
   run(): number {
@@ -32,6 +41,7 @@ export class DoctorCommand implements Command {
     const findings = [
       this.configuration(project),
       ...this.finishSkill(project),
+      ...this.review(project),
       this.hook(),
       ...runtimes.map((runtime) => this.runtime(runtime)),
       this.anyRuntime(runtimes),
@@ -77,6 +87,71 @@ export class DoctorCommand implements Command {
           {
             state: 'problem',
             text: `${skill.path} does not show ${missing.map((heading) => `## ${heading}`).join(', ')}, which the configuration waits for.`,
+          },
+        ]
+  }
+
+  private review(project: Project): Finding[] {
+    const declaration = project.readableDeclaration()
+    const judged = declaration?.rules.filter((rule) => rule.level === 'llm').length ?? 0
+
+    if (declaration === null) return []
+    if (declaration.review === null) {
+      return judged === 0
+        ? []
+        : [{ state: 'note', text: `${String(judged)} rule(s) of level llm and no review section: no one judges them` }]
+    }
+
+    return [...this.reviewers(declaration.review, judged), ...this.reviewSkill(project), ...this.reviewTime(declaration)]
+  }
+
+  private reviewers(policy: ReviewPolicy, judged: number): Finding[] {
+    const who = WHO[policy.runtime] ?? policy.runtime
+    const where = policy.experiments ? ', in a copy of the project where the reviewer may experiment' : ''
+    // Any of the two runtimes may then be the one that reviews.
+    const routed = policy.runtime in WHO || policy.criticalPaths.length > 0 || policy.criticalLines !== null
+    const review: Finding =
+      judged === 0
+        ? { state: 'note', text: `the review is by ${who}, and no rule is of level llm: it has nothing to judge` }
+        : { state: 'ok', text: `the review: by ${who}, for ${String(judged)} rule(s) of level llm${where}` }
+
+    return [review, ...REVIEWERS.flatMap((name) => this.reviewer(name, policy, routed || policy.runtime === name))]
+  }
+
+  private reviewer(name: ReviewerName, policy: ReviewPolicy, expected: boolean): Finding[] {
+    const { model } = policy.reviewers[name]
+    const named = model === null ? name : `${name} on ${model}`
+
+    if (this.executions.find(name)?.isAvailable() === true) return expected ? [{ state: 'ok', text: `the reviewer ${named} starts` }] : []
+
+    return expected
+      ? [{ state: 'problem', text: `${named} may review here, and the ${name} command does not start: its reviews fail.` }]
+      : [{ state: 'note', text: `the ${name} command does not start: a request marked #critical has no reviewer` }]
+  }
+
+  private reviewSkill(project: Project): Finding[] {
+    const skill = project.reviewSkill()
+
+    if (skill === null) return []
+
+    return skill.exists
+      ? [{ state: 'ok', text: `the review skill: ${skill.path}` }]
+      : [{ state: 'problem', text: `${skill.path} is missing, and the reviewer is pointed to it. Run weaver install to write a template.` }]
+  }
+
+  // A hook the runtime stops before its end says nothing: the unit of work would stay open without a word. A review
+  // that takes longer than the wait goes on by itself, so only the wait counts.
+  private reviewTime(declaration: Declaration): Finding[] {
+    const checks = declaration.finish.deadlineSeconds
+    const wait = declaration.review?.waitSeconds ?? 0
+    const given = RuntimeSettings.END_OF_TURN_SECONDS
+
+    return checks + wait <= given
+      ? []
+      : [
+          {
+            state: 'problem',
+            text: `the checks (${String(checks)} s) and the wait for a review (${String(wait)} s) may last longer than the ${String(given)} s the end of a turn is given: lower finish.deadlineSeconds or review.waitSeconds.`,
           },
         ]
   }

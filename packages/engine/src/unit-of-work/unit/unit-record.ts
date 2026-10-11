@@ -20,6 +20,10 @@ interface CheckProgress {
   readonly result: 'pass' | 'fail' | null
   // The agent was told how to end the work, for the request in progress.
   readonly reminded: boolean
+  // The contents whose review sent the agent back, for the request in progress.
+  readonly reviewed: readonly string[]
+  // The content whose review is still running.
+  readonly reviewing: string | null
 }
 
 export interface UnitRecord {

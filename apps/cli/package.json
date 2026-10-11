@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@weaver/agent-sdk": "workspace:*",
     "@weaver/engine": "workspace:*"
   },
   "devDependencies": {

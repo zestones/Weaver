@@ -24,17 +24,20 @@ interface Settings {
 export type Wiring = 'absent' | 'stale' | 'installed'
 
 const TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure'])
-// The end of a turn waits for the project's checks, whose own deadline is twenty minutes unless the project says so.
+// The end of a turn waits for the project's checks, then for its reviewer.
+const END_OF_TURN_SECONDS = 3600
 const TIMEOUT_SECONDS: Readonly<Record<string, number>> = {
   UserPromptSubmit: 30,
   PreToolUse: 10,
   PostToolUse: 120,
   PostToolUseFailure: 120,
-  Stop: 3600,
+  Stop: END_OF_TURN_SECONDS,
 }
 const DEFAULT_TIMEOUT_SECONDS = 60
 
 export abstract class RuntimeSettings {
+  static readonly END_OF_TURN_SECONDS = END_OF_TURN_SECONDS
+
   abstract readonly label: string
   abstract readonly file: string
   private readonly agent: Agent

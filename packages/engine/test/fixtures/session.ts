@@ -3,6 +3,12 @@ import { AgentCatalog } from '../../src/agents/runtimes/agent-catalog.ts'
 import { Payload } from '../../src/agents/events/payload.ts'
 import { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
 import type { CheckRunner } from '../../src/checks/running/check-runner.ts'
+import type { ReviewRequest } from '../../src/review/request/review-request.ts'
+import { ReviewOutcome } from '../../src/review/results/review-outcome.ts'
+import { InlineLauncher } from '../../src/review/launching/inline-launcher.ts'
+import { ReviewRounds } from '../../src/review/rounds/review-rounds.ts'
+import type { ReviewAssignment } from '../../src/review/routing/review-routing.ts'
+import type { Reviewer } from '../../src/review/running/reviewer.ts'
 import type { Declaration } from '../../src/declaration/content/declaration.ts'
 import { DeclarationFile } from '../../src/declaration/reading/declaration-file.ts'
 import { AfterCall } from '../../src/loop/moments/after-call.ts'
@@ -24,10 +30,16 @@ export interface CheckStub extends CheckRunner {
   readonly seen: string[][]
 }
 
+export interface ReviewerStub extends Reviewer {
+  readonly requests: ReviewRequest[]
+  readonly assignments: ReviewAssignment[]
+}
+
 export const A_FILE = 'src/a.ts'
 export const B_FILE = 'src/b.ts'
 const FINISHED = '## Request\n\nDone.\n\n## To validate\n\nNothing.\n'
 const AGENTS = new AgentCatalog()
+const REVIEW_POLL_MS = 2
 
 export const declaration = (extra: Raw = {}): Declaration =>
   new DeclarationFile('weaver.config.json').parse(
@@ -126,13 +138,43 @@ export function stubChecks(outcomes: readonly CheckOutcome[], during: () => Prom
   }
 }
 
+export function stubReviewer(outcomes: readonly ReviewOutcome[]): ReviewerStub {
+  const left = [...outcomes]
+  const requests: ReviewRequest[] = []
+  const assignments: ReviewAssignment[] = []
+
+  return {
+    requests,
+    assignments,
+    review: (request, assignment) => {
+      requests.push(request)
+      assignments.push(assignment)
+
+      return Promise.resolve(
+        left.shift() ?? new ReviewOutcome({ runtime: assignment.runtime, seconds: 0, failure: 'no review was expected' }),
+      )
+    },
+  }
+}
+
 export async function finishWith(
   session: Session,
   checks: CheckRunner,
   project: Declaration = declaration(),
   message = FINISHED,
+  reviewer: Reviewer = stubReviewer([]),
 ): Promise<AnswerBody> {
-  const answer = await new EndOfTurn(checks).run(turnOf(session, { last_assistant_message: message }, project))
+  return finishThrough(session, checks, new ReviewRounds(new InlineLauncher(reviewer), REVIEW_POLL_MS), project, message)
+}
+
+export async function finishThrough(
+  session: Session,
+  checks: CheckRunner,
+  reviews: ReviewRounds,
+  project: Declaration = declaration(),
+  message = FINISHED,
+): Promise<AnswerBody> {
+  const answer = await new EndOfTurn(checks, reviews).run(turnOf(session, { last_assistant_message: message }, project))
 
   return answer.body ?? {}
 }

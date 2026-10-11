@@ -21,6 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@weaver/agent-sdk": "workspace:*",
     "ajv": "8.20.0",
     "unbash": "2.2.0"
   },

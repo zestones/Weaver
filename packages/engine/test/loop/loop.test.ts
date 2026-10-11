@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeEach, test } from 'vitest'
 import type { Repository } from '../../src/lib/git/repository.ts'
 import { Journal } from '../../src/unit-of-work/journal/journal.ts'
@@ -65,6 +66,7 @@ afterAll(() => {
 
 beforeEach(() => {
   counter += 1
+  environment = process.env
   repo = makeRepo(join(scratch, `repo-${String(counter)}`), {
     'weaver.config.json': JSON.stringify(DECLARATION, null, 2),
     'tools/parse.mjs': PARSE,
@@ -73,9 +75,16 @@ beforeEach(() => {
   })
 })
 
+let environment: NodeJS.ProcessEnv = process.env
+
 function hook(event: string, payload: Record<string, unknown>, session = 'session-1', agent = 'claude'): Answer {
   const input = JSON.stringify({ hook_event_name: event, session_id: session, cwd: repo.top, ...payload })
-  const result = spawnSync(process.execPath, [HOOK, event, `--agent=${agent}`], { input, encoding: 'utf8', cwd: repo.top })
+  const result = spawnSync(process.execPath, [HOOK, event, `--agent=${agent}`], {
+    input,
+    encoding: 'utf8',
+    cwd: repo.top,
+    env: environment,
+  })
 
   assert.equal(result.status, 0, result.stderr)
 
@@ -229,6 +238,155 @@ process.exitCode = judging && untidy ? 1 : 0
   assert.match(stop().systemMessage ?? '', /2 check\(s\) passed on 1 changed file\(s\)\. Report/)
   assert.deepEqual(kinds(), ['touch', 'touch', 'check', 'touch', 'check', 'settle'])
   assert.deepEqual(stop(), {}, 'what the repair rewrote settled with the unit')
+})
+
+test('a declared reviewer is a real agent runtime, started once the checks pass; its findings send the agent back', () => {
+  const bin = join(scratch, `bin-${String(counter)}`)
+  const codex = `#!/usr/bin/env node
+let asked = ''
+process.stdin.on('data', (chunk) => { asked += chunk })
+process.stdin.on('end', () => {
+  const finding = { rule: 'N1', file: 'src/r.js', line: 1, quote: 'export const r = input', problem: 'name what the input is', suggestion: null, evidence: null }
+  const answer = { summary: 'Read src/r.js.', findings: asked.includes('+ export const r = input') ? [finding] : [], suspicions: [], experiments: [] }
+  console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'Reading src/r.js.' } }))
+  console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(answer) } }))
+})
+`
+  const declared = {
+    version: 1,
+    review: { runtime: 'codex' },
+    checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] } },
+    rules: {
+      S1: { level: 'gate', statement: 'Source files parse.', check: 'syntax' },
+      N1: { level: 'llm', statement: 'A name says what it holds.', scope: ['src/**'] },
+    },
+  }
+
+  writeFiles(repo.top, { 'weaver.config.json': JSON.stringify(declared) })
+  writeFiles(bin, { codex })
+  chmodSync(join(bin, 'codex'), 0o755)
+  environment = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` }
+  hook('UserPromptSubmit', { prompt: 'add r' })
+  write('src/r.js', 'export const r = input\n')
+
+  const refused = stop()
+
+  assert.equal(refused.decision, 'block')
+  assert.match(refused.reason ?? '', /the reviewer \(codex\) found 1 point\(s\)[^]*\nF1 N1 src\/r\.js:1: name what the input is\n/)
+
+  write('src/r.js', 'export const r = userInput\n')
+
+  const settled = stop(`${FINISHED}\nF1 fixed: the constant now says whose input it holds\n`)
+
+  assert.match(
+    settled.systemMessage ?? '',
+    /1 check\(s\) passed on 1 changed file\(s\)\. Reviewed by codex: 1 finding\(s\), 1 answered fixed\./,
+  )
+  assert.deepEqual(kinds(), ['touch', 'check', 'review', 'touch', 'check', 'answer', 'settle'])
+})
+
+test('a hook stopped while it waits leaves its review to the next end of turn, which does not start another', async () => {
+  const bin = join(scratch, `bin-${String(counter)}`)
+  const started = join(scratch, `started-${String(counter)}`)
+  const codex = `#!/usr/bin/env node
+let asked = ''
+process.stdin.on('data', (chunk) => { asked += chunk })
+process.stdin.on('end', () => {
+  require('node:fs').appendFileSync(${JSON.stringify(started)}, 'review\\n')
+  setTimeout(() => {
+    const finding = { rule: 'N1', file: 'src/r.js', line: 1, quote: null, problem: 'name what the input is', suggestion: null, evidence: null }
+    const answer = { summary: 'Read src/r.js.', findings: [finding], suspicions: [], experiments: [] }
+    console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: JSON.stringify(answer) } }))
+  }, 1500)
+})
+`
+  const declared = {
+    version: 1,
+    review: { runtime: 'codex' },
+    checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] } },
+    rules: {
+      S1: { level: 'gate', statement: 'Source files parse.', check: 'syntax' },
+      N1: { level: 'llm', statement: 'A name says what it holds.', scope: ['src/**'] },
+    },
+  }
+
+  writeFiles(repo.top, { 'weaver.config.json': JSON.stringify(declared) })
+  writeFiles(bin, { codex })
+  chmodSync(join(bin, 'codex'), 0o755)
+  environment = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` }
+  hook('UserPromptSubmit', { prompt: 'add r' })
+  write('src/r.js', 'export const r = input\n')
+
+  const waiting = spawn(process.execPath, [HOOK, 'Stop', '--agent=claude'], {
+    cwd: repo.top,
+    env: environment,
+    stdio: ['pipe', 'ignore', 'ignore'],
+  })
+
+  waiting.stdin.end(JSON.stringify({ hook_event_name: 'Stop', session_id: 'session-1', cwd: repo.top, last_assistant_message: FINISHED }))
+
+  for (let tries = 0; tries < 200 && !existsSync(started); tries += 1) await sleep(50)
+
+  waiting.kill('SIGKILL')
+
+  const delivered = stop()
+
+  assert.equal(delivered.decision, 'block')
+  assert.match(delivered.reason ?? '', /\nF1 N1 src\/r\.js:1: name what the input is\n/)
+  assert.equal(readFileSync(started, 'utf8'), 'review\n', 'the reviewer was started once')
+})
+
+test('a word of the owner that is almost a directive is said back at once, in a project that reviews its changes', () => {
+  assert.deepEqual(hook('UserPromptSubmit', { prompt: 'rename it #critcal' }), {}, 'this project declares no review')
+
+  writeFiles(repo.top, { 'weaver.config.json': JSON.stringify({ version: 1, review: { runtime: 'codex' } }) })
+
+  assert.equal(
+    hook('UserPromptSubmit', { prompt: 'rename it #critcal' }).systemMessage,
+    '[weaver] #critcal is not a directive: did you mean #critical?',
+  )
+  assert.deepEqual(hook('UserPromptSubmit', { prompt: 'rename it #critical' }), {})
+})
+
+test('a reviewer at work in a copy of the project is held there by its own hook, which keeps nothing', () => {
+  const copy = join(scratch, `copy-${String(counter)}`)
+  const call = (path: string) => ({ tool_name: 'Write', tool_input: { file_path: path, content: 'x' }, tool_use_id: 'c', cwd: copy })
+  const asReviewer = (event: string, payload: Record<string, unknown>) =>
+    JSON.parse(
+      spawnSync(process.execPath, [HOOK, event, '--agent=claude', `--review-copy=${copy}`], {
+        input: JSON.stringify({ session_id: 'reviewer', cwd: copy, ...payload }),
+        encoding: 'utf8',
+        env: { ...process.env, WEAVER_REVIEWER: '1' },
+      }).stdout || '{}',
+    ) as Answer
+
+  assert.deepEqual(asReviewer('PreToolUse', call(join(copy, 'probe.test.js'))), {})
+  assert.deepEqual(asReviewer('PreToolUse', call(join(tmpdir(), 'probe.txt'))), {})
+
+  // The repositories of these tests live in the temporary folder, where a reviewer may write: the project is elsewhere.
+  const project = join(homedir(), 'project')
+  const refused = asReviewer('PreToolUse', call(join(project, 'src/one.js')))
+
+  assert.equal(refused.hookSpecificOutput?.permissionDecision, 'deny')
+  assert.match(refused.hookSpecificOutput?.permissionDecisionReason ?? '', /A reviewer writes only inside its copy of the project/)
+  assert.equal(
+    asReviewer('PreToolUse', { tool_name: 'Bash', tool_input: { command: `echo x > ${project}/src/one.js` }, tool_use_id: 'c' })
+      .hookSpecificOutput?.permissionDecision,
+    'deny',
+  )
+  assert.deepEqual(asReviewer('Stop', { last_assistant_message: 'done' }), {})
+  assert.equal(existsSync(repo.stateDir), false)
+})
+
+test('a reviewer Weaver started is not supervised by Weaver: its own hooks answer nothing and keep nothing', () => {
+  environment = { ...process.env, WEAVER_REVIEWER: '1' }
+
+  const call = { tool_name: 'Write', tool_input: { file_path: join(repo.top, 'tools/markers.mjs') }, tool_use_id: 'r' }
+
+  assert.deepEqual(hook('UserPromptSubmit', { prompt: 'review this' }, 'reviewer'), {})
+  assert.deepEqual(hook('PreToolUse', call, 'reviewer'), {}, 'not even the guards: it can only read')
+  assert.deepEqual(hook('Stop', { last_assistant_message: 'done' }, 'reviewer'), {})
+  assert.equal(existsSync(repo.stateDir), false)
 })
 
 test('a turn that ends on a question checks nothing; a shell command is charged with the file it names', () => {

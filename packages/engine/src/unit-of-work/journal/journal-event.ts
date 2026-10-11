@@ -50,6 +50,29 @@ interface RefuseEvent {
   readonly what: string
 }
 
-export type EventBody = TouchEvent | CheckEvent | SettleEvent | HeadMovedEvent | RefuseEvent
+interface ReviewEvent {
+  readonly kind: 'review'
+  readonly unit: number
+  readonly runtime: string
+  // Why this runtime reviewed, or why no review was run.
+  readonly reason: string
+  readonly standing: string
+  readonly findings: number
+  readonly suspicions: number
+  readonly dropped: number
+  readonly failure: string | null
+  readonly seconds: number
+  readonly costUsd: number | null
+}
+
+interface AnswerEvent {
+  readonly kind: 'answer'
+  readonly unit: number
+  readonly finding: number
+  readonly rule: string
+  readonly status: 'fixed' | 'not-fixed' | 'missing'
+}
+
+export type EventBody = TouchEvent | CheckEvent | SettleEvent | HeadMovedEvent | RefuseEvent | ReviewEvent | AnswerEvent
 export type JournalEvent = EventBase & EventBody
 export type EventOf<Kind extends EventBody['kind']> = Extract<JournalEvent, { kind: Kind }>

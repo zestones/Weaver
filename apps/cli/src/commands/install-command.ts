@@ -43,9 +43,10 @@ export class InstallCommand implements Command {
         ? `${project.configName} created: declare your rules, checks and guards there.`
         : `${project.configName} kept as it is.`,
     )
-    const skill = project.finishSkill()
 
-    if (skill?.create() === true) this.output.say(`${skill.path} created: it tells the agent how to end a task. Adapt it to your project.`)
+    for (const skill of project.skills()) {
+      if (skill.create()) this.output.say(`${skill.path} created: ${skill.purpose} Adapt it to your project.`)
+    }
 
     this.output.say(
       `Wired to the Weaver checkout that holds ${dirname(this.link.hook)}. This is temporary: run weaver install again if it moves, and weaver doctor to check it.`,

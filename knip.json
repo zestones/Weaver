@@ -5,7 +5,11 @@
       "project": ["*.{js,mjs,ts}"]
     },
     "packages/engine": {
-      "entry": ["src/index.ts", "src/bin/hook.ts"],
+      "entry": ["src/index.ts", "src/bin/hook.ts", "src/bin/review-worker.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/agent-sdk": {
+      "entry": ["src/index.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "apps/cli": {

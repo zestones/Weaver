@@ -50,6 +50,45 @@ export class TreeDiff {
     return [...this.listFiles(pathspec)].map(([path, { status, oldPath }]) => ({ status, path, oldPath, added: ranges.get(path) ?? [] }))
   }
 
+  // The changes of these paths as a patch, for a reader rather than for a program.
+  patch(paths: readonly string[]): string {
+    if (paths.length === 0) return ''
+
+    return this.repo.git([
+      ...PINNED,
+      'diff',
+      '-M',
+      '--no-color',
+      '--no-ext-diff',
+      '--no-textconv',
+      this.base,
+      this.head,
+      '--',
+      ...paths.map((path) => `:(top,literal)${path}`),
+    ])
+  }
+
+  // Lines added and lines removed in these paths; a file that is not text counts for none.
+  changedLines(paths: readonly string[]): number {
+    if (paths.length === 0) return 0
+
+    return this.repo
+      .git([
+        ...PINNED,
+        'diff',
+        '--numstat',
+        '--no-ext-diff',
+        '--no-textconv',
+        this.base,
+        this.head,
+        '--',
+        ...paths.map((path) => `:(top,literal)${path}`),
+      ])
+      .split('\n')
+      .flatMap((row) => row.split('\t').slice(0, 2))
+      .reduce((sum, count) => sum + (Number(count) || 0), 0)
+  }
+
   excludedFolders(excluded: readonly string[]): ExcludedFolder[] {
     return excluded.map((folder) => ({ folder, files: this.listFiles([`:(top)${folder}`]).size })).filter((entry) => entry.files > 0)
   }

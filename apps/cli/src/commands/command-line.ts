@@ -1,8 +1,11 @@
+import { ExecutionCatalog } from '@weaver/agent-sdk'
 import { EngineLink } from '../link/engine-link.ts'
 import type { Output } from '../output/output.ts'
+import { CloseCommand } from './close-command.ts'
 import type { Command } from './command.ts'
 import { DoctorCommand } from './doctor-command.ts'
 import { InstallCommand } from './install-command.ts'
+import { StatusCommand } from './status-command.ts'
 import { UninstallCommand } from './uninstall-command.ts'
 
 const HELP = new Set(['help', '--help', '-h'])
@@ -11,11 +14,13 @@ export class CommandLine {
   private readonly cwd: string
   private readonly output: Output
   private readonly link: EngineLink | null
+  private readonly executions: ExecutionCatalog
 
-  constructor(cwd: string, output: Output, link: EngineLink | null = null) {
+  constructor(cwd: string, output: Output, link: EngineLink | null = null, executions: ExecutionCatalog = new ExecutionCatalog()) {
     this.cwd = cwd
     this.output = output
     this.link = link
+    this.executions = executions
   }
 
   run(argv: readonly string[]): number {
@@ -40,7 +45,13 @@ export class CommandLine {
   private commands(): Command[] {
     const link = this.link ?? new EngineLink()
 
-    return [InstallCommand, UninstallCommand, DoctorCommand].map((Each) => new Each(this.cwd, this.output, link))
+    return [
+      new InstallCommand(this.cwd, this.output, link),
+      new UninstallCommand(this.cwd, this.output, link),
+      new DoctorCommand(this.cwd, this.output, link, this.executions),
+      new StatusCommand(this.cwd, this.output),
+      new CloseCommand(this.cwd, this.output),
+    ]
   }
 
   private usage(commands: readonly Command[]): void {

@@ -4,6 +4,7 @@ import { Declaration } from '../content/declaration.ts'
 import type { DeclaredCheck } from '../content/declared-check.ts'
 import type { DeclaredGuard } from '../content/declared-guard.ts'
 import { FinishPolicy } from '../content/finish-policy.ts'
+import { ReviewPolicy, type ReviewerName, type ReviewerSettings } from '../content/review-policy.ts'
 import { GateRule } from '../rules/gate-rule.ts'
 import { HumanRule } from '../rules/human-rule.ts'
 import { LlmRule } from '../rules/llm-rule.ts'
@@ -31,7 +32,7 @@ export class DeclarationFile {
   }
 
   parse(text: string): Declaration {
-    const { scope, finish, scripts, ...document } = this.document(text)
+    const { scope, finish, review, scripts, ...document } = this.document(text)
     const checks = Object.entries(document.checks).map(([id, check]): DeclaredCheck => ({
       ...check,
       id,
@@ -47,6 +48,7 @@ export class DeclarationFile {
           source: rule.source ?? null,
           scope: rule.scope ?? null,
           check: rule.check ?? null,
+          evidence: rule.evidence,
         }),
     )
     const guards = Object.entries(document.guards).map(([id, guard]): DeclaredGuard => ({ ...guard, id }))
@@ -57,10 +59,33 @@ export class DeclarationFile {
     return new Declaration({
       exclude: scope.exclude,
       finish: new FinishPolicy({ ...finish, headings: finish.headings ?? null, skill: finish.skill ?? null }),
+      review: review === undefined ? null : this.reviewPolicy(review),
       scripts,
       checks,
       guards,
       rules,
+    })
+  }
+
+  private reviewPolicy(review: NonNullable<DeclarationDocument['review']>): ReviewPolicy {
+    const settings = (name: ReviewerName): ReviewerSettings => ({
+      model: review.reviewers[name]?.model ?? null,
+      effort: review.reviewers[name]?.effort ?? null,
+      maxTurns: review.reviewers[name]?.maxTurns ?? null,
+      maxCostUsd: review.reviewers[name]?.maxCostUsd ?? null,
+    })
+
+    return new ReviewPolicy({
+      runtime: review.runtime,
+      reviewers: { claude: settings('claude'), codex: settings('codex') },
+      criticalPaths: review.critical.paths,
+      criticalLines: review.critical.lines ?? null,
+      experiments: review.experiments,
+      timeoutSeconds: review.timeoutSeconds,
+      waitSeconds: review.waitSeconds,
+      maxRounds: review.maxRounds,
+      skill: review.skill ?? null,
+      issue: review.issue ?? null,
     })
   }
 
@@ -95,6 +120,15 @@ export class DeclarationFile {
 
     return [
       ...rules.flatMap((rule) => rule.bindingProblem(known, guardsOf(rule)) ?? []),
+      ...rules.flatMap((rule) => {
+        const lister = rule.level === 'llm' ? checks.find((check) => check.id === rule.check) : undefined
+
+        return lister === undefined || lister.reads === 'findings'
+          ? []
+          : [
+              `rules.${rule.id}.check names ${lister.id}, which reads ${lister.reads}: the check of an llm rule lists places for the reviewer, so it reads findings`,
+            ]
+      }),
       ...guards.flatMap((guard) => {
         if (!rules.some((rule) => rule.id === guard.rule)) return [`guards.${guard.id}.rule names ${guard.rule}, which is not a rule`]
         if (guard.writes.length + guard.runs.length === 0) return [`guards.${guard.id} refuses nothing: it needs writes or runs`]

@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { ProjectSkill } from './project-skill.ts'
 
 const EXPECTS: Readonly<Record<string, string>> = {
   Request: 'What you did for the request, and how you verified it: on the real stack, by tests only, or not at all and why.',
@@ -9,43 +8,25 @@ const EXPECTS: Readonly<Record<string, string>> = {
 }
 const PLACEHOLDER = 'Say here what this section must hold.'
 
-export class FinishSkill {
+export class FinishSkill extends ProjectSkill {
   static readonly PATH = '.agents/skills/wv-finish.md'
   static readonly HEADINGS: readonly string[] = Object.keys(EXPECTS)
 
-  readonly path: string
-  private readonly file: string
+  override readonly purpose = 'it tells the agent how to end a task.'
   private readonly headings: readonly string[]
 
   constructor(top: string, path: string, headings: readonly string[]) {
-    this.path = path
-    this.file = join(top, path)
+    super(top, path)
     this.headings = headings
   }
 
-  get exists(): boolean {
-    return existsSync(this.file)
-  }
-
-  // The skill is the owner's once it exists: it is never written over.
-  create(): boolean {
-    if (this.exists) return false
-
-    mkdirSync(dirname(this.file), { recursive: true })
-    writeFileSync(this.file, this.template())
-
-    return true
-  }
-
   missingHeadings(): string[] {
-    const lines = readFileSync(this.file, 'utf8')
-      .split('\n')
-      .map((line) => line.trim())
+    const lines = this.lines()
 
     return this.headings.filter((heading) => !lines.includes(`## ${heading}`))
   }
 
-  private template(): string {
+  protected override template(): string {
     const sections = this.headings.map((heading) => `## ${heading}\n\n${EXPECTS[heading] ?? PLACEHOLDER}`).join('\n\n')
 
     return [
@@ -61,6 +42,7 @@ export class FinishSkill {
       '',
       '- Write one point per subject, and nothing under a heading when there is nothing to say.',
       '- When the checks fail, Weaver sends you back with each failure. Fix them, then end again with the same sections.',
+      '- When a reviewer found points on your change, Weaver sends you back with them, numbered F1, F2 and so on. Fix each one or decide to leave it, then answer each in your final message, one line each: `F1 fixed: <what you changed>` or `F1 not fixed: <why>`.',
       '- This file is the project owner’s: describe the change you need rather than editing it.',
       '',
     ].join('\n')

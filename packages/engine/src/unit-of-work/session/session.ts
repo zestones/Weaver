@@ -97,6 +97,22 @@ export class Session {
     }).value
   }
 
+  reviewRound(content: string): void {
+    this.store.update((latest) => ({ ...latest, unit: new UnitOfWork(latest.unit).withReviewRound(content).record }))
+  }
+
+  reviewRunning(content: string | null): void {
+    this.store.update((latest) => ({ ...latest, unit: new UnitOfWork(latest.unit).withReviewRunning(content).record }))
+  }
+
+  get failedReview(): string | null {
+    return this.state()?.failedReview ?? null
+  }
+
+  reviewFailed(content: string | null): void {
+    this.store.update((latest) => ({ ...latest, failedReview: content, unit: new UnitOfWork(latest.unit).withReviewRunning(null).record }))
+  }
+
   failRound(): number {
     return this.store.update((latest) => ({ ...latest, unit: new UnitOfWork(latest.unit).withFailedRound().record })).unit.check.rounds
   }

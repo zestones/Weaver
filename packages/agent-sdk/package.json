@@ -1,0 +1,21 @@
+{
+  "name": "@weaver/agent-sdk",
+  "version": "0.0.0",
+  "description": "What Weaver asks of an agent runtime, and how Claude Code and Codex are asked",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "5.0.3"
+  }
+}

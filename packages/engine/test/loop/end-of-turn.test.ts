@@ -155,7 +155,7 @@ test('what waits for the owner is counted, listed in the report and never blocks
   )
   assert.match(
     report,
-    /## For the reviewer \(no review runs yet\)\n\n- N1: One level of abstraction per function\. \(docs\/conventions\.md\)\n\n?$/,
+    /## Rules of level llm, which no review judged\n\n- N1: One level of abstraction per function\. \(docs\/conventions\.md\)\n\n?$/,
   )
   assert.equal(checksOf()[0]?.toValidate, 2)
   assert.deepEqual(unitFiles(session), [])

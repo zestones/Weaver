@@ -1,6 +1,7 @@
 import type { Rule } from '../../declaration/rules/rule.ts'
 import type { ProcessResult } from '../../lib/process/process.ts'
-import type { CheckOutcome, Finding } from '../results/check-outcome.ts'
+import type { Finding } from '../../declaration/rules/finding.ts'
+import type { CheckOutcome } from '../results/check-outcome.ts'
 import { Check } from './check.ts'
 
 export class FindingsCheck extends Check {
@@ -27,6 +28,7 @@ export class FindingsCheck extends Check {
       reason: crashed ? `the check exited with ${String(result.code)}` : null,
       failures,
       toValidate: findings.filter((finding) => this.ruleOf(finding)?.waitsForOwner === true),
+      candidates: findings.filter((finding) => this.ruleOf(finding)?.level === 'llm'),
     })
   }
 

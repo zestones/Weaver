@@ -13,12 +13,12 @@ export class EngineGuard extends Guard {
   private readonly top: string
   private readonly owned: readonly string[]
 
-  constructor(repo: Repository, skill: string | null) {
+  constructor(repo: Repository, skills: readonly string[]) {
     super({
       id: 'weaver',
       rule: 'weaver:protected',
       statement:
-        "Weaver's configuration, its state, the agent's hook settings and the skill that says how a task ends are the owner's. Describe the change you need; the owner makes it.",
+        "Weaver's configuration, its state, the agent's hook settings and the skills Weaver relies on are the owner's. Describe the change you need; the owner makes it.",
     })
     this.top = realPath(repo.top)
     this.owned = [
@@ -26,7 +26,7 @@ export class EngineGuard extends Guard {
       join(repo.gitDir, 'weaver'),
       join(repo.commonDir, 'weaver'),
       ...AGENT_HOOKS.map((path) => join(repo.top, path)),
-      ...(skill === null ? [] : [join(repo.top, skill)]),
+      ...skills.map((skill) => join(repo.top, skill)),
     ].map(realPath)
   }
 

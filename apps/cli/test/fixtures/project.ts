@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { ClaudeCodeExecution, ExecutionCatalog, ScriptedExecution } from '@weaver/agent-sdk'
 import { CommandLine } from '../../src/commands/command-line.ts'
 import type { EngineLink } from '../../src/link/engine-link.ts'
 import type { Output } from '../../src/output/output.ts'
@@ -25,9 +26,12 @@ export function makeProject(top: string): string {
   return top
 }
 
+// On the machine of these tests, Codex starts and Claude Code does not.
+const EXECUTIONS = new ExecutionCatalog([new ScriptedExecution('codex', []), new ClaudeCodeExecution('/nowhere/claude')])
+
 export function weaver(cwd: string, args: readonly string[], link: EngineLink | null = null): Run {
   const output = new RecordingOutput()
-  const status = new CommandLine(cwd, output, link).run(args)
+  const status = new CommandLine(cwd, output, link, EXECUTIONS).run(args)
 
   return { status, lines: output.lines }
 }

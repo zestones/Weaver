@@ -1,9 +1,4 @@
-export interface Finding {
-  readonly rule: string
-  readonly file: string
-  readonly line?: number
-  readonly message: string
-}
+import type { Finding } from '../../declaration/rules/finding.ts'
 
 export type CheckStatus = 'pass' | 'fail' | 'timeout' | 'skip'
 
@@ -17,6 +12,7 @@ export interface OutcomeFields {
   readonly reason?: string | null
   readonly failures?: readonly Finding[]
   readonly toValidate?: readonly Finding[]
+  readonly candidates?: readonly Finding[]
 }
 
 const EXCERPT_LINES = 30
@@ -31,6 +27,8 @@ export class CheckOutcome {
   readonly reason: string | null
   readonly failures: readonly Finding[]
   readonly toValidate: readonly Finding[]
+  // Places a rule of level llm is about, for the reviewer to judge one by one.
+  readonly candidates: readonly Finding[]
 
   constructor(fields: OutcomeFields) {
     this.id = fields.id
@@ -42,6 +40,7 @@ export class CheckOutcome {
     this.reason = fields.reason ?? null
     this.failures = fields.failures ?? []
     this.toValidate = fields.toValidate ?? []
+    this.candidates = fields.candidates ?? []
   }
 
   get ran(): boolean {

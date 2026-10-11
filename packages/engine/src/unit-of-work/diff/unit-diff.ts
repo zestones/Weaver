@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { Repository } from '../../lib/git/repository.ts'
 import { TreeDiff, type ChangedFile, type ExcludedFolder } from '../../lib/git/tree-diff.ts'
 import { WorkingTreeSnapshot } from '../../lib/git/working-tree-snapshot.ts'
+import { numberedDiff } from '../../lib/text/numbered-diff.ts'
 import type { UnitFile } from '../unit/unit-record.ts'
 import { BaseTree } from './base-tree.ts'
 
@@ -42,6 +43,20 @@ export class UnitDiff {
 
   get paths(): string[] {
     return this.files.map((file) => file.path)
+  }
+
+  get addedLines(): number {
+    return this.files.flatMap((file) => file.added).reduce((sum, [start, end]) => sum + end - start + 1, 0)
+  }
+
+  // How much these paths changed since an earlier state of the working tree.
+  linesSince(tree: string, paths: readonly string[]): number {
+    return new TreeDiff(this.repo, tree, this.head).changedLines(paths)
+  }
+
+  // The changes as a reader takes them in: a patch whose lines carry their number in the new file.
+  patch(): string {
+    return numberedDiff(new TreeDiff(this.repo, this.base, this.head).patch(this.files.flatMap((file) => [file.path, file.oldPath])))
   }
 
   changes(path: string): boolean {

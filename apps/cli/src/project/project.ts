@@ -1,8 +1,10 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DeclarationError, DeclarationFile, Repository, type Declaration } from '@weaver/engine'
-import { FinishSkill } from './finish-skill.ts'
+import { DeclarationError, DeclarationFile, Repository, ReviewLedger, type Declaration } from '@weaver/engine'
+import { FinishSkill } from '../skills/finish-skill.ts'
+import type { ProjectSkill } from '../skills/project-skill.ts'
+import { ReviewSkill } from '../skills/review-skill.ts'
 
 export class Project {
   readonly top: string
@@ -39,17 +41,39 @@ export class Project {
     return true
   }
 
-  // null when the project names no skill, or when its configuration cannot be read: the doctor says why.
-  finishSkill(): FinishSkill | null {
+  // null when there is no configuration, or when it cannot be read: the doctor says why.
+  readableDeclaration(): Declaration | null {
     try {
-      const finish = this.declaration()?.finish
-
-      return finish?.skill == null ? null : new FinishSkill(this.top, finish.skill, finish.headings ?? [])
+      return this.declaration()
     } catch (error) {
       if (error instanceof DeclarationError) return null
 
       throw error
     }
+  }
+
+  finishSkill(): FinishSkill | null {
+    const finish = this.readableDeclaration()?.finish
+
+    return finish?.skill == null ? null : new FinishSkill(this.top, finish.skill, finish.headings ?? [])
+  }
+
+  reviewSkill(): ReviewSkill | null {
+    const skill = this.readableDeclaration()?.review?.skill ?? null
+
+    return skill === null ? null : new ReviewSkill(this.top, skill)
+  }
+
+  skills(): ProjectSkill[] {
+    return [this.finishSkill(), this.reviewSkill()].flatMap((skill) => skill ?? [])
+  }
+
+  reviewLedger(): ReviewLedger {
+    const repo = Repository.locate(this.top)
+
+    if (repo === null) throw new Error(`${this.top} is not inside a git repository`)
+
+    return new ReviewLedger(repo)
   }
 
   ignores(path: string): boolean {

@@ -13,7 +13,7 @@ export class ProjectGuards {
 
   constructor(declaration: Declaration, repo: Repository) {
     this.guards = [
-      new EngineGuard(repo, declaration.finish.skill),
+      new EngineGuard(repo, declaration.skills),
       ...declaration.guards.flatMap((declared) => this.guardsOf(declared, declaration, repo)),
     ]
   }

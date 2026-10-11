@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { Loop } from '../loop/dispatch/loop.ts'
+import { ReviewerLoop } from '../loop/dispatch/reviewer-loop.ts'
 import { Answer } from '../loop/exchange/answer.ts'
+import { AgentReviewer } from '../review/running/agent-reviewer.ts'
+import { ReviewCopy } from '../review/workspace/review-copy.ts'
 
 class HookProgram {
   private readonly argv: readonly string[]
@@ -13,8 +16,18 @@ class HookProgram {
   async run(): Promise<void> {
     const [eventName = ''] = this.argv.filter((arg) => !arg.startsWith('--'))
 
+    const copy = ReviewCopy.fromArguments(this.argv)
+
+    // A reviewer in its copy is held there; any other hook of a reviewer answers nothing and keeps nothing.
+    if (copy === null && process.env[AgentReviewer.MARK] !== undefined) return
+
     try {
-      process.stdout.write((await new Loop().handle(eventName, this.argv, await this.input())).print())
+      const answer =
+        copy === null
+          ? await new Loop().handle(eventName, this.argv, await this.input())
+          : new ReviewerLoop(copy).handle(eventName, this.argv, await this.input())
+
+      process.stdout.write(answer.print())
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
 

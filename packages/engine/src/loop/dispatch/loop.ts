@@ -6,6 +6,9 @@ import type { Declaration } from '../../declaration/content/declaration.ts'
 import { DeclarationError } from '../../declaration/reading/declaration-error.ts'
 import { DeclarationFile } from '../../declaration/reading/declaration-file.ts'
 import { Repository } from '../../lib/git/repository.ts'
+import { DetachedLauncher } from '../../review/launching/detached-launcher.ts'
+import type { ReviewLauncher } from '../../review/launching/review-launcher.ts'
+import { ReviewRounds } from '../../review/rounds/review-rounds.ts'
 import { Answer } from '../exchange/answer.ts'
 import { Turn } from '../exchange/turn.ts'
 import { AfterCall } from '../moments/after-call.ts'
@@ -18,7 +21,7 @@ export class Loop {
   private readonly agents = new AgentCatalog()
   private readonly moments: ReadonlyMap<string, Moment>
 
-  constructor(checks: CheckRunner = new ProjectChecks()) {
+  constructor(checks: CheckRunner = new ProjectChecks(), launcher: ReviewLauncher = new DetachedLauncher()) {
     const afterCall = new AfterCall()
 
     this.moments = new Map<string, Moment>([
@@ -27,7 +30,7 @@ export class Loop {
       ['PostToolUse', afterCall],
       // A command that fails may have written files before it did.
       ['PostToolUseFailure', afterCall],
-      ['Stop', new EndOfTurn(checks)],
+      ['Stop', new EndOfTurn(checks, new ReviewRounds(launcher))],
     ])
   }
 

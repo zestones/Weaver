@@ -71,7 +71,7 @@ test('a level says who settles a rule, so it says whether a program may stand be
   ])
   assert.deepEqual(
     problemsOf({ version: 1, checks: { c: { verify: ['true'] } }, rules: { N1: { level: 'llm', statement: 'x', check: 'c' } } }),
-    ['rules.N1 is an llm rule and c enforces it: a reviewer settles it'],
+    ['rules.N1.check names c, which reads exit: the check of an llm rule lists places for the reviewer, so it reads findings'],
   )
   assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'machine', statement: 'x' } } }), [
     'rules.T1.level must be one of gate, llm, human',
@@ -164,6 +164,66 @@ test('a guard enforces a rule that exists and that a program may enforce, and re
   ])
   assert.deepEqual(problemsOf({ version: 1, guards: { g: { runs: ['claude'], rule: 'N1' } }, rules: { N1: rules.N1 } }), [
     'rules.N1 is an llm rule and g enforces it: a reviewer settles it',
+  ])
+})
+
+const NO_SETTINGS = { model: null, effort: null, maxTurns: null, maxCostUsd: null }
+
+test('a project says who reviews its changes, where a mistake costs the most, and whether the reviewer may experiment', () => {
+  const plain = parse({ version: 1, review: { runtime: 'codex' } }).review
+  const full = parse({
+    version: 1,
+    review: {
+      runtime: 'other',
+      reviewers: { claude: { model: 'opus', effort: 'max', maxCostUsd: 25 } },
+      issue: ['gh', 'issue', 'create', '--title', '{title}', '--body', '{body}'],
+      critical: { paths: ['src/auth/**'], lines: 200 },
+      experiments: true,
+      skill: 'docs/review.md',
+    },
+  })
+
+  assert.deepEqual(
+    [
+      plain?.runtime,
+      plain?.reviewers,
+      plain?.criticalPaths,
+      plain?.criticalLines,
+      plain?.experiments,
+      plain?.timeoutSeconds,
+      plain?.maxRounds,
+    ],
+    ['codex', { claude: NO_SETTINGS, codex: NO_SETTINGS }, [], null, false, 900, 1],
+  )
+  assert.deepEqual(
+    [full.review?.runtime, full.review?.reviewers.claude, full.review?.criticalPaths, full.review?.criticalLines, full.review?.experiments],
+    ['other', { ...NO_SETTINGS, model: 'opus', effort: 'max', maxCostUsd: 25 }, ['src/auth/**'], 200, true],
+  )
+  assert.deepEqual(full.skills, ['docs/review.md'], 'the skill of the reviewer is guarded as the others are')
+  assert.deepEqual([full.review?.issue?.[0], plain?.issue, plain?.waitSeconds], ['gh', null, 1500])
+  assert.equal(parse({ version: 1 }).review, null)
+  assert.match(problemsOf({ version: 1, review: { runtime: 'gemini' } }).join(' '), /review\.runtime/)
+})
+
+test('the check of a rule of level llm settles nothing: it lists the places its reviewer judges', () => {
+  const listed = parse({
+    version: 1,
+    checks: { comments: { verify: ['node', 'tools/new-comments.mjs'], reads: 'findings' } },
+    rules: { C1: { level: 'llm', statement: 'A comment explains a real difficulty.', check: 'comments' } },
+  })
+
+  assert.deepEqual([listed.rules[0]?.check, listed.rulesOf('comments').map((rule) => rule.id)], ['comments', ['C1']])
+})
+
+test('a rule of level llm may ask for the experiment behind each finding; a rule a program or the owner settles may not', () => {
+  const defect = { level: 'llm', statement: 'The change has no defect.', evidence: true }
+
+  assert.deepEqual(
+    parse({ version: 1, rules: { BUG: defect, N1: { level: 'llm', statement: 'x' } } }).rules.map((rule) => rule.evidence),
+    [true, false],
+  )
+  assert.deepEqual(problemsOf({ version: 1, rules: { A8: { level: 'human', statement: 'x', evidence: true } } }), [
+    'rules.A8.evidence is for a rule of level llm: only a reviewer runs experiments',
   ])
 })
 

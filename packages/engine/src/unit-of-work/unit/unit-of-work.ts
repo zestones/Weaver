@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { AttributionWindow, Change, ClosedWindow } from '../attribution/attribution-window.ts'
 import type { Intent, UnitFile, UnitRecord } from './unit-record.ts'
 
@@ -16,7 +17,7 @@ export class UnitOfWork {
       openedAt: new Date().toISOString(),
       files: {},
       intents: [],
-      check: { rounds: 0, result: null, reminded: false },
+      check: { rounds: 0, result: null, reminded: false, reviewed: [], reviewing: null },
       unattributed: [],
     })
   }
@@ -31,6 +32,31 @@ export class UnitOfWork {
 
   get rounds(): number {
     return this.record.check.rounds
+  }
+
+  get reviewRounds(): number {
+    return this.record.check.reviewed.length
+  }
+
+  get lastReviewed(): string | null {
+    return this.record.check.reviewed.at(-1) ?? null
+  }
+
+  get reviewing(): string | null {
+    return this.record.check.reviewing
+  }
+
+  get requests(): string[] {
+    return this.record.intents.map((intent) => intent.text)
+  }
+
+  // What the files of the unit hold now, as one name: the same content is the same name.
+  content(): string {
+    const held = Object.entries(this.record.files)
+      .map(([path, file]) => `${path}\0${file.last ?? ''}`)
+      .sort()
+
+    return createHash('sha1').update(held.join('\n')).digest('hex')
   }
 
   get reminded(): boolean {
@@ -56,12 +82,22 @@ export class UnitOfWork {
     return new UnitOfWork({
       ...this.record,
       intents: known ? intents : [...intents, intent],
-      check: { ...check, rounds: 0, reminded: false },
+      check: { ...check, rounds: 0, reminded: false, reviewed: [] },
     })
   }
 
   withFailedRound(): UnitOfWork {
     return new UnitOfWork({ ...this.record, check: { ...this.record.check, rounds: this.rounds + 1, result: 'fail' } })
+  }
+
+  withReviewRound(content: string): UnitOfWork {
+    const { check } = this.record
+
+    return new UnitOfWork({ ...this.record, check: { ...check, reviewed: [...check.reviewed, content], reviewing: null } })
+  }
+
+  withReviewRunning(content: string | null): UnitOfWork {
+    return new UnitOfWork({ ...this.record, check: { ...this.record.check, reviewing: content } })
   }
 
   withReminder(): UnitOfWork {

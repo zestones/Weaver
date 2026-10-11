@@ -1,3 +1,4 @@
+import { OwnerDirectives } from '../../review/routing/owner-directives.ts'
 import { OwnerRequest } from '../../unit-of-work/owner/owner-request.ts'
 import { Answer } from '../exchange/answer.ts'
 import type { Turn } from '../exchange/turn.ts'
@@ -7,11 +8,16 @@ export class OnRequest implements Moment {
   readonly speaksToOwner = true
 
   run(turn: Turn): Answer {
-    const request = new OwnerRequest(turn.event.prompt ?? '')
+    const prompt = turn.event.prompt ?? ''
+    const request = new OwnerRequest(prompt)
 
     // A subagent's prompt is its parent's words, not the owner's.
-    if (!turn.event.subagent && request.isFromOwner) turn.session()?.request(request)
+    if (turn.event.subagent || !request.isFromOwner) return Answer.silent()
 
-    return Answer.silent()
+    turn.session()?.request(request)
+
+    const mistyped = turn.declaration.review === null ? [] : new OwnerDirectives([prompt]).problems()
+
+    return mistyped.length === 0 ? Answer.silent() : Answer.saying(`[weaver] ${mistyped.join(' ')}`)
   }
 }

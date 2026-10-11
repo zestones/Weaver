@@ -8,7 +8,7 @@ export interface Transaction<Value> {
   readonly value: Value
 }
 
-const VERSION = 2
+const VERSION = 4
 const LOCK_WAIT_MS = 5000
 const LOCK_POLL_MS = 20
 
@@ -50,7 +50,15 @@ export class SessionStore {
   }
 
   private fresh(): SessionRecord {
-    return { version: VERSION, agent: this.agent, unit: UnitOfWork.fresh(1).record, pending: {}, lastReply: null, head: null }
+    return {
+      version: VERSION,
+      agent: this.agent,
+      unit: UnitOfWork.fresh(1).record,
+      pending: {},
+      lastReply: null,
+      failedReview: null,
+      head: null,
+    }
   }
 
   private save(record: SessionRecord): void {

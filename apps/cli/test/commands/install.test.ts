@@ -111,6 +111,21 @@ test('a skill the configuration names is written once with its headings, and nev
   assert.equal(readJson<string>(top, 'docs/fin.md'), 'mine now')
 })
 
+test('the skill of the reviewer is written the same way, where the configuration says', () => {
+  writeJson(top, CONFIG, { version: 1, review: { runtime: 'codex', skill: 'docs/review.md' } })
+
+  const { lines } = weaver(top, ['install', 'claude'])
+
+  assert.ok(
+    lines.includes('docs/review.md created: it tells the reviewer how this project wants its changes reviewed. Adapt it to your project.'),
+  )
+  assert.match(
+    readFileSync(join(top, 'docs/review.md'), 'utf8'),
+    /## What counts as a finding\n\n- A finding is a place where the change breaks one of the rules/,
+  )
+  assert.ok(!weaver(top, ['install', 'claude']).lines.some((line) => line.includes('docs/review.md created')))
+})
+
 test('install may name the runtimes to wire, and refuses a name it does not know', () => {
   assert.equal(weaver(top, ['install', 'codex']).status, 0)
   assert.equal(existsSync(join(top, CODEX)), true)
@@ -150,7 +165,7 @@ test('without a command, or with one it does not know, weaver lists what it can 
   assert.equal(usage.lines[0], 'weaver <command>')
   assert.deepEqual(
     usage.lines.slice(2).map((line) => line.trim().split(' ')[0]),
-    ['install', 'uninstall', 'doctor'],
+    ['install', 'uninstall', 'doctor', 'status', 'close'],
   )
   assert.equal(weaver(top, ['frobnicate']).status, 2)
 })

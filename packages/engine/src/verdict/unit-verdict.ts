@@ -1,8 +1,9 @@
-import { DeclarationFile } from '../../declaration/reading/declaration-file.ts'
-import type { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
-import type { EventBody } from '../../unit-of-work/journal/journal-event.ts'
-import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
-import type { CheckOutcome } from './check-outcome.ts'
+import { DeclarationFile } from '../declaration/reading/declaration-file.ts'
+import type { UnitDiff } from '../unit-of-work/diff/unit-diff.ts'
+import type { EventBody } from '../unit-of-work/journal/journal-event.ts'
+import type { UnitOfWork } from '../unit-of-work/unit/unit-of-work.ts'
+import type { UnitReview } from '../review/rounds/unit-review.ts'
+import type { CheckOutcome } from '../checks/results/check-outcome.ts'
 
 export interface VerdictFields {
   readonly unit: UnitOfWork
@@ -10,6 +11,7 @@ export interface VerdictFields {
   readonly diff: UnitDiff
   readonly outcomes: readonly CheckOutcome[]
   readonly repaired: readonly string[]
+  readonly review: UnitReview | null
   readonly ms: number
 }
 
@@ -25,6 +27,8 @@ export class UnitVerdict {
   readonly outcomes: readonly CheckOutcome[]
   // The files the repairs of the checks rewrote before the verdict.
   readonly repaired: readonly string[]
+  // null when no review was asked: no reviewer declared, no rule for one, or checks that fail.
+  readonly review: UnitReview | null
   readonly ms: number
 
   constructor(fields: VerdictFields) {
@@ -35,6 +39,7 @@ export class UnitVerdict {
     this.unattributed = fields.unit.unattributed
     this.outcomes = fields.outcomes
     this.repaired = fields.repaired
+    this.review = fields.review
     this.ms = fields.ms
   }
 
@@ -55,7 +60,7 @@ export class UnitVerdict {
       ? [`${DECLARATION_RULE} ${DeclarationFile.NAME}: the unit changed the project's declaration`]
       : []
 
-    return [...findings, ...advisory, ...declaration]
+    return [...findings, ...advisory, ...declaration, ...(this.review?.toValidate() ?? [])]
   }
 
   event(): EventBody {
