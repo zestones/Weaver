@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 572" width="880" height="572" role="img" aria-labelledby="t d">
+  <title id="t">How Weaver plugs in</title>
+  <desc id="d">You give a request to an agent. The agent calls the engine of Weaver at each of its hooks. The engine reads what the project declares, runs its commands, keeps its state under .git/weaver, hands the flags and what a review leaves to the memory, and asks the agent SDK to start a reviewer or a writer. You run the weaver command from a terminal.</desc>
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 12.5px; }
+    .code { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace; font-size: 12px; }
+    .head { font-weight: 600; font-size: 13px; }
+    .head.code { font-size: 12.5px; }
+    .w rect, .w polygon { fill: #17806a; stroke: #0f5446; }
+    .w text { fill: #ffffff; }
+    .w .sub { fill: #d9f1ea; }
+    .o rect, .o polygon { fill: #eef0f8; stroke: #8790b4; }
+    .o text { fill: #161b2e; }
+    .o .sub { fill: #454d6b; }
+    .y rect, .y polygon { fill: #efeafd; stroke: #6247c2; }
+    .y text { fill: #23194f; }
+    .y .sub { fill: #4a3d86; }
+    rect, polygon { stroke-width: 1.5; }
+    .wire { fill: none; stroke: #6b7394; stroke-width: 1.5; }
+    .wire.dotted { stroke-dasharray: 2 5; stroke-linecap: round; }
+    .tip { fill: #6b7394; }
+    .lbl { fill: #6b7394; font-size: 12px; }
+    .frame { fill: none; stroke: #8790b4; stroke-width: 1.2; stroke-dasharray: 6 5; }
+    .frame-title { fill: #6b7394; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; }
+    .step { fill: #6b7394; font-size: 22px; font-weight: 700; }
+    .axis { stroke: #8790b4; stroke-width: 1; }
+    .grid { stroke: #8790b4; stroke-width: 1; stroke-dasharray: 2 5; opacity: 0.55; }
+    .mark { fill: #17806a; stroke: #0f5446; stroke-width: 1.5; }
+    .value { fill: #17806a; font-weight: 600; }
+    .name { fill: #3d4563; font-size: 13px; }
+    @media (prefers-color-scheme: dark) {
+      .o rect, .o polygon { fill: #1f2439; stroke: #6a73a0; }
+      .o text { fill: #e7eaf6; }
+      .o .sub { fill: #b4bcd6; }
+      .y rect, .y polygon { fill: #271f47; stroke: #a78ff2; }
+      .y text { fill: #efeafd; }
+      .y .sub { fill: #c9bdf5; }
+      .wire { stroke: #8d95b4; }
+      .tip { fill: #8d95b4; }
+      .lbl, .frame-title, .step { fill: #a3abc8; }
+      .frame, .axis, .grid { stroke: #6a73a0; }
+      .mark { fill: #45c2a6; stroke: #2a8f79; }
+      .value { fill: #45c2a6; }
+      .name { fill: #cfd5ea; }
+    }
+  </style>
+  <defs>
+    <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0.8 L 10 5 L 0 9.2 z" class="tip"/>
+    </marker>
+    <marker id="tip-back" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 10 0.8 L 0 5 L 10 9.2 z" class="tip"/>
+    </marker>
+  </defs>
+
+  <!-- You, and the agent you work with -->
+  <g class="y">
+    <rect x="40" y="24" width="120" height="60" rx="7"/>
+    <text x="100" y="50" class="head" text-anchor="middle">You</text>
+    <text x="100" y="66" class="sub" text-anchor="middle">in a terminal</text>
+  </g>
+  <g class="o">
+    <rect x="300" y="24" width="440" height="60" rx="7"/>
+    <text x="520" y="50" class="head" text-anchor="middle">An agent: Claude Code or Codex</text>
+    <text x="520" y="66" class="sub" text-anchor="middle">its hooks: request · before a call · after a call · end of turn</text>
+  </g>
+  <path d="M 160 42 L 300 42" class="wire" marker-end="url(#tip)"/>
+  <text x="230" y="34" class="lbl" text-anchor="middle">a request</text>
+
+  <!-- Weaver -->
+  <rect x="20" y="140" width="840" height="224" rx="10" class="frame"/>
+  <text x="846" y="160" class="frame-title" text-anchor="end">WEAVER</text>
+  <g class="w">
+    <rect x="40" y="186" width="180" height="64" rx="7"/>
+    <text x="130" y="214" class="head code" text-anchor="middle">apps/cli</text>
+    <text x="130" y="230" class="sub" text-anchor="middle">the weaver command</text>
+  </g>
+  <g class="w">
+    <rect x="340" y="186" width="240" height="64" rx="7"/>
+    <text x="460" y="214" class="head code" text-anchor="middle">packages/engine</text>
+    <text x="460" y="230" class="sub" text-anchor="middle">the loop: it answers every hook</text>
+  </g>
+  <g class="w">
+    <rect x="660" y="186" width="180" height="64" rx="7"/>
+    <text x="750" y="214" class="head code" text-anchor="middle">packages/memory</text>
+    <text x="750" y="230" class="sub" text-anchor="middle">flags, cards, registry</text>
+  </g>
+  <g class="w">
+    <rect x="660" y="284" width="180" height="60" rx="7"/>
+    <text x="750" y="310" class="head code" text-anchor="middle">packages/agent-sdk</text>
+    <text x="750" y="326" class="sub" text-anchor="middle">speaks to the runtimes</text>
+  </g>
+  <path d="M 80 84 L 80 186" class="wire" marker-end="url(#tip)"/>
+  <text x="88" y="124" class="lbl" text-anchor="start">your commands</text>
+  <path d="M 190 186 L 190 78 Q 190 70 198 70 L 300 70" class="wire" marker-end="url(#tip)"/>
+  <text x="198" y="104" class="lbl" text-anchor="start">writes their hooks</text>
+  <path d="M 435 84 L 435 186" class="wire" marker-end="url(#tip)"/>
+  <text x="427" y="124" class="lbl" text-anchor="end">an event, as JSON</text>
+  <path d="M 485 186 L 485 84" class="wire" marker-end="url(#tip)"/>
+  <text x="493" y="124" class="lbl" text-anchor="start">nothing, a message or a refusal</text>
+  <path d="M 580 218 L 660 218" class="wire" marker-end="url(#tip)"/>
+  <text x="620" y="176" class="lbl" text-anchor="middle">flags, what a review leaves</text>
+  <path d="M 750 250 L 750 284" class="wire" marker-end="url(#tip)"/>
+  <text x="758" y="271" class="lbl" text-anchor="start">asks for a card</text>
+  <path d="M 540 250 L 540 306 Q 540 314 548 314 L 660 314" class="wire" marker-end="url(#tip)"/>
+  <text x="550" y="306" class="lbl" text-anchor="start">asks for a review</text>
+
+  <!-- The project it supervises -->
+  <rect x="20" y="404" width="560" height="124" rx="10" class="frame"/>
+  <text x="34" y="518" class="frame-title" text-anchor="start">YOUR PROJECT</text>
+  <g class="o">
+    <rect x="40" y="440" width="170" height="60" rx="7"/>
+    <text x="125" y="466" class="head code" text-anchor="middle">.weaver/</text>
+    <text x="125" y="482" class="sub" text-anchor="middle">what it declares</text>
+  </g>
+  <g class="o">
+    <rect x="225" y="440" width="170" height="60" rx="7"/>
+    <text x="310" y="466" class="head" text-anchor="middle">Its commands</text>
+    <text x="310" y="482" class="sub" text-anchor="middle">tsc, eslint, its scripts</text>
+  </g>
+  <g class="o">
+    <rect x="410" y="440" width="150" height="60" rx="7"/>
+    <text x="485" y="466" class="head code" text-anchor="middle">.git/weaver/</text>
+    <text x="485" y="482" class="sub" text-anchor="middle">state, journal, cards</text>
+  </g>
+  <path d="M 70 250 L 70 440" class="wire" marker-end="url(#tip)"/>
+  <text x="78" y="300" class="lbl" text-anchor="start">writes a starter folder</text>
+  <path d="M 370 250 L 370 364 Q 370 372 362 372 L 158 372 Q 150 372 150 380 L 150 440" class="wire" marker-end="url(#tip)"/>
+  <text x="362" y="348" class="lbl" text-anchor="end">reads</text>
+  <path d="M 410 250 L 410 382 Q 410 390 402 390 L 318 390 Q 310 390 310 398 L 310 440" class="wire" marker-end="url(#tip)"/>
+  <text x="418" y="348" class="lbl" text-anchor="start">runs</text>
+  <path d="M 500 250 L 500 440" class="wire" marker-end="url(#tip)"/>
+  <text x="508" y="348" class="lbl" text-anchor="start">writes</text>
+
+  <!-- The agents Weaver starts by itself -->
+  <rect x="600" y="404" width="260" height="124" rx="10" class="frame"/>
+  <text x="614" y="518" class="frame-title" text-anchor="start">AGENTS WEAVER STARTS</text>
+  <g class="o">
+    <rect x="614" y="440" width="114" height="60" rx="7"/>
+    <text x="671" y="466" class="head" text-anchor="middle">A reviewer</text>
+    <text x="671" y="482" class="sub" text-anchor="middle">judges a change</text>
+  </g>
+  <g class="o">
+    <rect x="738" y="440" width="108" height="60" rx="7"/>
+    <text x="792" y="466" class="head" text-anchor="middle">A writer</text>
+    <text x="792" y="482" class="sub" text-anchor="middle">writes a card</text>
+  </g>
+  <path d="M 690 344 L 690 440" class="wire" marker-end="url(#tip)"/>
+  <path d="M 792 344 L 792 440" class="wire" marker-end="url(#tip)"/>
+  <text x="741" y="388" class="lbl" text-anchor="middle">starts</text>
+  <g class="w"><rect x="40" y="548" width="12" height="12" rx="3"/></g>
+  <text x="58" y="558" class="lbl" text-anchor="start">Weaver</text>
+  <g class="o"><rect x="119.6" y="548" width="12" height="12" rx="3"/></g>
+  <text x="137.6" y="558" class="lbl" text-anchor="start">the agent and the project</text>
+  <g class="y"><rect x="324.6" y="548" width="12" height="12" rx="3"/></g>
+  <text x="342.6" y="558" class="lbl" text-anchor="start">you</text>
+</svg>

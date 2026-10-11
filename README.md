@@ -1,215 +1,189 @@
 ![Weaver — Let the daemons weave your codebase.](_docs/assets/weaver-banner-monogram.png)
 
-Weaver is a local development workbench for coding agents. It brings permissions, change tracking, automated checks, independent reviews, and project memory into one place, keeping you in control from the first action to the final diff.
+Weaver supervises the coding agents that work in a repository. It plugs into the hooks of Claude Code and Codex. From there it knows which files each agent changed, refuses what the project forbids, runs the project's own checks when a task ends, has another agent review the change, and keeps what agents discover along the way for you to decide on later.
 
-This repository is the development environment for building Weaver as an independent application from an existing repository harness.
+Weaver knows no rule by itself. Everything it enforces is declared by the project, in a `.weaver/` folder.
 
-## Project status
+> [!NOTE]
+> Weaver runs today from a checkout of this repository, on the command line. It is not distributed as a package yet, and its web interface, the workbench, is not built. [What is not there yet](#what-is-not-there-yet) lists the rest.
 
-Weaver has an initial development toolchain. No engine has been extracted yet, and there is no runnable application or application installation procedure in this repository.
+## What it does
 
-The reference harness remains operational while Weaver is developed separately. A consuming project will adopt a selected version only after its integration and historical data preservation have been validated.
+| What                            | How                                                                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Knows who changed what          | Each request you send opens a unit of work. The files an agent changes join it, tool call by tool call: the diff Weaver checks and reviews is that agent's own.                       |
+| Refuses before a tool runs      | The project declares guards: paths an agent may not write, commands it may not run. A refusal carries the sentence of the project that says why.                                      |
+| Checks when a task ends         | The project's programs judge the change: the compiler, the linter, scripts of its own. A check may repair first, then judge. A failure sends the agent back to work.                  |
+| Has another agent review        | The rules no program can judge go to a reviewer, Claude Code or Codex, that only reads or that experiments in a throwaway copy of the project. The agent answers each finding.        |
+| Keeps what agents discover      | An agent flags what it comes across and its task does not settle. A writer turns the flag into a card. You read the cards and decide: fixed, left as it is, or an issue.              |
+| Leaves the deciding to you      | An agent cannot close a card, change one, or unplug Weaver: the commands that decide refuse to run under an agent. Weaver also guards its own configuration, its state and the hooks. |
+| Says whether it is really alive | `weaver doctor` checks the configuration, the hook, and each runtime. It asks Codex whether it runs the hooks, since Codex may hold them and work without Weaver, without a word.     |
 
-The [architecture and package boundaries](_docs/architecture.md) describe the proposed monorepo, the agent SDK's ports and adapters, project instruction integration, and the separation between responsibilities, capabilities, configuration and project requirements.
+## How it plugs in
 
-The [development guide](_docs/development.md) documents the local workspace checks, TypeScript configuration, package exports, unused-code analysis and test resource limits.
+![How Weaver plugs in: you, the agent, the packages of Weaver, the project, and the agents Weaver starts.](_docs/assets/weaver-wiring.svg)
 
-## Responsibilities
+The agent calls Weaver at each of its hooks, in a process that lasts a little over a tenth of a second and answers with nothing, a message, or a refusal. Weaver reads what the project declares, runs the project's commands, and keeps its own state under `.git/weaver/`: the index and the objects of your repository are never touched.
 
-Weaver is organized around six responsibilities. These are architectural boundaries to establish, not a description of modules already implemented here.
+| Package              | What it holds                                                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `packages/engine`    | The loop: the unit of work, the guards, the checks, the review, and what happens at each hook.                        |
+| `packages/memory`    | Flags, cards, the registry that keeps them, and the writer.                                                           |
+| `packages/agent-sdk` | What Weaver asks of an agent, and how Claude Code and Codex are started. The reviewer and the writer go through here. |
+| `apps/cli`           | The `weaver` command.                                                                                                 |
 
-| Responsibility                 | Purpose                                                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Agent action control           | Identify the actor, interpret actions, evaluate permissions and explain refusals.                                        |
-| Session tracking               | Retain owner requests, attribute changes to sessions and maintain snapshots and units of work.                           |
-| Validation and task completion | Run configured checks, coordinate independent reviews, handle findings and determine whether a unit can finish.          |
-| Harness memory                 | Retain signals, sources, decisions and evidence; structure items and retrieve qualified context under explicit policies. |
-| Workbench                      | Provide the local interface for memory, workspace information and conversations with Codex and Claude.                   |
-| Storage                        | Provide durable records, transactions, locking, content preservation and explicit migrations.                            |
+## One turn
 
-Storage supports the other responsibilities without defining their business rules. Hooks, the CLI and HTTP endpoints adapt external interactions to domain operations. Orchestration coordinates those operations without becoming another place to define their rules.
+![One turn, hook by hook: a request, before a tool call, after a tool call, the end of the turn.](_docs/assets/weaver-turn.svg)
 
-## System context
+A turn starts with your request and ends when the agent stops. In between, Weaver is called before and after every tool call. The end of the turn is where most of the work happens.
 
-Scope: Weaver as one software system. This view identifies its users and external systems; it intentionally omits internal modules and implementation technologies.
+### When the agent stops
 
-The static views use C4 element types and boundaries with Mermaid's automatic flowchart layout. Blue elements belong to Weaver; grey elements are external. Arrows name interactions, and a double-headed arrow represents a bidirectional exchange. These views remain proposed architecture.
+![What happens when the agent stops: the writer starts, repairs, checks, a review, and the unit of work is settled.](_docs/assets/weaver-end-of-turn.svg)
 
-```mermaid
-flowchart TB
-    owner(["Project owner<br/>[Person]"])
-    agents["Coding agent runtimes<br/>[External software system]"]
-    weaver["Weaver<br/>[Software system]"]
-    project["Project workspace<br/>[External software system]"]
+A task is finished when the last message of the agent carries the headings the project's finish skill lists. Until then the unit of work stays open, and the agent is pointed to the skill once a request.
 
-    owner -->|Directs work| agents
-    owner -->|Uses workbench and CLI| weaver
-    agents <-->|Hook events and feedback| weaver
-    agents -->|Reads and edits| project
-    weaver -->|Tracks and validates| project
+Every rule of a project has one of three levels, which says who judges it and what a failure does:
 
-    classDef internal fill:#1168bd,stroke:#0b4884,color:#fff
-    classDef external fill:#666,stroke:#444,color:#fff
-    classDef person fill:#08427b,stroke:#052e56,color:#fff
-    class weaver internal
-    class agents,project external
-    class owner person
+| Level   | Who judges                        | What a failure does                                                          |
+| ------- | --------------------------------- | ---------------------------------------------------------------------------- |
+| `gate`  | A program of the project, a check | The end of the turn is refused. The agent fixes it and comes back.           |
+| `llm`   | Another agent, the reviewer       | The end is refused with the findings, until the agent has answered each one. |
+| `human` | You                               | It is listed under "To validate" in the report. The agent is not held.       |
+
+A few things the diagram leaves out:
+
+- **A review is due** when a rule of level `llm` applies to the change, the project declares a reviewer, and your request does not say `#no-review`. `#review` in a request runs again a review that broke, and `#critical` gives the review to the runtime that did not write the change.
+- **A finding needs an answer, not obedience.** The agent writes `F1 fixed: …` or `F1 not fixed: …` in its final message. An answer `fixed` is refused while the file has not changed. What it does not fix waits for you, with its reason.
+- **A suspicion is for you alone.** For a rule about what the code does, a finding must carry the experiment that shows it. Without one it is a suspicion: you read it, the agent never does.
+- **A review never holds a turn hostage.** One that outlasts its wait goes on by itself, and its findings come at the next end of turn. One that breaks is listed for you.
+- **Every limit is written in the project**: how many times the checks may refuse, how long they may run, how long a review may take.
+
+## What agents discover: flags and cards
+
+![From a flag to a decision: the agent flags, the hook records, the writer writes a card, you decide.](_docs/assets/weaver-memory.svg)
+
+An agent often sees more than its task: a defect in code it did not write, a debt, a choice that is yours. Weaver tells it, with every request, to flag such a thing instead of fixing it in passing, or of leaving it in a final message that is read once:
+
+```sh
+weaver flag src/auth/token.ts:17 <<'EOF'
+Seen: getToken() returns the cached token without looking at its expiry.
+Expected: an expired token is refreshed before it is returned.
+Found: while reading the callers of getToken() for the logout task.
+Checked: read the function and its two callers; did not run it.
+Did: left as it is.
+EOF
 ```
 
-## Runtime structure
+The command never runs. The hook takes the call, records the flag with who made it, in which session and for which request, and answers in its place with the number of the flag. At the end of the turn a writer, an agent that only reads, looks at the code and turns each flag into a card: a title, the project's labels, and four sections that say what was seen, in what context, how it was found, and what was not verified. A card is not an investigation: it holds enough to be understood alone, months later.
 
-Scope: the proposed executables, browser application and data store within Weaver. A C4 container is an application or data store, not a Docker container. The six responsibility boundaries above describe modules inside these executables; they are not six services.
+What a review leaves, a finding the author did not fix or a suspicion, becomes a card too, so there is one place to look.
 
-The container view is split into two focused views to keep relationships readable. The record store and native runtimes shown in both views are the same elements, not separate installations.
-
-### Workbench and conversations
-
-```mermaid
-flowchart TB
-    owner(["Project owner<br/>[Person]"])
-    subgraph weaver [Weaver — system boundary]
-        direction TB
-        web["Workbench UI<br/>[Container: React / TypeScript]"]
-        server["Local server<br/>[Container: Node.js / TypeScript]"]
-        records[("Project record store<br/>[Data store: local files]")]
-        web -->|Calls API / receives updates| server
-        server -->|Reads and writes| records
-    end
-    agents["Coding agent runtimes<br/>[External software system]"]
-    owner -->|Uses in browser| web
-    server <-->|Native runtime protocols| agents
-
-    classDef internal fill:#1168bd,stroke:#0b4884,color:#fff
-    classDef external fill:#666,stroke:#444,color:#fff
-    classDef person fill:#08427b,stroke:#052e56,color:#fff
-    class web,server,records internal
-    class agents external
-    class owner person
+```sh
+weaver cards                 # the cards that wait for you, newest first
+weaver cards 12              # one card, as Markdown
+weaver close 12 fixed        # or wontfix, or issue, with a reason
 ```
 
-### Hooks, CLI and project validation
+`weaver cards` is what an agent runs in a conversation as well, to read the registry. Closing a card, correcting it or tying two cards together is yours: those commands refuse to run under an agent. The [memory design](_docs/memory.md) says the rest.
 
-```mermaid
-flowchart TB
-    owner(["Project owner<br/>[Person]"])
-    agents["Coding agent runtimes<br/>[External software system]"]
-    subgraph weaver [Weaver — system boundary]
-        direction TB
-        hooks["Hooks and CLI<br/>[Container: Node.js / TypeScript]"]
-        records[("Project record store<br/>[Data store: local files]")]
-        hooks -->|Reads and writes| records
-    end
-    project["Project workspace and tools<br/>[External software system]"]
-    owner -->|Runs commands| hooks
-    agents -->|Invokes hooks| hooks
-    hooks -->|Snapshots / invokes checks| project
+## What a project declares
 
-    classDef internal fill:#1168bd,stroke:#0b4884,color:#fff
-    classDef external fill:#666,stroke:#444,color:#fff
-    classDef person fill:#08427b,stroke:#052e56,color:#fff
-    class hooks,records internal
-    class agents,project external
-    class owner person
+A repository is supervised as soon as it has a `.weaver/settings.json`. The other files are optional, and each has a JSON Schema that an editor completes and checks.
+
+```text
+.weaver/
+├── settings.json        how Weaver works here: the limits of the checks, the finish skill
+├── project/
+│   ├── guards.json      what is refused before a tool runs
+│   ├── checks.json      the programs that judge, each with the rules it stands behind
+│   ├── scripts.json     the scripts that write files, the folders nothing looks at
+│   ├── labels.json      the labels a card may carry
+│   └── issues.json      the command that opens an issue from a card
+├── llm/
+│   ├── rules.json       the rules a reviewer judges
+│   ├── reviewers.json   who reviews, and when it must be the other runtime
+│   └── writer.json      who writes the cards
+└── skills/
+    ├── wv-finish.md     how a task ends: the headings of the final message
+    ├── wv-review.md     how to review
+    └── wv-card.md       how a card is written
 ```
 
-| Relationship                                                | Interface and responsibility                                                                                    |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| UI to local server                                          | HTTP requests and SSE updates over loopback; presentation invokes domain operations.                            |
-| Local server to agent runtimes                              | Native provider protocols for sending messages, streaming, interruption and resumption.                         |
-| Agent runtimes to hooks                                     | Process invocation with JSON event input; decisions and feedback are returned through the hook protocol.        |
-| Owner to CLI                                                | Terminal invocation with owner/agent authority checks.                                                          |
-| Hooks to project workspace                                  | Filesystem inspection and configured child processes for validation.                                            |
-| Server to project workspace, omitted from the focused views | Reads workspace metadata and repository workflows.                                                              |
-| Executables to record store                                 | Domain-owned persistence through shared durability primitives; local JSONL records and content-addressed blobs. |
+A guard, in `project/guards.json`: the sentence is what the agent reads when it is refused.
 
-The hook/CLI executables and local server share domain code rather than communicating through an additional engine service. The record store is logically managed by Weaver, but its contents belong to the consuming project. Its physical location and installation strategy remain design decisions.
-
-## Unit lifecycle — UML sequence
-
-Scope: one supervised unit, showing ordered calls and responses. Solid arrows denote calls or notifications; dashed arrows denote responses. `loop`, `alt` and `opt` fragments express repetition, alternatives and optional review. This view omits storage calls and provider-specific protocol details.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Runtime as Agent runtime
-    participant Weaver as Weaver hook orchestration
-    participant Workspace as Project workspace
-    participant Checks as Project validation tools
-    participant Reviewer as Independent reviewer
-
-    Runtime->>Weaver: UserPromptSubmit(owner request)
-    Weaver-->>Runtime: Record intent and return applicable context
-    loop Each tool call
-        Runtime->>Weaver: PreToolUse(action)
-        alt Action refused
-            Weaver-->>Runtime: Deny with rule and explanation
-        else Action permitted
-            Weaver-->>Runtime: Permit and open attribution window
-            Runtime->>Workspace: Execute action
-            Workspace-->>Runtime: Action result
-            Runtime->>Weaver: PostToolUse or PostToolUseFailure(result)
-            Weaver-->>Runtime: Attribute changes and return bounded feedback
-        end
-    end
-    Runtime->>Weaver: Stop(completion report)
-    Weaver->>Checks: Execute applicable checks for the unit
-    Checks-->>Weaver: Outcomes and observed evidence
-    alt Checks fail
-        Weaver-->>Runtime: Keep unit open and return failures
-    else Checks pass
-        opt Review required
-            Weaver->>Reviewer: Submit scoped diff, criteria and context
-            Reviewer-->>Weaver: Review result or explicit failure
-        end
-        alt Completion requirements satisfied
-            Weaver-->>Runtime: Settle unit and retain its record
-        else Findings or completion requirements outstanding
-            Weaver-->>Runtime: Keep unit open and return required follow-up
-        end
-    end
+```json
+{
+  "git-writes": {
+    "statement": "Agents never write to git. Reading it (status, diff, log) stays allowed.",
+    "runs": ["git commit", "git push", "git reset"]
+  }
+}
 ```
 
-A review failure is retained explicitly and never represented as a clean review. Its effect on settlement is defined by the completion policy. Correction and finding-answer rounds repeat the relevant lifecycle steps.
+A check, in `project/checks.json`: it repairs with `fix`, judges with `verify`, and names the rules it stands behind.
 
-## Weaver and its projects
+```json
+{
+  "format": {
+    "fix": ["npx", "prettier", "--write", "{files}"],
+    "verify": ["npx", "prettier", "--check", "{files}"],
+    "when": ["src/**/*.ts"],
+    "reads": "exit",
+    "timeoutSeconds": 120,
+    "rules": { "prettier-formats": "Prettier decides formatting." }
+  }
+}
+```
 
-Weaver owns the mechanisms. Each project owns its requirements, validation tools, integration settings and retained data.
+## Try it
 
-| Weaver owns                                                   | The project owns                                                                |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Policy evaluation and enforcement mechanisms                  | Enabled restrictions, protected paths and project-specific exceptions           |
-| Session attribution and snapshot mechanisms                   | Repository scopes and actual session records                                    |
-| Check scheduling, execution observation and review lifecycle  | Check commands, thresholds, review criteria and development-stack configuration |
-| Memory schemas, lifecycle operations and retrieval mechanisms | Items, sources, labels, evidence and owner decisions                            |
-| Workbench and native agent connectors                         | Local conversations and repository workflows                                    |
-| Storage and migration mechanisms                              | Historical records and backups                                                  |
+You need Node.js 24 (24.13 or later), pnpm, git, and Claude Code or Codex.
 
-Frontend rules, backend linters, migration tools, development stacks and contribution conventions remain with their consuming projects. A file protected by Weaver remains owned by the project when its contents express project policy.
+```sh
+git clone https://github.com/zestones/Weaver.git && cd Weaver
+pnpm install --frozen-lockfile
+pnpm build
+ln -s "$PWD/apps/cli/dist/bin/weaver.js" ~/.local/bin/weaver
+```
 
-Project integration must declare these requirements explicitly. Weaver must build and run without relying on a particular project's directory layout, a sibling checkout or that project's installed dependencies.
+Then, from a terminal of your own, at the root of the project to supervise:
 
-Diagram conventions follow the [C4 model](https://c4model.com/diagrams) for static architecture views and UML sequence notation for the lifecycle. The C4 views are rendered with Mermaid's [flowchart syntax](https://mermaid.js.org/syntax/flowchart.html), with explicit element types and system boundaries; the lifecycle uses its [sequence syntax](https://mermaid.js.org/syntax/sequenceDiagram.html). This avoids the fixed placement of Mermaid's experimental C4 renderer.
+```sh
+weaver install     # the hooks of Claude Code and Codex, and a starter .weaver/ if there is none
+weaver doctor      # is everything alive?
+```
 
-## Development principles
+The hooks point at this checkout, for as long as Weaver is not distributed. Codex loads the hooks of a project only once it trusts the project, and runs each one only once you have approved it with `/hooks`: `weaver doctor` says where that stands. Who reviews and who writes the cards are yours to add in `.weaver/llm/`, since both cost money.
 
-- Keep domain boundaries explicit and access another domain through its public operations.
-- Share domain operations across hooks, the CLI and the workbench rather than implementing different behavior for each entry point.
-- Define observable behavior through its trigger, inputs, effects, outputs, failure handling and resource budget.
-- Distinguish preserved behavior from intentional changes; restructuring must not silently change how agents are supervised.
-- Keep recorded statements, observed execution and verified conclusions distinguishable.
-- Preserve historical identifiers, sources, outcomes and evidence during extraction and migration.
-- Bound resource use and make waits, interruptions and failures understandable.
-- Start with a modular application; separate services and a general plugin system are not prerequisites for extraction.
+| Command                                        | What it does                                                            |
+| ---------------------------------------------- | ----------------------------------------------------------------------- |
+| `weaver install [claude] [codex]`              | Plugs Weaver into the project: the hooks, and a starter configuration.  |
+| `weaver uninstall [claude] [codex]`            | Removes the hooks, and leaves everything else as it is.                 |
+| `weaver doctor`                                | Checks the configuration, the hook, and each agent runtime.             |
+| `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.   |
+| `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`. |
+| `weaver cards reopen\|retitle\|label\|rewrite` | Corrects a card, or opens it again.                                     |
+| `weaver cards tie\|untie\|separate`            | Ties two cards that may be about the same thing, or undoes a merge.     |
+| `weaver close <number> fixed\|wontfix\|issue`  | Closes a card, with a reason.                                           |
 
-## Extraction approach
+## What it costs
 
-1. Establish a source reference and inventory existing behavior and project dependencies.
-2. Create an isolated development baseline with self-contained tooling and tests.
-3. Define the project integration contracts and separate project-specific policy and validation from the engine.
-4. Restructure the engine around the responsibility boundaries, validating behavior at each step.
-5. Validate historical data preservation, project integration and native agent lifecycle behavior.
-6. Prepare a pinned installation, a verified data backup and a rollback procedure before activating Weaver in a consuming project.
+![What supervision costs, in seconds: a hook 0.13 s, a hook that records a flag 0.15 s, the end of a task 11 to 13 s, the writer 14 s for one card, a review 30 to 50 s.](_docs/assets/weaver-timings.svg)
 
-The development copy must not write to a project's live harness state alongside its operational harness. Tests use isolated repositories and explicit copies of retained data. Historical project data, credentials and private conversation transcripts do not belong in Weaver's version-controlled sources.
+Orders of magnitude, not a benchmark: seen on one machine on 2026-10-11, a few runs each. The hook was timed in a small project. The rest comes from a clone of a real project with its own checks (`tsc`, `eslint`, `prettier`), a Codex reviewer working in a copy of the project, and a Claude writer.
 
-Replacing the engine and migrating its data are separate operations. Removal of an embedded harness happens only after the external replacement is operational and the transition has been verified.
+## What is not there yet
+
+- **The workbench.** A web interface to browse the cards, decide on them and ask an agent to investigate. It is the likely next step.
+- **The recall.** Telling an agent what the cards and the git history know of the code it is about to change, so that it does not undo a correction or a decision.
+- **A comparison with the base.** A check that looks at the whole project reports what is wrong in the working tree, whoever wrote it. Two sessions in one folder can therefore hold each other back.
+- **Guards decided by a program.** A guard is a list of paths and commands today. What depends on a detail of the call, such as killing processes by a broad pattern, cannot be expressed.
+- **A distribution.** An installable package and hosted schemas, in place of the link to a checkout.
+
+[To do later](_docs/todo-later.md) says why each of these waits, and where it would start.
+
+## Working on Weaver
+
+Weaver is the rewrite, as a tool of its own, of a harness that first grew inside one project. `pnpm check` formats, builds, type-checks, lints, looks for unused code and tests. The [development guide](_docs/development.md) holds the commands and the conventions of the code.

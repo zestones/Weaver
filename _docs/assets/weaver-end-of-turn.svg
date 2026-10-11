@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 846" width="880" height="846" role="img" aria-labelledby="t d">
+  <title id="t">What happens when the agent stops</title>
+  <desc id="d">When the agent stops, a writer starts apart on the flags of the turn. If the last message carries the finish headings, Weaver repairs, then checks. A broken gate rule refuses the end; a broken human rule is listed for you. When nothing is broken and a review is due, another agent judges the change: its findings refuse the end until the agent has answered each one. Then the unit is settled, and what the review leaves becomes cards.</desc>
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 12.5px; }
+    .code { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace; font-size: 12px; }
+    .head { font-weight: 600; font-size: 13px; }
+    .head.code { font-size: 12.5px; }
+    .w rect, .w polygon { fill: #17806a; stroke: #0f5446; }
+    .w text { fill: #ffffff; }
+    .w .sub { fill: #d9f1ea; }
+    .o rect, .o polygon { fill: #eef0f8; stroke: #8790b4; }
+    .o text { fill: #161b2e; }
+    .o .sub { fill: #454d6b; }
+    .y rect, .y polygon { fill: #efeafd; stroke: #6247c2; }
+    .y text { fill: #23194f; }
+    .y .sub { fill: #4a3d86; }
+    rect, polygon { stroke-width: 1.5; }
+    .wire { fill: none; stroke: #6b7394; stroke-width: 1.5; }
+    .wire.dotted { stroke-dasharray: 2 5; stroke-linecap: round; }
+    .tip { fill: #6b7394; }
+    .lbl { fill: #6b7394; font-size: 12px; }
+    .frame { fill: none; stroke: #8790b4; stroke-width: 1.2; stroke-dasharray: 6 5; }
+    .frame-title { fill: #6b7394; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; }
+    .step { fill: #6b7394; font-size: 22px; font-weight: 700; }
+    .axis { stroke: #8790b4; stroke-width: 1; }
+    .grid { stroke: #8790b4; stroke-width: 1; stroke-dasharray: 2 5; opacity: 0.55; }
+    .mark { fill: #17806a; stroke: #0f5446; stroke-width: 1.5; }
+    .value { fill: #17806a; font-weight: 600; }
+    .name { fill: #3d4563; font-size: 13px; }
+    @media (prefers-color-scheme: dark) {
+      .o rect, .o polygon { fill: #1f2439; stroke: #6a73a0; }
+      .o text { fill: #e7eaf6; }
+      .o .sub { fill: #b4bcd6; }
+      .y rect, .y polygon { fill: #271f47; stroke: #a78ff2; }
+      .y text { fill: #efeafd; }
+      .y .sub { fill: #c9bdf5; }
+      .wire { stroke: #8d95b4; }
+      .tip { fill: #8d95b4; }
+      .lbl, .frame-title, .step { fill: #a3abc8; }
+      .frame, .axis, .grid { stroke: #6a73a0; }
+      .mark { fill: #45c2a6; stroke: #2a8f79; }
+      .value { fill: #45c2a6; }
+      .name { fill: #cfd5ea; }
+    }
+  </style>
+  <defs>
+    <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0.8 L 10 5 L 0 9.2 z" class="tip"/>
+    </marker>
+    <marker id="tip-back" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 10 0.8 L 0 5 L 10 9.2 z" class="tip"/>
+    </marker>
+  </defs>
+
+  <!-- The agent stops -->
+  <g class="o">
+    <rect x="330" y="20" width="220" height="44" rx="7"/>
+    <text x="440" y="46" class="head" text-anchor="middle">The agent stops</text>
+  </g>
+  <path d="M 550 42 L 620 42" class="wire dotted" marker-end="url(#tip)"/>
+  <text x="585" y="34" class="lbl" text-anchor="middle">flags wait</text>
+  <g class="w">
+    <rect x="620" y="10" width="240" height="64" rx="7"/>
+    <text x="740" y="30" class="head" text-anchor="middle">The writer starts</text>
+    <text x="740" y="46" class="sub" text-anchor="middle">apart: it makes cards of</text>
+    <text x="740" y="62" class="sub" text-anchor="middle">the flags of the turn</text>
+  </g>
+  <path d="M 440 64 L 440 98" class="wire" marker-end="url(#tip)"/>
+
+  <!-- Did it say that it has finished? -->
+  <g class="w">
+    <polygon points="440,98 560,140 440,182 320,140"/>
+    <text x="440" y="136" class="head" text-anchor="middle">Does its message carry</text>
+    <text x="440" y="152" class="sub" text-anchor="middle">the finish headings?</text>
+  </g>
+  <path d="M 320 140 L 260 140" class="wire" marker-end="url(#tip)"/>
+  <text x="290" y="132" class="lbl" text-anchor="middle">no</text>
+  <g class="w">
+    <rect x="40" y="108" width="220" height="64" rx="7"/>
+    <text x="150" y="128" class="head" text-anchor="middle">A reminder</text>
+    <text x="150" y="144" class="sub" text-anchor="middle">of the finish skill,</text>
+    <text x="150" y="160" class="sub" text-anchor="middle">once a request</text>
+  </g>
+  <path d="M 440 182 L 440 216" class="wire" marker-end="url(#tip)"/>
+  <text x="448" y="204" class="lbl" text-anchor="start">yes</text>
+
+  <!-- The programs of the project judge -->
+  <g class="w">
+    <rect x="330" y="216" width="220" height="50" rx="7"/>
+    <text x="440" y="237" class="head" text-anchor="middle">Repairs</text>
+    <text x="440" y="253" class="sub" text-anchor="middle">each fix, one by one</text>
+  </g>
+  <path d="M 440 266 L 440 290" class="wire" marker-end="url(#tip)"/>
+  <g class="w">
+    <rect x="330" y="290" width="220" height="50" rx="7"/>
+    <text x="440" y="311" class="head" text-anchor="middle">Checks</text>
+    <text x="440" y="327" class="sub" text-anchor="middle">every verify, in parallel</text>
+  </g>
+  <path d="M 440 340 L 440 366" class="wire" marker-end="url(#tip)"/>
+  <g class="w">
+    <polygon points="440,366 560,408 440,450 320,408"/>
+    <text x="440" y="404" class="head" text-anchor="middle">Which level of rule</text>
+    <text x="440" y="420" class="sub" text-anchor="middle">is broken?</text>
+  </g>
+  <path d="M 320 408 L 260 408" class="wire" marker-end="url(#tip)"/>
+  <text x="290" y="400" class="lbl" text-anchor="middle">gate</text>
+  <g class="w">
+    <rect x="40" y="376" width="220" height="64" rx="7"/>
+    <text x="150" y="396" class="head" text-anchor="middle">The end is refused</text>
+    <text x="150" y="412" class="sub" text-anchor="middle">the agent fixes it</text>
+    <text x="150" y="428" class="sub" text-anchor="middle">and comes back</text>
+  </g>
+  <path d="M 560 408 L 620 408" class="wire" marker-end="url(#tip)"/>
+  <text x="590" y="400" class="lbl" text-anchor="middle">human</text>
+  <g class="y">
+    <rect x="620" y="376" width="220" height="64" rx="7"/>
+    <text x="730" y="396" class="head" text-anchor="middle">Listed for you</text>
+    <text x="730" y="412" class="sub" text-anchor="middle">under To validate:</text>
+    <text x="730" y="428" class="sub" text-anchor="middle">the agent is not held</text>
+  </g>
+  <path d="M 440 450 L 440 486" class="wire" marker-end="url(#tip)"/>
+  <text x="448" y="472" class="lbl" text-anchor="start">none</text>
+
+  <!-- Another agent judges -->
+  <g class="w">
+    <polygon points="440,486 560,528 440,570 320,528"/>
+    <text x="440" y="532" class="head" text-anchor="middle">Is a review due?</text>
+  </g>
+  <path d="M 560 528 L 620 528" class="wire" marker-end="url(#tip)"/>
+  <text x="590" y="520" class="lbl" text-anchor="middle">yes</text>
+  <g class="w">
+    <rect x="620" y="496" width="220" height="64" rx="7"/>
+    <text x="730" y="516" class="head" text-anchor="middle">A review</text>
+    <text x="730" y="532" class="sub" text-anchor="middle">another agent judges</text>
+    <text x="730" y="548" class="sub" text-anchor="middle">the change</text>
+  </g>
+  <path d="M 730 496 L 730 440" class="wire" marker-end="url(#tip)"/>
+  <text x="738" y="472" class="lbl" text-anchor="start">it broke</text>
+  <path d="M 730 560 L 730 616" class="wire" marker-end="url(#tip)"/>
+  <text x="738" y="592" class="lbl" text-anchor="start">findings</text>
+  <g class="w">
+    <rect x="620" y="616" width="220" height="80" rx="7"/>
+    <text x="730" y="636" class="head" text-anchor="middle">The end is refused</text>
+    <text x="730" y="652" class="sub" text-anchor="middle">with the findings: the agent</text>
+    <text x="730" y="668" class="sub" text-anchor="middle">answers each one, fixed</text>
+    <text x="730" y="684" class="sub" text-anchor="middle">or not and why</text>
+  </g>
+  <path d="M 440 570 L 440 640" class="wire" marker-end="url(#tip)"/>
+  <text x="448" y="606" class="lbl" text-anchor="start">no</text>
+  <path d="M 620 546 L 600 546 Q 592 546 592 554 L 592 648 Q 592 656 584 656 L 550 656" class="wire" marker-end="url(#tip)"/>
+  <text x="586" y="604" class="lbl" text-anchor="end">no finding</text>
+  <path d="M 620 682 L 550 682" class="wire" marker-end="url(#tip)"/>
+  <text x="585" y="700" class="lbl" text-anchor="middle">answered</text>
+
+  <!-- The end -->
+  <g class="w">
+    <rect x="330" y="640" width="220" height="56" rx="7"/>
+    <text x="440" y="664" class="head" text-anchor="middle">The unit is settled</text>
+    <text x="440" y="680" class="sub" text-anchor="middle">its report is written</text>
+  </g>
+  <path d="M 440 696 L 440 740" class="wire dotted" marker-end="url(#tip)"/>
+  <text x="448" y="723" class="lbl" text-anchor="start">the review leaves points</text>
+  <g class="y">
+    <rect x="310" y="740" width="260" height="64" rx="7"/>
+    <text x="440" y="760" class="head" text-anchor="middle">They become cards, for you</text>
+    <text x="440" y="776" class="sub" text-anchor="middle">a finding not fixed,</text>
+    <text x="440" y="792" class="sub" text-anchor="middle">or a suspicion</text>
+  </g>
+  <g class="w"><rect x="40" y="822" width="12" height="12" rx="3"/></g>
+  <text x="58" y="832" class="lbl" text-anchor="start">Weaver</text>
+  <g class="o"><rect x="119.6" y="822" width="12" height="12" rx="3"/></g>
+  <text x="137.6" y="832" class="lbl" text-anchor="start">the agent and the project</text>
+  <g class="y"><rect x="324.6" y="822" width="12" height="12" rx="3"/></g>
+  <text x="342.6" y="832" class="lbl" text-anchor="start">you</text>
+</svg>

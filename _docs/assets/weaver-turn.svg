@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 310" width="880" height="310" role="img" aria-labelledby="t d">
+  <title id="t">One turn, hook by hook</title>
+  <desc id="d">Weaver is called four times in a turn: when you send a request, before each tool call, after each tool call, and when the agent stops. The two in the middle repeat for every call.</desc>
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 12.5px; }
+    .code { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace; font-size: 12px; }
+    .head { font-weight: 600; font-size: 13px; }
+    .head.code { font-size: 12.5px; }
+    .w rect, .w polygon { fill: #17806a; stroke: #0f5446; }
+    .w text { fill: #ffffff; }
+    .w .sub { fill: #d9f1ea; }
+    .o rect, .o polygon { fill: #eef0f8; stroke: #8790b4; }
+    .o text { fill: #161b2e; }
+    .o .sub { fill: #454d6b; }
+    .y rect, .y polygon { fill: #efeafd; stroke: #6247c2; }
+    .y text { fill: #23194f; }
+    .y .sub { fill: #4a3d86; }
+    rect, polygon { stroke-width: 1.5; }
+    .wire { fill: none; stroke: #6b7394; stroke-width: 1.5; }
+    .wire.dotted { stroke-dasharray: 2 5; stroke-linecap: round; }
+    .tip { fill: #6b7394; }
+    .lbl { fill: #6b7394; font-size: 12px; }
+    .frame { fill: none; stroke: #8790b4; stroke-width: 1.2; stroke-dasharray: 6 5; }
+    .frame-title { fill: #6b7394; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; }
+    .step { fill: #6b7394; font-size: 22px; font-weight: 700; }
+    .axis { stroke: #8790b4; stroke-width: 1; }
+    .grid { stroke: #8790b4; stroke-width: 1; stroke-dasharray: 2 5; opacity: 0.55; }
+    .mark { fill: #17806a; stroke: #0f5446; stroke-width: 1.5; }
+    .value { fill: #17806a; font-weight: 600; }
+    .name { fill: #3d4563; font-size: 13px; }
+    @media (prefers-color-scheme: dark) {
+      .o rect, .o polygon { fill: #1f2439; stroke: #6a73a0; }
+      .o text { fill: #e7eaf6; }
+      .o .sub { fill: #b4bcd6; }
+      .y rect, .y polygon { fill: #271f47; stroke: #a78ff2; }
+      .y text { fill: #efeafd; }
+      .y .sub { fill: #c9bdf5; }
+      .wire { stroke: #8d95b4; }
+      .tip { fill: #8d95b4; }
+      .lbl, .frame-title, .step { fill: #a3abc8; }
+      .frame, .axis, .grid { stroke: #6a73a0; }
+      .mark { fill: #45c2a6; stroke: #2a8f79; }
+      .value { fill: #45c2a6; }
+      .name { fill: #cfd5ea; }
+    }
+  </style>
+  <defs>
+    <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0.8 L 10 5 L 0 9.2 z" class="tip"/>
+    </marker>
+    <marker id="tip-back" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 10 0.8 L 0 5 L 10 9.2 z" class="tip"/>
+    </marker>
+  </defs>
+
+  <!-- The hooks of the agent, in the order of a turn -->
+  <g class="o">
+    <rect x="4" y="58" width="188" height="54" rx="27"/>
+    <text x="98" y="81" class="head" text-anchor="middle">1 · A request</text>
+    <text x="98" y="97" class="sub code" text-anchor="middle">UserPromptSubmit</text>
+  </g>
+  <g class="o">
+    <rect x="232" y="58" width="188" height="54" rx="27"/>
+    <text x="326" y="81" class="head" text-anchor="middle">2 · Before a tool call</text>
+    <text x="326" y="97" class="sub code" text-anchor="middle">PreToolUse</text>
+  </g>
+  <g class="o">
+    <rect x="460" y="58" width="188" height="54" rx="27"/>
+    <text x="554" y="81" class="head" text-anchor="middle">3 · After a tool call</text>
+    <text x="554" y="97" class="sub code" text-anchor="middle">PostToolUse</text>
+  </g>
+  <g class="o">
+    <rect x="688" y="58" width="188" height="54" rx="27"/>
+    <text x="782" y="81" class="head" text-anchor="middle">4 · The end of the turn</text>
+    <text x="782" y="97" class="sub code" text-anchor="middle">Stop</text>
+  </g>
+  <path d="M 192 85 L 232 85" class="wire" marker-end="url(#tip)"/>
+  <path d="M 420 85 L 460 85" class="wire" marker-end="url(#tip)"/>
+  <path d="M 648 85 L 688 85" class="wire" marker-end="url(#tip)"/>
+  <path d="M 554 58 L 554 38 Q 554 30 546 30 L 334 30 Q 326 30 326 38 L 326 58" class="wire" marker-end="url(#tip)"/>
+  <text x="440" y="22" class="lbl" text-anchor="middle">for every call</text>
+
+  <!-- What Weaver does at each of them -->
+  <path d="M 98 112 L 98 142" class="wire" marker-end="url(#tip)"/>
+  <g class="w">
+    <rect x="4" y="142" width="188" height="152" rx="7"/>
+    <text x="18" y="168" class="sub" text-anchor="start">The request joins the</text>
+    <text x="18" y="184" class="sub" text-anchor="start">unit of work.</text>
+    <text x="18" y="216" class="sub" text-anchor="start">The agent is told how</text>
+    <text x="18" y="232" class="sub" text-anchor="start">to flag what it finds.</text>
+  </g>
+  <path d="M 326 112 L 326 142" class="wire" marker-end="url(#tip)"/>
+  <g class="w">
+    <rect x="232" y="142" width="188" height="152" rx="7"/>
+    <text x="246" y="168" class="sub" text-anchor="start">A flag is recorded: the</text>
+    <text x="246" y="184" class="sub" text-anchor="start">hook answers for it.</text>
+    <text x="246" y="216" class="sub" text-anchor="start">A call the project</text>
+    <text x="246" y="232" class="sub" text-anchor="start">forbids is refused,</text>
+    <text x="246" y="248" class="sub" text-anchor="start">with its rule.</text>
+  </g>
+  <path d="M 554 112 L 554 142" class="wire" marker-end="url(#tip)"/>
+  <g class="w">
+    <rect x="460" y="142" width="188" height="152" rx="7"/>
+    <text x="474" y="168" class="sub" text-anchor="start">The files that changed</text>
+    <text x="474" y="184" class="sub" text-anchor="start">join the unit of work:</text>
+    <text x="474" y="200" class="sub" text-anchor="start">Weaver knows who</text>
+    <text x="474" y="216" class="sub" text-anchor="start">changed what.</text>
+  </g>
+  <path d="M 782 112 L 782 142" class="wire" marker-end="url(#tip)"/>
+  <g class="w">
+    <rect x="688" y="142" width="188" height="152" rx="7"/>
+    <text x="702" y="168" class="sub" text-anchor="start">The writer starts on</text>
+    <text x="702" y="184" class="sub" text-anchor="start">the flags of the turn.</text>
+    <text x="702" y="216" class="sub" text-anchor="start">Repairs, checks, and a</text>
+    <text x="702" y="232" class="sub" text-anchor="start">review if one is due.</text>
+    <text x="702" y="264" class="sub" text-anchor="start">The unit is settled, or</text>
+    <text x="702" y="280" class="sub" text-anchor="start">the agent goes back.</text>
+  </g>
+</svg>
