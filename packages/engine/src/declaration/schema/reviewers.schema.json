@@ -102,16 +102,6 @@
           "type": "string",
           "minLength": 1,
           "description": "How hard the model thinks, in the words of its runtime (`low`, `high`, ...)."
-        },
-        "maxTurns": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "How many turns one review may take. Claude Code holds a review to it; Codex has no such limit."
-        },
-        "maxCostUsd": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "How much one review may cost, in dollars. Claude Code holds a review to it; Codex has no such limit."
         }
       }
     }

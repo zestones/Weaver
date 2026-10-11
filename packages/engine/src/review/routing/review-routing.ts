@@ -9,8 +9,6 @@ export interface ReviewAssignment {
   readonly reason: string
   readonly model: string | null
   readonly effort: string | null
-  readonly maxTurns: number | null
-  readonly maxCostUsd: number | null
   readonly timeoutSeconds: number
   readonly experiments: boolean
 }

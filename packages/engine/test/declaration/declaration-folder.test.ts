@@ -239,14 +239,14 @@ test('a guard holds its own sentence, and refuses something', () => {
   assert.deepEqual(problems({ guards: { g: { statement: 'x' } } }), ['project/guards.json: g refuses nothing: it needs writes or runs'])
 })
 
-const NO_SETTINGS = { model: null, effort: null, maxTurns: null, maxCostUsd: null }
+const NO_SETTINGS = { model: null, effort: null }
 
 test('a project says who reviews its changes, where a mistake costs the most, and whether the reviewer may experiment', () => {
   const plain = parse({ review: { runtime: 'codex' } }).review
   const full = parse({
     review: {
       runtime: 'other',
-      reviewers: { claude: { model: 'opus', effort: 'max', maxCostUsd: 25 } },
+      reviewers: { claude: { model: 'opus', effort: 'max' } },
       issue: ['gh', 'issue', 'create', '--title', '{title}', '--body', '{body}'],
       critical: { paths: ['src/auth/**'], lines: 200 },
       experiments: true,
@@ -268,7 +268,7 @@ test('a project says who reviews its changes, where a mistake costs the most, an
   )
   assert.deepEqual(
     [full.review?.runtime, full.review?.reviewers.claude, full.review?.criticalPaths, full.review?.criticalLines, full.review?.experiments],
-    ['other', { ...NO_SETTINGS, model: 'opus', effort: 'max', maxCostUsd: 25 }, ['src/auth/**'], 200, true],
+    ['other', { model: 'opus', effort: 'max' }, ['src/auth/**'], 200, true],
   )
   assert.deepEqual(full.skills, ['docs/review.md'], 'the skill of the reviewer is guarded as the others are')
   assert.deepEqual([full.review?.issue?.[0], plain?.issue, plain?.waitSeconds], ['gh', null, 1500])

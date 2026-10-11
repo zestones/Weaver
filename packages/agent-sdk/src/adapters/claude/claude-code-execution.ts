@@ -70,8 +70,6 @@ export class ClaudeCodeExecution implements AgentExecution {
       ...model,
       ...effort,
       ...schema,
-      ...(task.maxTurns === null ? [] : ['--max-turns', String(task.maxTurns)]),
-      ...(task.maxCostUsd === null ? [] : ['--max-budget-usd', String(task.maxCostUsd)]),
       ...(task.access === 'write' ? this.writing(task, scratch) : this.reading()),
     ]
   }

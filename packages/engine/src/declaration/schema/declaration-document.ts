@@ -26,8 +26,6 @@ interface DocumentGuard {
 interface DocumentReviewer {
   readonly model?: string
   readonly effort?: string
-  readonly maxTurns?: number
-  readonly maxCostUsd?: number
 }
 
 // What each file of `.weaver/` holds once the defaults its schema gives are filled in. A file that names its schema

@@ -44,9 +44,7 @@ const task = (prompt: string, fields: Partial<ConstructorParameters<typeof Agent
 
 test('a task is run without the owner’s configuration, in a sandbox that matches its access, and its answer is the last message', async () => {
   const reading = await codex.run(task('ask:echo'))
-  const writing = await codex.run(
-    task('ask:echo', { access: 'write', model: 'gpt-5.5', effort: 'low', beforeTool: ['node', 'hook.js'], maxTurns: 80, maxCostUsd: 25 }),
-  )
+  const writing = await codex.run(task('ask:echo', { access: 'write', model: 'gpt-5.5', effort: 'low', beforeTool: ['node', 'hook.js'] }))
   const seen = JSON.parse(reading.text) as Seen
 
   assert.equal(reading.succeeded, true)

@@ -146,8 +146,6 @@ export class DeclarationParts {
     const settings = (name: ReviewerName): ReviewerSettings => ({
       model: review.reviewers[name]?.model ?? null,
       effort: review.reviewers[name]?.effort ?? null,
-      maxTurns: review.reviewers[name]?.maxTurns ?? null,
-      maxCostUsd: review.reviewers[name]?.maxCostUsd ?? null,
     })
 
     return new ReviewPolicy({

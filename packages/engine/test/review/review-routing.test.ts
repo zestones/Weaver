@@ -19,7 +19,7 @@ const assign = (review: Record<string, unknown>, author: string, files: ChangedF
   new ReviewRouting(policyOf(review), new OwnerDirectives(requests)).assign(author, diffOf(files))
 
 test('the project names who reviews: a runtime, the one that wrote the change, or the one that did not, each with its model', () => {
-  const reviewers = { claude: { model: 'opus', effort: 'max', maxCostUsd: 25 }, codex: { model: 'gpt-6', maxTurns: 40 } }
+  const reviewers = { claude: { model: 'opus', effort: 'max' }, codex: { model: 'gpt-6' } }
   const files = [changed('src/a.ts')]
 
   assert.deepEqual(assign({ runtime: 'codex', reviewers, timeoutSeconds: 60 }, 'claude', files), {
@@ -27,8 +27,6 @@ test('the project names who reviews: a runtime, the one that wrote the change, o
     reason: 'the runtime the project names',
     model: 'gpt-6',
     effort: null,
-    maxTurns: 40,
-    maxCostUsd: null,
     timeoutSeconds: 60,
     experiments: false,
   })

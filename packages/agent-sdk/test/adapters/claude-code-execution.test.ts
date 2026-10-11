@@ -61,12 +61,16 @@ test('a task may add variables to the environment its agent runs in', async () =
   assert.equal((await seenBy(task('ask:echo'))).marked, null)
 })
 
-test('a task that writes runs commands too, and names its model, its effort and its limits when it has them', async () => {
-  const seen = await seenBy(task('ask:echo', { access: 'write', model: 'claude-haiku-5-5', effort: 'low', maxTurns: 80, maxCostUsd: 25 }))
+test('a task that writes runs commands too, and names its model and its effort when it has them', async () => {
+  const seen = await seenBy(task('ask:echo', { access: 'write', model: 'claude-haiku-5-5', effort: 'low' }))
 
   assert.deepEqual(seen.argv.slice(ALONE.length), [
-    ...['--model', 'claude-haiku-5-5', '--effort', 'low', '--max-turns', '80', '--max-budget-usd', '25'],
-    ...['--permission-mode', 'bypassPermissions'],
+    '--model',
+    'claude-haiku-5-5',
+    '--effort',
+    'low',
+    '--permission-mode',
+    'bypassPermissions',
   ])
 })
 

@@ -80,7 +80,7 @@ export class AgentReviewer implements Reviewer {
   }
 
   private task(request: ReviewRequest, assignment: ReviewAssignment, cwd: string, copy: ReviewCopy | null): AgentTask {
-    const { runtime, model, effort, maxTurns, maxCostUsd, timeoutSeconds } = assignment
+    const { runtime, model, effort, timeoutSeconds } = assignment
 
     return new AgentTask({
       prompt: request.prompt(copy?.path ?? null),
@@ -90,8 +90,6 @@ export class AgentReviewer implements Reviewer {
       timeoutSeconds,
       model,
       effort,
-      maxTurns,
-      maxCostUsd,
       answerSchema: request.schema(),
       environment: { [AgentReviewer.MARK]: '1' },
     })

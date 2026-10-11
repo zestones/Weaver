@@ -42,8 +42,6 @@ const READS: ReviewAssignment = {
   reason: 'the runtime the project names',
   model: 'gpt-5.5',
   effort: 'high',
-  maxTurns: 80,
-  maxCostUsd: 25,
   timeoutSeconds: 120,
   experiments: false,
 }
@@ -66,7 +64,6 @@ test('the reviewer is the runtime it was assigned, started where the project is,
     [task?.cwd, task?.access, task?.beforeTool, task?.model, task?.effort, task?.timeoutSeconds, task?.environment],
     [repo.top, 'read-only', null, 'gpt-5.5', 'high', 120, { WEAVER_REVIEWER: '1' }],
   )
-  assert.deepEqual([task?.maxTurns, task?.maxCostUsd], [80, 25])
   assert.match(task?.prompt ?? '', /Do not change any file: you may only read\./)
   assert.match(JSON.stringify(task?.answerSchema), /"rule":\{"type":"string","enum":\["N1","N2","BUG"\]\}/, 'only the rules it was given')
   assert.deepEqual(
