@@ -101,7 +101,7 @@ test('a pass settles the unit: the next one starts empty, and a file changed dur
   assert.deepEqual(stateOf(session)?.unit.intents, [])
 })
 
-test('with headings declared, a turn that ends without them checks nothing; the agent is told once how to end, by the skill when there is one', async () => {
+test('with a finish skill, a turn that ends without its headings checks nothing; the agent is told once how to end, and where it is written', async () => {
   const project = declaration({ finish: { headings: ['Request', 'To validate'], skill: '.agents/skills/wv-finish.md' } })
   const checks = stubChecks([PASSING])
 
@@ -137,9 +137,9 @@ test('what waits for the owner is counted, listed in the report and never blocks
 
   prompt(session, 'change it')
   agentWrites(session, { [A_FILE]: '// eslint-disable-next-line\nexport const a = 2\n' })
-  writeFiles(session.repo.top, { 'weaver.config.json': '{}\n' })
-  agentRuns(session, "python3 -c \"open('weaver.config.json', 'w').write('{}')\"", () => {
-    writeFiles(session.repo.top, { 'weaver.config.json': '{"version":1}\n' })
+  writeFiles(session.repo.top, { '.weaver/settings.json': '{}\n' })
+  agentRuns(session, "python3 -c \"open('.weaver/settings.json', 'w').write('{}')\"", () => {
+    writeFiles(session.repo.top, { '.weaver/settings.json': '{"version":1}\n' })
   })
 
   const markers = new CheckOutcome({ ...PASSING, id: 'markers', rules: ['S1'], toValidate: [finding] })
@@ -149,7 +149,7 @@ test('what waits for the owner is counted, listed in the report and never blocks
   assert.match(output.systemMessage ?? '', /2 item\(s\) to validate\./)
   assert.match(
     report,
-    /## To validate\n\n- S1 src\/a\.ts:1: eslint-disable added\n- weaver:declaration weaver\.config\.json: the unit changed the project's declaration/,
+    /## To validate\n\n- S1 src\/a\.ts:1: eslint-disable added\n- weaver:declaration \.weaver: the unit changed the project's declaration/,
   )
   assert.equal(checksOf()[0]?.toValidate, 2)
   assert.deepEqual(unitFiles(session), [])

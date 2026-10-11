@@ -1,7 +1,16 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { DeclarationError, DeclarationFile, Repository, ReviewLedger, type Declaration } from '@weaver/engine'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import {
+  DeclarationError,
+  DeclarationFolder,
+  DeclarationParts,
+  Repository,
+  ReviewLedger,
+  type Declaration,
+  type PartName,
+} from '@weaver/engine'
+import type { EngineLink } from '../link/engine-link.ts'
 import { FinishSkill } from '../skills/finish-skill.ts'
 import type { ProjectSkill } from '../skills/project-skill.ts'
 import { ReviewSkill } from '../skills/review-skill.ts'
@@ -22,21 +31,32 @@ export class Project {
   }
 
   get configName(): string {
-    return DeclarationFile.NAME
+    return DeclarationFolder.NAME
   }
 
   declaration(): Declaration | null {
-    return DeclarationFile.in(this.top).load()
+    return DeclarationFolder.in(this.top).load()
   }
 
-  createConfig(schema: string): boolean {
-    const path = join(this.top, this.configName)
+  // The settings, and one empty file for each part of what the project asks, each naming the schema an editor checks
+  // it against. Who reviews is the owner's to add: a review costs money.
+  createConfig(link: EngineLink): boolean {
+    const folder = DeclarationFolder.in(this.top)
+    const starter: Readonly<Partial<Record<PartName, object>>> = {
+      settings: { version: 1, finish: { skill: FinishSkill.PATH } },
+      guards: {},
+      checks: {},
+      scripts: {},
+    }
 
-    if (existsSync(path)) return false
+    if (existsSync(folder.settings)) return false
 
-    const finish = { headings: FinishSkill.HEADINGS, skill: FinishSkill.PATH }
+    for (const [part, content] of Object.entries(starter) as [PartName, object][]) {
+      const path = join(folder.path, DeclarationParts.FILES[part])
 
-    writeFileSync(path, `${JSON.stringify({ $schema: schema, version: 1, finish, checks: {}, guards: {} }, null, 2)}\n`)
+      mkdirSync(dirname(path), { recursive: true })
+      if (!existsSync(path)) writeFileSync(path, `${JSON.stringify({ $schema: link.schemaOf(part), ...content }, null, 2)}\n`)
+    }
 
     return true
   }
@@ -55,7 +75,7 @@ export class Project {
   finishSkill(): FinishSkill | null {
     const finish = this.readableDeclaration()?.finish
 
-    return finish?.skill == null ? null : new FinishSkill(this.top, finish.skill, finish.headings ?? [])
+    return finish?.skill == null ? null : new FinishSkill(this.top, finish.skill, finish.headings ?? FinishSkill.HEADINGS)
   }
 
   reviewSkill(): ReviewSkill | null {

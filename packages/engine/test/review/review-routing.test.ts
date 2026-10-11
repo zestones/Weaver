@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { DeclarationFile } from '../../src/declaration/reading/declaration-file.ts'
 import type { ChangedFile } from '../../src/lib/git/tree-diff.ts'
 import { OwnerDirectives } from '../../src/review/routing/owner-directives.ts'
 import { ReviewRouting } from '../../src/review/routing/review-routing.ts'
 import { UnitDiff } from '../../src/unit-of-work/diff/unit-diff.ts'
+import { declarationOf } from '../fixtures/declaration.ts'
 
 const policyOf = (review: Record<string, unknown>) => {
-  const { review: policy } = new DeclarationFile('weaver.config.json').parse(JSON.stringify({ version: 1, review }))
+  const { review: policy } = declarationOf({ review })
 
   if (policy === null) throw new Error('a review is declared')
 

@@ -4,30 +4,27 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AgentResult, ExecutionCatalog, ScriptedExecution } from '@weaver/agent-sdk'
 import { afterAll, test } from 'vitest'
-import { DeclarationFile } from '../../src/declaration/reading/declaration-file.ts'
 import type { ChangedFile } from '../../src/lib/git/tree-diff.ts'
 import { ReviewRequest, type ReviewRequestFields } from '../../src/review/request/review-request.ts'
 import type { ReviewAssignment } from '../../src/review/routing/review-routing.ts'
 import { AgentReviewer } from '../../src/review/running/agent-reviewer.ts'
+import { declarationOf } from '../fixtures/declaration.ts'
 import { makeRepo } from '../fixtures/repo.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-reviewer-'))
 const repo = makeRepo(join(scratch, 'project'), { 'src/a.ts': 'const a = raw as User\n' })
 const copies = join(scratch, 'copies')
 const FILES: ChangedFile[] = [{ status: 'M', path: 'src/a.ts', oldPath: 'src/a.ts', added: [[1, 1]] }]
-const { rules } = new DeclarationFile('weaver.config.json').parse(
-  JSON.stringify({
-    version: 1,
-    review: {
-      runtime: 'codex',
-      rules: {
-        N1: 'One level of abstraction per function.',
-        N2: 'No cast of external data.',
-        BUG: { statement: 'The change has no defect.', evidence: true },
-      },
+const { rules } = declarationOf({
+  review: {
+    runtime: 'codex',
+    rules: {
+      N1: 'One level of abstraction per function.',
+      N2: 'No cast of external data.',
+      BUG: { statement: 'The change has no defect.', evidence: true },
     },
-  }),
-)
+  },
+})
 const request = (fields: Partial<ReviewRequestFields> = {}) =>
   new ReviewRequest({
     rules,

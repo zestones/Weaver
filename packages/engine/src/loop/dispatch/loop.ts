@@ -4,7 +4,7 @@ import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import { ProjectChecks } from '../../checks/running/project-checks.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import { DeclarationError } from '../../declaration/reading/declaration-error.ts'
-import { DeclarationFile } from '../../declaration/reading/declaration-file.ts'
+import { DeclarationFolder } from '../../declaration/reading/declaration-folder.ts'
 import { Repository } from '../../lib/git/repository.ts'
 import { DetachedLauncher } from '../../review/launching/detached-launcher.ts'
 import type { ReviewLauncher } from '../../review/launching/review-launcher.ts'
@@ -58,7 +58,7 @@ export class Loop {
 
   private declarationOf(repo: Repository): Declaration | DeclarationError | null {
     try {
-      return DeclarationFile.in(repo.top).load()
+      return DeclarationFolder.in(repo.top).load()
     } catch (error) {
       if (error instanceof DeclarationError) return error
 

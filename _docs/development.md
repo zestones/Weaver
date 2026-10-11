@@ -74,6 +74,6 @@ A package that uses another reads its emitted types and runs its emitted code, s
 
 ### Running the CLI on a project
 
-`weaver install`, run at the root of a project, writes the hooks of the agent runtimes and a starter `weaver.config.json`. `weaver doctor` checks that the wiring is alive, and `weaver uninstall` removes the hooks. To have the command on this machine, build the workspace, then link its entry into a folder of your `PATH`, for example `ln -s "$PWD/apps/cli/dist/bin/weaver.js" ~/.local/bin/weaver` from the root of this repository. The build makes the entry executable.
+`weaver install`, run at the root of a project, writes the hooks of the agent runtimes and a starter `.weaver/` folder: the settings, one file for each part of what the project asks, and the skill that says how a task ends. `weaver doctor` checks that the wiring is alive, and `weaver uninstall` removes the hooks. To have the command on this machine, build the workspace, then link its entry into a folder of your `PATH`, for example `ln -s "$PWD/apps/cli/dist/bin/weaver.js" ~/.local/bin/weaver` from the root of this repository. The build makes the entry executable.
 
 This is temporary. Weaver is not distributed yet, so a project is wired to this checkout by absolute paths: the hooks and the `$schema` line stop working when the checkout moves or its `dist/` is removed, and they belong to one machine. The `TODO(distribution)` in `apps/cli/src/link/engine-link.ts` marks what to replace once Weaver is published.

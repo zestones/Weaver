@@ -39,9 +39,9 @@ export class InstallCommand implements Command {
     }
 
     this.output.say(
-      project.createConfig(this.link.schema)
-        ? `${project.configName} created: declare your rules, checks and guards there.`
-        : `${project.configName} kept as it is.`,
+      project.createConfig(this.link)
+        ? `${project.configName}/ created: declare your guards and your checks in ${project.configName}/project/.`
+        : `${project.configName}/ kept as it is.`,
     )
 
     for (const skill of project.skills()) {

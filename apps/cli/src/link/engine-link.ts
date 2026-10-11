@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import type { PartName } from '@weaver/engine'
 
 const MARK = '--weaver'
 
@@ -10,13 +12,18 @@ const MARK = '--weaver'
 // hosted schema once Weaver is published.
 export class EngineLink {
   readonly hook: string
-  readonly schema: string
+  // The folder that holds one schema for each file of a declaration.
+  readonly schemas: string
 
-  constructor(hook?: string, schema?: string) {
+  constructor(hook?: string, schemas?: string) {
     const require = createRequire(import.meta.url)
 
     this.hook = hook ?? require.resolve('@weaver/engine/hook')
-    this.schema = schema ?? require.resolve('@weaver/engine/weaver.config.schema.json')
+    this.schemas = schemas ?? dirname(require.resolve('@weaver/engine/schema/settings.schema.json'))
+  }
+
+  schemaOf(part: PartName): string {
+    return join(this.schemas, `${part}.schema.json`)
   }
 
   command(event: string, agent: string): string {

@@ -3,10 +3,10 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DeclarationFile } from '@weaver/engine'
+import { DeclarationFolder } from '@weaver/engine'
 import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
-import { makeProject, readJson, weaver, writeJson } from '../fixtures/project.ts'
+import { makeProject, readJson, weaver, writeConfig, writeJson } from '../fixtures/project.ts'
 
 interface Group {
   readonly matcher?: string
@@ -20,8 +20,8 @@ interface Settings {
 
 const CLAUDE = '.claude/settings.local.json'
 const CODEX = '.codex/hooks.json'
-const CONFIG = 'weaver.config.json'
-const SKILL = '.agents/skills/wv-finish.md'
+const CONFIG = '.weaver/settings.json'
+const SKILL = '.weaver/skills/wv-finish.md'
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-install-'))
 const link = new EngineLink()
 let top: string
@@ -54,9 +54,16 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   assert.match(claude.hooks.Stop?.[0]?.hooks[0]?.command ?? '', /hook\.js" Stop --agent=claude --weaver$/)
   assert.match(codex.hooks.PreToolUse?.[0]?.hooks[0]?.command ?? '', /hook\.js" PreToolUse --agent=codex --weaver$/)
 
-  assert.equal(readJson<{ $schema: string }>(top, CONFIG).$schema, link.schema)
-  assert.deepEqual(DeclarationFile.in(top).load()?.rules, [])
-  assert.deepEqual(DeclarationFile.in(top).load()?.finish.headings, ['Request', 'To validate', 'Found along the way'])
+  for (const part of ['settings', 'guards', 'checks', 'scripts'] as const) {
+    const file = part === 'settings' ? CONFIG : `.weaver/project/${part}.json`
+
+    assert.equal(readJson<{ $schema: string }>(top, file).$schema, link.schemaOf(part), 'each file names the schema it follows')
+  }
+
+  assert.equal(existsSync(join(top, '.weaver/llm')), false, 'who reviews is the owner’s to add')
+  assert.deepEqual(DeclarationFolder.in(top).load()?.rules, [])
+  assert.deepEqual(DeclarationFolder.in(top).load()?.finish.headings, ['Request', 'To validate', 'Found along the way'])
+  assert.ok(lines.includes('.weaver/ created: declare your guards and your checks in .weaver/project/.'))
   assert.match(
     readFileSync(join(top, SKILL), 'utf8'),
     /## Request\n\nWhat you did for the request[^]*## To validate\n\n[^]*## Found along the way\n\n/,
@@ -78,7 +85,7 @@ test('the command install writes is one the runtime can run as it is', () => {
 
 test('install twice wires once, and leaves what the owner put in the files', () => {
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine', timeout: 5 }] }
-  const declared = '{"version":1,"rules":{"A8":{"level":"human","statement":"Dependencies are the owner’s."}}}'
+  const declared = '{"version":1,"finish":{"maxRounds":5}}'
 
   writeJson(top, CLAUDE, { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine], Notification: [mine] } })
   writeJson(top, CONFIG, JSON.parse(declared))
@@ -95,24 +102,26 @@ test('install twice wires once, and leaves what the owner put in the files', () 
   }
 
   assert.deepEqual(JSON.parse(readFileSync(join(top, CONFIG), 'utf8')), JSON.parse(declared))
-  assert.ok(lines.includes(`${CONFIG} kept as it is.`))
+  assert.ok(lines.includes('.weaver/ kept as it is.'))
+  assert.equal(existsSync(join(top, '.weaver/project')), false, 'nothing is added to a declaration the owner wrote')
   assert.equal(existsSync(join(top, SKILL)), false, 'a project that names no skill gets none')
 })
 
-test('a skill the configuration names is written once with its headings, and never written over', () => {
-  writeJson(top, CONFIG, { version: 1, finish: { headings: ['Ta demande', 'À valider'], skill: 'docs/fin.md' } })
+test('a skill the settings name is written once, with the headings a task ends by in its header, and never written over', () => {
+  writeJson(top, CONFIG, { version: 1, finish: { skill: 'docs/fin.md' } })
   weaver(top, ['install', 'claude'])
 
   const written = readFileSync(join(top, 'docs/fin.md'), 'utf8')
 
-  assert.match(written, /## Ta demande\n\nSay here what this section must hold\.\n\n## À valider\n\nSay here/)
+  assert.match(written, /^---\ndescription: [^\n]*\nheadings:\n {2}- Request\n {2}- To validate\n {2}- Found along the way\n---\n/)
+  assert.deepEqual(DeclarationFolder.in(top).load()?.finish.headings, ['Request', 'To validate', 'Found along the way'])
   writeJson(top, 'docs/fin.md', 'mine now')
   assert.ok(!weaver(top, ['install', 'claude']).lines.some((line) => line.includes('docs/fin.md created')))
   assert.equal(readJson<string>(top, 'docs/fin.md'), 'mine now')
 })
 
 test('the skill of the reviewer is written the same way, where the configuration says', () => {
-  writeJson(top, CONFIG, { version: 1, review: { runtime: 'codex', skill: 'docs/review.md' } })
+  writeConfig(top, { settings: { version: 1 }, reviewers: { runtime: 'codex', skill: 'docs/review.md' } })
 
   const { lines } = weaver(top, ['install', 'claude'])
 
@@ -138,7 +147,7 @@ test('install may name the runtimes to wire, and refuses a name it does not know
 })
 
 test('nothing is written when the hook cannot start, or outside a git repository', () => {
-  const dead = weaver(top, ['install'], new EngineLink(join(scratch, 'nowhere/hook.js'), link.schema))
+  const dead = weaver(top, ['install'], new EngineLink(join(scratch, 'nowhere/hook.js'), link.schemas))
   const outside = weaver(scratch, ['install'])
 
   assert.equal(dead.status, 1)

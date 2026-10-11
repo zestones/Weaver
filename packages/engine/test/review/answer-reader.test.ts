@@ -3,9 +3,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, test } from 'vitest'
-import { DeclarationFile } from '../../src/declaration/reading/declaration-file.ts'
 import type { ChangedFile } from '../../src/lib/git/tree-diff.ts'
 import { AnswerReader } from '../../src/review/findings/answer-reader.ts'
+import { declarationOf } from '../fixtures/declaration.ts'
 import { writeFiles } from '../fixtures/repo.ts'
 
 const top = mkdtempSync(join(tmpdir(), 'weaver-answer-'))
@@ -24,15 +24,12 @@ const SOURCE = [
   'export const untouched = 1',
 ]
 const FILES: ChangedFile[] = [{ status: 'M', path: 'src/a.ts', oldPath: 'src/a.ts', added: [[3, 6]] }]
-const { rules } = new DeclarationFile('weaver.config.json').parse(
-  JSON.stringify({
-    version: 1,
-    review: {
-      runtime: 'codex',
-      rules: { T10: 'External data is parsed, never cast.', BUG: { statement: 'The change has no defect.', evidence: true } },
-    },
-  }),
-)
+const { rules } = declarationOf({
+  review: {
+    runtime: 'codex',
+    rules: { T10: 'External data is parsed, never cast.', BUG: { statement: 'The change has no defect.', evidence: true } },
+  },
+})
 const finding = (fields: Record<string, unknown> = {}) => ({
   rule: 'T10',
   file: 'src/a.ts',

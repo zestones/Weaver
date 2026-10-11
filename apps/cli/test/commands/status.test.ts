@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Repository, ReviewLedger } from '@weaver/engine'
 import { afterAll, test } from 'vitest'
-import { makeProject, weaver, writeJson } from '../fixtures/project.ts'
+import { makeProject, weaver, writeConfig } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-status-'))
 const top = makeProject(join(scratch, 'project'))
@@ -66,7 +66,7 @@ test('closing a point as an issue files it with the command the project names, a
     filer,
     `if (process.argv[2].includes('F2')) { console.error('no network'); process.exit(1) }\nconsole.log('https://issues.example/42 ' + JSON.stringify(process.argv[3]))\n`,
   )
-  writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'codex', issue: ['node', filer, '{body}', '{title}'] } })
+  writeConfig(top, { settings: { version: 1 }, reviewers: { runtime: 'codex', issue: ['node', filer, '{body}', '{title}'] } })
 
   const filed = weaver(top, ['close', '77aa001/F1', 'issue', 'for', 'later'])
 

@@ -25,7 +25,7 @@ export class UninstallCommand implements Command {
       this.output.say(runtime.uninstall() ? `${runtime.label}: hooks removed from ${runtime.file}` : `${runtime.label}: no hook to remove`)
     }
 
-    this.output.say(`${project.configName} and .git/weaver/ are left: they hold your rules and Weaver's records.`)
+    this.output.say(`${project.configName}/ and .git/weaver/ are left: they hold your rules and Weaver's records.`)
 
     return 0
   }

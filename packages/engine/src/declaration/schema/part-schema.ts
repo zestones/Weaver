@@ -1,18 +1,25 @@
 import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv'
-import type { DeclarationDocument } from './declaration-document.ts'
-import schema from './weaver.config.schema.json' with { type: 'json' }
+import checks from './checks.schema.json' with { type: 'json' }
+import type { PartName } from './declaration-document.ts'
+import guards from './guards.schema.json' with { type: 'json' }
+import reviewers from './reviewers.schema.json' with { type: 'json' }
+import rules from './rules.schema.json' with { type: 'json' }
+import scripts from './scripts.schema.json' with { type: 'json' }
+import settings from './settings.schema.json' with { type: 'json' }
 
+const SCHEMAS: Readonly<Record<PartName, object>> = { settings, guards, checks, scripts, reviewers, rules }
 const TYPES: Readonly<Record<string, string>> = { object: 'an object', array: 'a list', string: 'a text', integer: 'a whole number' }
 
-export class DeclarationSchema {
-  private readonly validate: ValidateFunction<DeclarationDocument>
+// The shape of one file of `.weaver/`: its schema is the single definition of what the file may hold.
+export class PartSchema {
+  private readonly validate: ValidateFunction
 
-  constructor() {
-    this.validate = new Ajv({ allErrors: true, useDefaults: true, allowUnionTypes: true }).compile<DeclarationDocument>(schema)
+  constructor(part: PartName) {
+    this.validate = new Ajv({ allErrors: true, useDefaults: true, allowUnionTypes: true }).compile(SCHEMAS[part])
   }
 
   // An accepted value comes out with the defaults it left out filled in.
-  accepts(value: unknown): value is DeclarationDocument {
+  accepts(value: unknown): boolean {
     return this.validate(value)
   }
 
@@ -36,7 +43,7 @@ export class DeclarationSchema {
       case 'required':
         return `${inside(params.missingProperty)} is missing`
       case 'propertyNames':
-        return `${inside(params.propertyName)} is not a valid identifier`
+        return `${inside(params.propertyName)} is not a valid name`
       case 'enum':
         return `${at} must be one of ${(params.allowedValues as unknown[]).join(', ')}`
       case 'const':

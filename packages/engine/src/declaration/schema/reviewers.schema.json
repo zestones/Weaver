@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver reviewers",
+  "description": "Who reviews a unit of work, and with what means. An agent that did not write the change judges it against the rules of `llm/rules.json` once the checks pass, and the agent that wrote it answers each finding, fixed or not fixed with a reason. A finding never holds the change by itself. The owner has four words for a request: `#no-review` asks for no review of that work, `#review` takes it back and has a review that failed tried again, `#critical` asks for the runtime that did not write the change, `#simple` for the one that did.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runtime"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows, for the editor."
+    },
+    "runtime": {
+      "enum": ["claude", "codex", "same", "other"],
+      "description": "Who reviews: a runtime by its name, `same` for the one that wrote the change, `other` for the one that did not."
+    },
+    "reviewers": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "The model and the effort of each runtime when it reviews. Without them, the runtime chooses.",
+      "properties": {
+        "claude": {
+          "$ref": "#/definitions/reviewer"
+        },
+        "codex": {
+          "$ref": "#/definitions/reviewer"
+        }
+      }
+    },
+    "critical": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "Where a mistake costs the most: such a change is reviewed by the runtime that did not write it, whatever `runtime` says.",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [],
+          "description": "A change that touches one of these paths, as globs relative to the repository root."
+        },
+        "lines": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "A change that adds or modifies more lines than this."
+        }
+      }
+    },
+    "experiments": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the reviewer may run commands and write files to show what it suspects. It then works in a copy of the working tree, outside the repository and removed after the review; what else it may reach, such as a running stack, is for the skill to say. Without this, it only reads."
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 900,
+      "description": "How long one review may take. A review that does not answer in time holds nobody: the owner is told that the rules were not judged, and `#review` in a later request has it tried again."
+    },
+    "waitSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1500,
+      "description": "How long the end of a turn waits for a review. A review that runs longer goes on by itself: the unit of work stays open, and the next end of turn gives its findings."
+    },
+    "maxRounds": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1,
+      "description": "How many reviews may send the agent back to work, for one request. What a later review finds waits for the owner."
+    },
+    "skill": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The file that tells the reviewer how this project wants its changes reviewed, relative to the repository root. Weaver guards it."
+    },
+    "issue": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "description": "The command that files an issue when the owner closes a point as `issue` with `weaver close`, with `{title}` and `{body}` where they go. Without it, closing as `issue` only records it."
+    }
+  },
+  "definitions": {
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The model the runtime reviews with."
+        },
+        "effort": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How hard the model thinks, in the words of its runtime (`low`, `high`, ...)."
+        },
+        "maxTurns": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many turns one review may take. Claude Code holds a review to it; Codex has no such limit."
+        },
+        "maxCostUsd": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "How much one review may cost, in dollars. Claude Code holds a review to it; Codex has no such limit."
+        }
+      }
+    }
+  }
+}

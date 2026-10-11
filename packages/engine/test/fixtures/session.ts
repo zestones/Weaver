@@ -10,7 +10,6 @@ import { ReviewRounds } from '../../src/review/rounds/review-rounds.ts'
 import type { ReviewAssignment } from '../../src/review/routing/review-routing.ts'
 import type { Reviewer } from '../../src/review/running/reviewer.ts'
 import type { Declaration } from '../../src/declaration/content/declaration.ts'
-import { DeclarationFile } from '../../src/declaration/reading/declaration-file.ts'
 import { AfterCall } from '../../src/loop/moments/after-call.ts'
 import type { Answer, AnswerBody } from '../../src/loop/exchange/answer.ts'
 import { BeforeCall } from '../../src/loop/moments/before-call.ts'
@@ -21,6 +20,7 @@ import type { Session } from '../../src/unit-of-work/session/session.ts'
 import { Journal } from '../../src/unit-of-work/journal/journal.ts'
 import type { EventBody, EventOf } from '../../src/unit-of-work/journal/journal-event.ts'
 import type { SessionRecord } from '../../src/unit-of-work/session/session-record.ts'
+import { declarationOf } from './declaration.ts'
 import { writeFiles } from './repo.ts'
 
 type Raw = Record<string, unknown>
@@ -43,14 +43,7 @@ const AGENTS = new AgentCatalog()
 export const LINT = { verify: ['true'], rules: { L1: 'The code passes the linter.' } }
 const REVIEW_POLL_MS = 2
 
-export const declaration = (extra: Raw = {}): Declaration =>
-  new DeclarationFile('weaver.config.json').parse(
-    JSON.stringify({
-      version: 1,
-      checks: { lint: LINT },
-      ...extra,
-    }),
-  )
+export const declaration = (extra: Raw = {}): Declaration => declarationOf({ checks: { lint: LINT }, ...extra })
 
 export const FAILING = new CheckOutcome({
   id: 'lint',

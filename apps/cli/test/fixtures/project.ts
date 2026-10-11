@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { ClaudeCodeExecution, ExecutionCatalog, ScriptedExecution } from '@weaver/agent-sdk'
+import { DeclarationFolder, DeclarationParts, type PartName } from '@weaver/engine'
 import { CommandLine } from '../../src/commands/command-line.ts'
 import type { EngineLink } from '../../src/link/engine-link.ts'
 import type { Output } from '../../src/output/output.ts'
@@ -34,6 +35,12 @@ export function weaver(cwd: string, args: readonly string[], link: EngineLink | 
   const status = new CommandLine(cwd, output, link, EXECUTIONS).run(args)
 
   return { status, lines: output.lines }
+}
+
+// What a project declares, each part in the file Weaver reads it from.
+export function writeConfig(top: string, parts: Readonly<Partial<Record<PartName, unknown>>>): void {
+  for (const [part, value] of Object.entries(parts))
+    writeJson(top, `${DeclarationFolder.NAME}/${DeclarationParts.FILES[part as PartName]}`, value)
 }
 
 export function writeJson(top: string, path: string, value: unknown): void {

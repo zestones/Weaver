@@ -1,4 +1,4 @@
-import { DeclarationFile } from '../declaration/reading/declaration-file.ts'
+import { DeclarationFolder } from '../declaration/reading/declaration-folder.ts'
 import type { UnitDiff } from '../unit-of-work/diff/unit-diff.ts'
 import type { EventBody } from '../unit-of-work/journal/journal-event.ts'
 import type { UnitOfWork } from '../unit-of-work/unit/unit-of-work.ts'
@@ -56,8 +56,8 @@ export class UnitVerdict {
     const advisory = this.outcomes
       .filter((outcome) => outcome.failedWithoutBlocking)
       .map((outcome) => `${outcome.rules.join(' ')} the check ${outcome.id} reports: ${outcome.excerpt().slice(0, 3).join(' / ')}`)
-    const declaration = this.diff.changes(DeclarationFile.NAME)
-      ? [`${DECLARATION_RULE} ${DeclarationFile.NAME}: the unit changed the project's declaration`]
+    const declaration = this.diff.changesUnder(DeclarationFolder.NAME)
+      ? [`${DECLARATION_RULE} ${DeclarationFolder.NAME}: the unit changed the project's declaration`]
       : []
 
     return [...findings, ...advisory, ...declaration, ...(this.review?.toValidate() ?? [])]

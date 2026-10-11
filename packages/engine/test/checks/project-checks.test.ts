@@ -5,12 +5,12 @@ import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
 import type { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
 import { ProjectChecks } from '../../src/checks/running/project-checks.ts'
-import { DeclarationFile } from '../../src/declaration/reading/declaration-file.ts'
 import type { Repository } from '../../src/lib/git/repository.ts'
 import { TreeDiff } from '../../src/lib/git/tree-diff.ts'
 import { WorkingTreeSnapshot } from '../../src/lib/git/working-tree-snapshot.ts'
 import { UnitDiff } from '../../src/unit-of-work/diff/unit-diff.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
+import { declarationOf } from '../fixtures/declaration.ts'
 import { git, makeRepo, writeFiles } from '../fixtures/repo.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-checks-'))
@@ -34,7 +34,7 @@ beforeEach(() => {
 const reporter = (findings: unknown, exit = 0): string[] => ['node', 'reporter.mjs', JSON.stringify(findings), String(exit)]
 
 async function run(declaration: Record<string, unknown>): Promise<Record<string, CheckOutcome>> {
-  const project = new DeclarationFile('weaver.config.json').parse(JSON.stringify({ version: 1, ...declaration }))
+  const project = declarationOf(declaration)
   const { dir } = new Session(repo, 's', 'claude')
   const base = git(repo.top, ['rev-parse', 'HEAD^{tree}'])
   const head = new WorkingTreeSnapshot(repo, dir).tree()

@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver guards",
+  "description": "What is refused before a tool runs, each with the sentence that says why. Each key is the name of a guard.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows, for the editor."
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {
+        "const": "$schema"
+      },
+      {
+        "$ref": "#/definitions/identifier"
+      }
+    ]
+  },
+  "additionalProperties": {
+    "$ref": "#/definitions/guard"
+  },
+  "definitions": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z][\\w.-]*$"
+    },
+    "guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement"],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The rule the guard holds, as it is told to the agent it refuses."
+        },
+        "writes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [],
+          "description": "Paths the agent may not write, create, move or remove, as globs relative to the repository root. Only what a call names is refused before it runs: a script that writes one of them is not seen."
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [],
+          "description": "Commands the agent may not run. Each entry is a command and words that appear in that order among its arguments: `git commit` also refuses `git -C api commit`."
+        }
+      }
+    }
+  }
+}

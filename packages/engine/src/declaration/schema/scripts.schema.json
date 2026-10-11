@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver scripts",
+  "description": "What Weaver must be told about the files and the scripts of this project, because it cannot guess it.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows, for the editor."
+    },
+    "writers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [],
+      "description": "Scripts that write files, such as a generator: everything that changes while one runs is the agent's work, and is checked."
+    },
+    "readers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [],
+      "description": "Scripts that only read, such as a check of the project's own: what changes while one runs is never the agent's work."
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": [],
+          "description": "Folders no check and no review looks at, relative to the repository root."
+        }
+      }
+    }
+  }
+}

@@ -7,7 +7,7 @@ import { makeProject, readJson, weaver, writeJson } from '../fixtures/project.ts
 
 const CLAUDE = '.claude/settings.local.json'
 const CODEX = '.codex/hooks.json'
-const CONFIG = 'weaver.config.json'
+const CONFIG = '.weaver/settings.json'
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-uninstall-'))
 let top: string
 let counter = 0
@@ -35,7 +35,7 @@ test('uninstall removes the files it had created, and leaves the rules and the r
   assert.deepEqual(lines, [
     `Claude Code: hooks removed from ${CLAUDE}`,
     `Codex: hooks removed from ${CODEX}`,
-    `${CONFIG} and .git/weaver/ are left: they hold your rules and Weaver's records.`,
+    ".weaver/ and .git/weaver/ are left: they hold your rules and Weaver's records.",
   ])
 })
 

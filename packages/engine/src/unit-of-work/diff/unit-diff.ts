@@ -59,8 +59,8 @@ export class UnitDiff {
     return numberedDiff(new TreeDiff(this.repo, this.base, this.head).patch(this.files.flatMap((file) => [file.path, file.oldPath])))
   }
 
-  changes(path: string): boolean {
-    return this.files.some((file) => file.path === path || file.oldPath === path)
+  changesUnder(folder: string): boolean {
+    return this.files.some((file) => [file.path, file.oldPath].some((path) => path.startsWith(`${folder}/`)))
   }
 
   environment(): NodeJS.ProcessEnv {

@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver settings",
+  "description": "How Weaver works in this project. A repository is supervised as soon as this file exists; the other files of `.weaver/` are optional.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows, for the editor."
+    },
+    "version": {
+      "const": 1,
+      "description": "The version of this format."
+    },
+    "finish": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "description": "How a task ends, and how long the checks may hold the agent.",
+      "properties": {
+        "skill": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The file that tells the agent how to write the final message, relative to the repository root. Its header lists the `headings` of that message: a final message that carries them all is what tells Weaver that a task is finished. Weaver guards the file, and names it to an agent that stops with changed files and without the headings. Without a skill, every end of turn ends the task."
+        },
+        "maxRounds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "How many times in a row the checks may refuse the end of a turn. After that the agent may stop, its unit of work still open."
+        },
+        "deadlineSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1200,
+          "description": "How long one run of all the checks may take."
+        },
+        "concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "How many checks run at once."
+        }
+      }
+    }
+  }
+}

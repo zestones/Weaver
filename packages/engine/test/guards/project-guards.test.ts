@@ -5,9 +5,9 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, test } from 'vitest'
 import { AgentCatalog } from '../../src/agents/runtimes/agent-catalog.ts'
 import { Payload } from '../../src/agents/events/payload.ts'
-import { DeclarationFile } from '../../src/declaration/reading/declaration-file.ts'
 import { ProjectGuards } from '../../src/guards/deciding/project-guards.ts'
 import type { Repository } from '../../src/lib/git/repository.ts'
+import { declarationOf } from '../fixtures/declaration.ts'
 import { git, makeRepo } from '../fixtures/repo.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-guards-'))
@@ -28,7 +28,7 @@ let guards: ProjectGuards
 
 beforeAll(() => {
   repo = makeRepo(join(scratch, 'repo'), { 'client/eslint.config.js': 'export default []\n', 'src/a.ts': 'export const a = 1\n' })
-  guards = new ProjectGuards(new DeclarationFile('weaver.config.json').parse(JSON.stringify(DECLARATION)), repo)
+  guards = new ProjectGuards(declarationOf(DECLARATION), repo)
 })
 
 afterAll(() => {
@@ -95,7 +95,7 @@ test('a command is refused by the words that name it, through the wrappers that 
 })
 
 test('Weaver’s configuration, its state and the agent’s hook settings are guarded whatever the project declares', () => {
-  const bare = new ProjectGuards(new DeclarationFile('weaver.config.json').parse('{"version":1}'), repo)
+  const bare = new ProjectGuards(declarationOf({}), repo)
   const refusal = (tool: string, input: Record<string, unknown>): string | null => {
     const { call } = catalog.fromArguments([]).read(new Payload({ cwd: repo.top, tool_name: tool, tool_input: input }))
 
@@ -103,7 +103,9 @@ test('Weaver’s configuration, its state and the agent’s hook settings are gu
   }
 
   for (const path of [
-    'weaver.config.json',
+    '.weaver/settings.json',
+    '.weaver/project/checks.json',
+    '.weaver/skills/wv-finish.md',
     '.claude/settings.json',
     '.claude/settings.local.json',
     '.codex/hooks.json',
@@ -117,20 +119,19 @@ test('Weaver’s configuration, its state and the agent’s hook settings are gu
   }
 
   assert.match(
-    refusal('Edit', { file_path: join(repo.top, 'weaver.config.json') }) ?? '',
-    /^\[weaver weaver:protected\] Writing weaver\.config\.json is refused/,
+    refusal('Edit', { file_path: join(repo.top, '.weaver/llm/rules.json') }) ?? '',
+    /^\[weaver weaver:protected\] Writing \.weaver\/llm\/rules\.json is refused/,
   )
   assert.match(refusal('Bash', { command: 'rm -rf .git/weaver' }) ?? '', /weaver:protected/)
   assert.match(refusal('Bash', { command: 'rm -rf .git' }) ?? '', /weaver:protected/, 'a removed folder takes Weaver’s state with it')
-  assert.match(refusal('Bash', { command: 'echo {} > weaver.config.json' }) ?? '', /weaver:protected/)
+  assert.match(refusal('Bash', { command: 'echo {} > .weaver/settings.json' }) ?? '', /weaver:protected/)
+  assert.match(refusal('Bash', { command: 'rm -rf .weaver' }) ?? '', /weaver:protected/)
   assert.equal(refusal('Write', { file_path: join(repo.top, '.claude/notes.md') }), null)
   assert.equal(refusal('Bash', { command: 'git status' }), null)
 })
 
 test('the skill that says how a task ends is guarded as soon as the configuration names it', () => {
-  const declared = new DeclarationFile('weaver.config.json').parse(
-    '{"version":1,"finish":{"headings":["Done"],"skill":".agents/skills/wv-finish.md"}}',
-  )
+  const declared = declarationOf({ finish: { headings: ['Done'], skill: '.agents/skills/wv-finish.md' } })
   const { call } = catalog
     .fromArguments([])
     .read(new Payload({ cwd: repo.top, tool_name: 'Edit', tool_input: { file_path: join(repo.top, '.agents/skills/wv-finish.md') } }))
@@ -147,7 +148,7 @@ test('the state of a linked worktree is guarded where it lives, outside the work
 
   git(repo.top, ['worktree', 'add', '-q', linked, '-b', 'side'])
 
-  const bare = new ProjectGuards(new DeclarationFile('weaver.config.json').parse('{"version":1}'), repo)
+  const bare = new ProjectGuards(declarationOf({}), repo)
   const { call } = catalog
     .fromArguments([])
     .read(new Payload({ cwd: linked, tool_name: 'Bash', tool_input: { command: `rm -rf ${join(repo.commonDir, 'weaver')}` } }))

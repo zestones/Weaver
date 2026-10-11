@@ -7,6 +7,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeEach, test } from 'vitest'
 import type { Repository } from '../../src/lib/git/repository.ts'
 import { Journal } from '../../src/unit-of-work/journal/journal.ts'
+import { declarationFiles, writeDeclaration } from '../fixtures/declaration.ts'
 import { git, locate, makeRepo, writeFiles } from '../fixtures/repo.ts'
 
 const HOOK = join(import.meta.dirname, '../../src/bin/hook.ts')
@@ -69,7 +70,7 @@ beforeEach(() => {
   counter += 1
   environment = process.env
   repo = makeRepo(join(scratch, `repo-${String(counter)}`), {
-    'weaver.config.json': JSON.stringify(DECLARATION, null, 2),
+    ...declarationFiles(DECLARATION),
     'tools/parse.mjs': PARSE,
     'tools/markers.mjs': MARKERS,
     'src/a.js': 'export const a = 1\n// FIXME an old one, not this unit’s\n',
@@ -173,7 +174,11 @@ test('a call a guard refuses does not verify: the runtime is told to deny it, wi
 
   const edit = hook('PreToolUse', { tool_name: 'Write', tool_input: { file_path: join(repo.top, 'tools/markers.mjs') }, tool_use_id: 'e' })
   const commit = hook('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'git commit -am done' }, tool_use_id: 'c' })
-  const own = hook('PreToolUse', { tool_name: 'Edit', tool_input: { file_path: join(repo.top, 'weaver.config.json') }, tool_use_id: 'o' })
+  const own = hook('PreToolUse', {
+    tool_name: 'Edit',
+    tool_input: { file_path: join(repo.top, '.weaver/settings.json') },
+    tool_use_id: 'o',
+  })
 
   assert.equal(edit.hookSpecificOutput?.permissionDecision, 'deny')
   assert.equal(
@@ -223,7 +228,8 @@ process.exitCode = judging && untidy ? 1 : 0
     },
   }
 
-  writeFiles(repo.top, { 'weaver.config.json': JSON.stringify(declared), 'tools/tidy.mjs': tidy })
+  writeDeclaration(repo.top, declared)
+  writeFiles(repo.top, { 'tools/tidy.mjs': tidy })
   hook('UserPromptSubmit', { prompt: 'add t' })
   write('src/t.js', 'export const t = 1   \nexport const u = ;  \n')
 
@@ -259,7 +265,7 @@ process.stdin.on('end', () => {
     checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
   }
 
-  writeFiles(repo.top, { 'weaver.config.json': JSON.stringify(declared) })
+  writeDeclaration(repo.top, declared)
   writeFiles(bin, { codex })
   chmodSync(join(bin, 'codex'), 0o755)
   environment = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` }
@@ -303,7 +309,7 @@ process.stdin.on('end', () => {
     checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
   }
 
-  writeFiles(repo.top, { 'weaver.config.json': JSON.stringify(declared) })
+  writeDeclaration(repo.top, declared)
   writeFiles(bin, { codex })
   chmodSync(join(bin, 'codex'), 0o755)
   environment = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` }
@@ -332,7 +338,7 @@ process.stdin.on('end', () => {
 test('a word of the owner that is almost a directive is said back at once, in a project that reviews its changes', () => {
   assert.deepEqual(hook('UserPromptSubmit', { prompt: 'rename it #critcal' }), {}, 'this project declares no review')
 
-  writeFiles(repo.top, { 'weaver.config.json': JSON.stringify({ version: 1, review: { runtime: 'codex' } }) })
+  writeDeclaration(repo.top, { review: { runtime: 'codex' } })
 
   assert.equal(
     hook('UserPromptSubmit', { prompt: 'rename it #critcal' }).systemMessage,
@@ -388,7 +394,7 @@ test('a turn that ends on a question checks nothing; a shell command is charged 
 
   assert.match(
     stop('Should I also export it from the index?').reason ?? '',
-    /end with a message that has these sections: ## Request, ## To validate\. If you are waiting/,
+    /end with a message that has these sections: ## Request, ## To validate\. How to write them is in \.weaver\/skills\/wv-finish\.md\. If you are waiting/,
   )
   assert.match(stop('I am waiting for your answer.').systemMessage ?? '', /Checks pending/)
   assert.match(stop().systemMessage ?? '', /passed on 1 changed file/)
@@ -415,16 +421,19 @@ test('the owner’s commit of the agent’s work settles it without a check', ()
 })
 
 test('a repository that declares nothing is left alone, and a declaration that cannot be read says so to the owner', () => {
-  rmSync(join(repo.top, 'weaver.config.json'))
+  rmSync(join(repo.top, '.weaver'), { recursive: true })
   hook('UserPromptSubmit', { prompt: 'add h' })
   write('src/h.js', 'export const h = ;\n')
 
   assert.deepEqual(stop(), {})
   assert.equal(existsSync(repo.stateDir), false)
 
-  writeFiles(repo.top, { 'weaver.config.json': '{"version":1,"checks":{"lint":{"verify":["true"]}}}' })
+  writeDeclaration(repo.top, { checks: { lint: { verify: ['true'] } } })
 
-  assert.match(stop().systemMessage ?? '', /Nothing is checked: .*checks\.lint stands behind no rule/)
+  assert.match(
+    stop().systemMessage ?? '',
+    /Nothing is checked: \.weaver is not a valid project declaration: project\/checks\.json: lint stands behind no rule/,
+  )
 })
 
 test('the user’s index and object store never see the loop', () => {

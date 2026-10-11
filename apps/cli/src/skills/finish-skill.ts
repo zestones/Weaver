@@ -6,13 +6,13 @@ const EXPECTS: Readonly<Record<string, string>> = {
     'What the owner must decide or check before committing: an exception to a rule, a suppression, a deleted test, a limit you could not remove.',
   'Found along the way': 'What you noticed outside the request. List it here; never do it in the task.',
 }
-const PLACEHOLDER = 'Say here what this section must hold.'
 
 export class FinishSkill extends ProjectSkill {
-  static readonly PATH = '.agents/skills/wv-finish.md'
+  static readonly PATH = '.weaver/skills/wv-finish.md'
   static readonly HEADINGS: readonly string[] = Object.keys(EXPECTS)
 
   override readonly purpose = 'it tells the agent how to end a task.'
+  // What the header of the skill lists, or what a new skill starts with.
   private readonly headings: readonly string[]
 
   constructor(top: string, path: string, headings: readonly string[]) {
@@ -27,11 +27,13 @@ export class FinishSkill extends ProjectSkill {
   }
 
   protected override template(): string {
-    const sections = this.headings.map((heading) => `## ${heading}\n\n${EXPECTS[heading] ?? PLACEHOLDER}`).join('\n\n')
+    const sections = this.headings.map((heading) => `## ${heading}\n\n${EXPECTS[heading] ?? ''}`).join('\n\n')
 
     return [
       '---',
       'description: How to end a task that changed files, with the final message Weaver waits for before it checks the work.',
+      'headings:',
+      ...this.headings.map((heading) => `  - ${heading}`),
       '---',
       '',
       'When a task changed files, end it with a message made of these sections, in this order. Their headings are the signal that the work is finished: Weaver runs the checks of the project only then. A message without them, such as a question or a progress update, leaves the work open.',

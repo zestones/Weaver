@@ -1,7 +1,7 @@
 import { ProjectSkill } from './project-skill.ts'
 
 export class ReviewSkill extends ProjectSkill {
-  static readonly PATH = '.agents/skills/wv-review.md'
+  static readonly PATH = '.weaver/skills/wv-review.md'
 
   override readonly purpose = 'it tells the reviewer how this project wants its changes reviewed.'
 
@@ -26,7 +26,7 @@ export class ReviewSkill extends ProjectSkill {
       '',
       '## What you may run',
       '',
-      'This section matters when `review.experiments` is on in `weaver.config.json`: you then work in a copy of the project, where you may write and run what you need. Say here what a reviewer may reach beyond that copy, such as a development stack that is already running, and what it must never start or touch.',
+      'This section matters when `experiments` is on in `.weaver/llm/reviewers.json`: you then work in a copy of the project, where you may write and run what you need. Say here what a reviewer may reach beyond that copy, such as a development stack that is already running, and what it must never start or touch.',
       '',
       '## What this project cares about',
       '',

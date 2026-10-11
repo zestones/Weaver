@@ -5,10 +5,11 @@ import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
 import { RuntimeCatalog } from '../../src/runtimes/runtime-catalog.ts'
-import { makeProject, weaver, writeJson } from '../fixtures/project.ts'
+import { makeProject, weaver, writeConfig } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-doctor-'))
 const link = new EngineLink()
+const SKILL = '.weaver/skills/wv-finish.md'
 let top: string
 let counter = 0
 
@@ -26,7 +27,7 @@ test('a project that was never wired is told that agents work there unsupervised
 
   assert.equal(status, 1)
   assert.deepEqual(lines, [
-    'PROBLEM no weaver.config.json: Weaver does nothing in this project. Run weaver install.',
+    'PROBLEM no .weaver/settings.json: Weaver does nothing in this project. Run weaver install.',
     `ok      the hook starts: ${link.hook}`,
     '-       Claude Code: not wired',
     '-       Codex: not wired',
@@ -41,8 +42,8 @@ test('after install everything is alive; a runtime left out is only noted', () =
 
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines, [
-    'ok      weaver.config.json: 0 rule(s), 0 check(s), 0 guard(s)',
-    'ok      the finish skill: .agents/skills/wv-finish.md',
+    'ok      .weaver: 0 rule(s), 0 check(s), 0 guard(s)',
+    'ok      the finish skill: .weaver/skills/wv-finish.md',
     `ok      the hook starts: ${link.hook}`,
     'ok      Claude Code: wired in .claude/settings.local.json',
     '-       Codex: not wired',
@@ -51,7 +52,7 @@ test('after install everything is alive; a runtime left out is only noted', () =
 })
 
 test('hooks that point to a Weaver that is no longer there are a problem, and so is a hook that does not start', () => {
-  const moved = new EngineLink(join(scratch, 'old-checkout/hook.js'), link.schema)
+  const moved = new EngineLink(join(scratch, 'old-checkout/hook.js'), link.schemas)
 
   for (const runtime of new RuntimeCatalog().settings(top, moved, ['codex'])) runtime.install()
 
@@ -64,34 +65,35 @@ test('hooks that point to a Weaver that is no longer there are a problem, and so
   assert.ok(dead.lines.includes(`PROBLEM the hook does not start: ${moved.hook}. Build Weaver with pnpm build.`))
 })
 
-test('a finish skill that is missing, or that no longer shows a heading the configuration waits for, is a problem', () => {
-  weaver(top, ['install', 'claude'])
-  writeFileSync(join(top, '.agents/skills/wv-finish.md'), '## Request\n\n## To validate\n')
+test('a finish skill that is missing, that lists no headings, or that no longer shows one it lists, is a problem', () => {
+  const header = '---\nheadings:\n  - Request\n  - To validate\n  - Found along the way\n---\n'
 
-  assert.ok(
-    weaver(top, ['doctor']).lines.includes(
-      'PROBLEM .agents/skills/wv-finish.md does not show ## Found along the way, which the configuration waits for.',
-    ),
+  weaver(top, ['install', 'claude'])
+  writeFileSync(join(top, SKILL), `${header}\n## Request\n\n## To validate\n`)
+
+  assert.ok(weaver(top, ['doctor']).lines.includes(`PROBLEM ${SKILL} does not show ## Found along the way, which its header lists.`))
+
+  writeFileSync(join(top, SKILL), '## Request\n\n## To validate\n')
+  assert.equal(
+    weaver(top, ['doctor']).lines[0],
+    `PROBLEM .weaver is not a valid project declaration: ${SKILL}: its header lists no \`headings\`: they are what tells Weaver that a task is finished`,
   )
 
-  rmSync(join(top, '.agents'), { recursive: true })
+  rmSync(join(top, SKILL))
 
   const missing = weaver(top, ['doctor'])
 
   assert.equal(missing.status, 1)
-  assert.ok(
-    missing.lines.includes(
-      'PROBLEM .agents/skills/wv-finish.md is missing, and agents are pointed to it. Run weaver install to write a template.',
-    ),
-  )
+  assert.ok(missing.lines.includes(`PROBLEM ${SKILL} is missing, and agents are pointed to it. Run weaver install to write a template.`))
 })
 
 const RULES = { N1: 'A name says what it holds.' }
+const SETTINGS = { version: 1 }
 
 test('a reviewer that starts, with its skill and rules to judge, is alive', () => {
-  const review = { runtime: 'codex', reviewers: { codex: { model: 'gpt-5.5' } }, skill: 'docs/review.md', rules: RULES }
+  const reviewers = { runtime: 'codex', reviewers: { codex: { model: 'gpt-5.5' } }, skill: 'docs/review.md' }
 
-  writeJson(top, 'weaver.config.json', { version: 1, review })
+  writeConfig(top, { settings: SETTINGS, reviewers, rules: RULES })
   weaver(top, ['install', 'claude'])
 
   const { status, lines } = weaver(top, ['doctor'])
@@ -106,9 +108,9 @@ test('a reviewer that starts, with its skill and rules to judge, is alive', () =
 })
 
 test('a reviewer whose command does not start, whose skill is missing, or that the end of a turn cannot wait for is a problem', () => {
-  const review = { runtime: 'claude', skill: 'docs/review.md', waitSeconds: 3000, rules: RULES }
+  const reviewers = { runtime: 'claude', skill: 'docs/review.md', waitSeconds: 3000 }
 
-  writeJson(top, 'weaver.config.json', { version: 1, review })
+  writeConfig(top, { settings: SETTINGS, reviewers, rules: RULES })
 
   const { status, lines } = weaver(top, ['doctor'])
 
@@ -122,7 +124,7 @@ test('a reviewer whose command does not start, whose skill is missing, or that t
 })
 
 test('when either runtime may be the one that reviews, both must start', () => {
-  writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'other', experiments: true, rules: RULES } })
+  writeConfig(top, { settings: SETTINGS, reviewers: { runtime: 'other', experiments: true }, rules: RULES })
 
   assert.deepEqual(weaver(top, ['doctor']).lines.slice(1, 4), [
     'ok      the review: by the runtime that did not write the change, for 1 rule(s), in a copy of the project where the reviewer may experiment',
@@ -130,23 +132,23 @@ test('when either runtime may be the one that reviews, both must start', () => {
     'ok      the reviewer codex starts',
   ])
 
-  writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'codex', critical: { paths: ['src/auth/**'] }, rules: RULES } })
+  writeConfig(top, { settings: SETTINGS, reviewers: { runtime: 'codex', critical: { paths: ['src/auth/**'] } }, rules: RULES })
   assert.ok(
     weaver(top, ['doctor']).lines.includes('PROBLEM claude may review here, and the claude command does not start: its reviews fail.'),
   )
 })
 
 test('a review that has no rule to judge is noted', () => {
-  writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'codex' } })
+  writeConfig(top, { settings: SETTINGS, reviewers: { runtime: 'codex' } })
   assert.ok(weaver(top, ['doctor']).lines.includes('-       the review is by codex, and it has no rule: it has nothing to judge'))
 })
 
 test('a configuration that cannot be read is a problem, with what is wrong in it', () => {
   weaver(top, ['install'])
-  writeFileSync(join(top, 'weaver.config.json'), '{"version":1,"chekcs":{}}')
+  writeFileSync(join(top, '.weaver/settings.json'), '{"version":1,"chekcs":{}}')
 
   const { status, lines } = weaver(top, ['doctor'])
 
   assert.equal(status, 1)
-  assert.match(lines[0] ?? '', /^PROBLEM .*weaver\.config\.json is not a valid project declaration: chekcs is not a known field$/)
+  assert.match(lines[0] ?? '', /^PROBLEM \.weaver is not a valid project declaration: settings\.json: chekcs is not a known field$/)
 })

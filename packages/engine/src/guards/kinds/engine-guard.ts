@@ -1,6 +1,6 @@
 import { join, relative, sep } from 'node:path'
 import type { ToolCall } from '../../agents/tool-calls/tool-call.ts'
-import { DeclarationFile } from '../../declaration/reading/declaration-file.ts'
+import { DeclarationFolder } from '../../declaration/reading/declaration-folder.ts'
 import { realPath } from '../../lib/files/real-path.ts'
 import type { Repository } from '../../lib/git/repository.ts'
 import type { Refusal } from '../results/refusal.ts'
@@ -21,7 +21,7 @@ export class EngineGuard extends Guard {
     })
     this.top = realPath(repo.top)
     this.owned = [
-      join(repo.top, DeclarationFile.NAME),
+      join(repo.top, DeclarationFolder.NAME),
       join(repo.gitDir, 'weaver'),
       join(repo.commonDir, 'weaver'),
       ...AGENT_HOOKS.map((path) => join(repo.top, path)),

@@ -57,7 +57,10 @@ export class DoctorCommand implements Command {
       const declaration = project.declaration()
 
       if (declaration === null) {
-        return { state: 'problem', text: `no ${project.configName}: Weaver does nothing in this project. Run weaver install.` }
+        return {
+          state: 'problem',
+          text: `no ${project.configName}/settings.json: Weaver does nothing in this project. Run weaver install.`,
+        }
       }
 
       const { rules, checks, guards } = declaration
@@ -86,7 +89,7 @@ export class DoctorCommand implements Command {
       : [
           {
             state: 'problem',
-            text: `${skill.path} does not show ${missing.map((heading) => `## ${heading}`).join(', ')}, which the configuration waits for.`,
+            text: `${skill.path} does not show ${missing.map((heading) => `## ${heading}`).join(', ')}, which its header lists.`,
           },
         ]
   }

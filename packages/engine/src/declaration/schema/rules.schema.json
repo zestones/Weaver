@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver review rules",
+  "description": "The rules the reviewer judges. Each key is the name of a rule, as the agent and the owner read it: `external-data-parsed` says more than a code.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows, for the editor."
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {
+        "const": "$schema"
+      },
+      {
+        "$ref": "#/definitions/identifier"
+      }
+    ]
+  },
+  "additionalProperties": {
+    "$ref": "#/definitions/reviewRule"
+  },
+  "definitions": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z][\\w.-]*$"
+    },
+    "reviewRule": {
+      "type": ["string", "object"],
+      "minLength": 1,
+      "additionalProperties": false,
+      "required": ["statement"],
+      "description": "A rule the reviewer judges: the sentence it is given, or an object when the rule says more.",
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the rule says, as it is given to the reviewer and told to whoever broke it."
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Where the rule applies, as globs. Without it, everywhere."
+        },
+        "evidence": {
+          "type": "boolean",
+          "default": false,
+          "description": "For a rule about what the code does, such as a defect: a finding must carry the experiment that shows it. Without one it is a suspicion, which the owner reads and the agent does not."
+        },
+        "candidates": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The check that lists the places this rule is about, for the reviewer to judge one by one. That check reads `findings`."
+        }
+      }
+    }
+  }
+}

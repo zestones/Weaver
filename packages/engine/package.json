@@ -10,7 +10,7 @@
       "import": "./dist/index.js"
     },
     "./hook": "./dist/bin/hook.js",
-    "./weaver.config.schema.json": "./dist/declaration/schema/weaver.config.schema.json"
+    "./schema/*": "./dist/declaration/schema/*"
   },
   "bin": {
     "weaver-hook": "./dist/bin/hook.js"
