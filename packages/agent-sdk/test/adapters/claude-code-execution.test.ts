@@ -117,3 +117,7 @@ test('a runtime is available when its command line starts', () => {
   assert.equal(claude.isAvailable(), true)
   assert.equal(new ClaudeCodeExecution(join(scratch, 'nowhere')).isAvailable(), false)
 })
+
+test('Claude Code has no way to say which hooks it runs in a folder', async () => {
+  assert.equal(await claude.hooks(), null)
+})

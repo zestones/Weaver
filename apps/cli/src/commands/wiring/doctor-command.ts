@@ -1,4 +1,4 @@
-import type { ExecutionCatalog } from '@weaver/agent-sdk'
+import type { ExecutionCatalog, RuntimeHook } from '@weaver/agent-sdk'
 import { DeclarationParts, type Declaration, type ReviewPolicy, type ReviewerName } from '@weaver/engine'
 import { RegistryError, type Card } from '@weaver/memory'
 import type { EngineLink } from '../../link/engine-link.ts'
@@ -37,9 +37,10 @@ export class DoctorCommand implements Command {
     this.executions = executions
   }
 
-  run(): number {
+  async run(): Promise<number> {
     const project = Project.locate(this.cwd)
     const runtimes = new RuntimeCatalog().settings(project.top, this.link, [])
+    const held = await Promise.all(runtimes.map((runtime) => this.held(runtime, project.top)))
     const findings = [
       this.configuration(project),
       ...this.finishSkill(project),
@@ -47,7 +48,7 @@ export class DoctorCommand implements Command {
       ...this.writer(project),
       ...this.cards(project),
       this.hook(),
-      ...runtimes.map((runtime) => this.runtime(runtime)),
+      ...runtimes.flatMap((runtime, index) => [this.runtime(runtime), ...(held[index] ?? [])]),
       this.anyRuntime(runtimes),
     ]
 
@@ -240,6 +241,56 @@ export class DoctorCommand implements Command {
     if (wiring === 'absent') return { state: 'note', text: `${runtime.label}: not wired` }
 
     return { state: 'problem', text: `${runtime.label}: the hooks in ${runtime.file} point somewhere else. Run weaver install.` }
+  }
+
+  // A runtime may hold hooks and not run them, without a word: it alone says. Nothing is said of a runtime that has
+  // no way to say, nor of one that does not start, which has no session to supervise.
+  private async held(runtime: RuntimeSettings, top: string): Promise<Finding[]> {
+    const execution = this.executions.find(runtime.runtime)
+
+    if (execution === null || runtime.wiring() !== 'installed') return []
+
+    const answer = await execution.hooks(top)
+
+    if (answer === null) return []
+    if (answer.failure === null) return this.standing(runtime, answer.hooks)
+
+    return execution.isAvailable()
+      ? [{ state: 'note', text: `${runtime.label} did not say whether it runs these hooks: ${answer.failure}` }]
+      : []
+  }
+
+  private standing(runtime: RuntimeSettings, hooks: readonly RuntimeHook[]): Finding[] {
+    const { label } = runtime
+    const wired = runtime.commands()
+    const held = hooks.filter((hook) => wired.includes(hook.command))
+    const some = (count: number): string =>
+      count === wired.length ? 'these hooks' : `${String(count)} of these ${String(wired.length)} hooks`
+    const waiting = held.filter((hook) => hook.standing === 'waits').length
+    const off = held.filter((hook) => hook.standing === 'off').length
+
+    if (held.length === 0) {
+      return [
+        {
+          state: 'problem',
+          text: `${label} does not load these hooks: it works in this project without Weaver. It loads the hooks of a project it trusts: it asks when it is first opened in the folder, and keeps the answer in its own configuration.`,
+        },
+      ]
+    }
+
+    const problems = [
+      ...(held.length < wired.length ? [`${label} loads only ${some(held.length)}: /hooks, in ${label}, shows the ones it holds.`] : []),
+      ...(waiting > 0
+        ? [
+            `${label} does not run ${some(waiting)} until you approve them, and asks again whenever one changes: open ${label} in this folder and approve them with /hooks.`,
+          ]
+        : []),
+      ...(off > 0 ? [`${label} holds ${some(off)} turned off: turn them on there with /hooks.`] : []),
+    ]
+
+    return problems.length === 0
+      ? [{ state: 'ok', text: `${label} runs these hooks` }]
+      : problems.map((problem): Finding => ({ state: 'problem', text: problem }))
   }
 
   // With no runtime wired, no agent calls Weaver: nothing is refused and nothing is checked, without a word.

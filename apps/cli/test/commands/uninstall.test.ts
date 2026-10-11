@@ -21,11 +21,11 @@ beforeEach(() => {
   top = makeProject(join(scratch, `project-${String(counter)}`))
 })
 
-test('uninstall removes the files it had created, and leaves the rules and the records', () => {
-  weaver(top, ['install'])
+test('uninstall removes the files it had created, and leaves the rules and the records', async () => {
+  await weaver(top, ['install'])
   mkdirSync(join(top, '.git/weaver'), { recursive: true })
 
-  const { status, lines } = weaver(top, ['uninstall'])
+  const { status, lines } = await weaver(top, ['uninstall'])
 
   assert.equal(status, 0)
   assert.equal(existsSync(join(top, CLAUDE)), false)
@@ -39,19 +39,19 @@ test('uninstall removes the files it had created, and leaves the rules and the r
   ])
 })
 
-test('uninstall takes only Weaver’s hooks out of a file the owner also uses', () => {
+test('uninstall takes only Weaver’s hooks out of a file the owner also uses', async () => {
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine', timeout: 5 }] }
 
   writeJson(top, CLAUDE, { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine] } })
-  weaver(top, ['install', 'claude'])
-  weaver(top, ['uninstall'])
+  await weaver(top, ['install', 'claude'])
+  await weaver(top, ['uninstall'])
 
   assert.deepEqual(readJson(top, CLAUDE), { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine] } })
 })
 
-test('uninstall on a project that was never wired says so and changes nothing', () => {
+test('uninstall on a project that was never wired says so and changes nothing', async () => {
   writeJson(top, CLAUDE, { permissions: {} })
 
-  assert.deepEqual(weaver(top, ['uninstall']).lines.slice(0, 2), ['Claude Code: no hook to remove', 'Codex: no hook to remove'])
+  assert.deepEqual((await weaver(top, ['uninstall'])).lines.slice(0, 2), ['Claude Code: no hook to remove', 'Codex: no hook to remove'])
   assert.deepEqual(readJson(top, CLAUDE), { permissions: {} })
 })

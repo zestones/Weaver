@@ -125,13 +125,15 @@ A card follows a strict schema, in two parts.
 
 **What can happen to it.**
 
-- The owner closes it, as `fixed`, `wontfix` or `issue`, with a reason. Weaver checks who closes: today nothing keeps an agent from running `weaver close`.
+- The owner closes it, as `fixed`, `wontfix` or `issue`, with a reason. Weaver checks who closes: the command refuses to run under an agent.
 - It can be corrected, and opened again.
 - When the thing is found again, the card gains an occurrence instead of a duplicate. A closed card that is found again is marked as seen since its closing; it is not reopened by itself.
 - When two cards may be about the same thing and it is not sure, they stay two cards tied together, and a tie can be undone: a wrong merge hides a discovery.
 - It has room for a closing that an agent proposes and that the owner accepts. That path is built after the first version.
 
 A card keeps its flag word for word: what the agent said and what the writer made of it can always be compared.
+
+**Who reads it, and where.** The owner said on 2026-10-11 how the two readers differ. `weaver cards` is what an agent runs in a chat, to read the registry for the owner or for its own work. A person will browse the cards, decide on them and ask for an investigation in the workbench. Until the workbench exists, the terminal is where the owner decides.
 
 ## Where it is kept
 
@@ -171,7 +173,7 @@ On 2026-10-11, with real sessions of Claude Code in the clone of Adaptive and of
 
 - **What an agent is told decides whether it flags.** With a first wording, both runtimes saw a real defect of Adaptive, wrote about it in their final message and flagged nothing. With a second one, which said in advance that the call would be refused, Claude Code believed the command did not work and did not run it. With the third, which says to flag even what the final message also tells and that the hook's message is the answer, Claude Code flagged the defect by itself twice, and Codex flagged one too.
 - **From the flag to the card.** The writer, Claude Code on Sonnet with the skill of Adaptive, wrote a card in French with its four sections in 14 seconds, for 0.11 dollar. The second flag of the same defect was merged into the first card as an occurrence.
-- **Codex loads the hooks of a project only when the project is trusted** in the owner's `~/.codex/config.toml`. The clone of Adaptive is not: Codex ran there unsupervised, was told nothing, and its `weaver flag` ran for real. Trusting a project is the owner's to do; `weaver doctor` does not see it yet.
+- **Codex loads the hooks of a project only when the project is trusted** in the owner's `~/.codex/config.toml`. The clone of Adaptive is not: Codex ran there unsupervised, was told nothing, and its `weaver flag` ran for real. Trusting a project is the owner's to do. Codex also runs a hook only once the owner has approved it as it is written, and asks again when it changes. `weaver doctor` asks Codex itself whether it runs the hooks of the project, and says so when it does not.
 - **The sandbox of Codex puts the runtime at the first process.** The check of who runs a command now looks there too: before, a `weaver flag` run by an unsupervised Codex took itself for the owner's.
 - **A label came back with its family in front** (`type:bug` as the value) and was dropped. The writer is now told what a family and a value are, and both forms are taken.
 
@@ -199,7 +201,7 @@ Not decisions: facts to keep in mind when the code is written.
 
 **An agent that proposes closings**, which the owner accepts in a batch. It is what emptied the pile of the source harness. After the first version.
 
-**The recall against regressions.** Deferred by the owner on 2026-10-11, and the corrections made during a task come with it. The first idea started from git, at the line: when an agent changes lines that a commit of correction wrote, Weaver tells the agent, the reviewer and the owner. The first review showed where that breaks: a squash, a formatting commit, moved code, generated files, a fix that removes code, a regression that lands in another file. Adaptive has such a history: its commit `2331926a4` moves 852 files. What that review proposes instead is that the memory selects the decisions and the corrections tied to the files, and that git only adds hints. Nothing of this is decided.
+**The recall against regressions.** Deferred by the owner on 2026-10-11, and the corrections made during a task come with it. What is known of it is in [to do later](todo-later.md).
 
 ## Plan
 
@@ -210,6 +212,6 @@ The first five steps are built. The owner asked for them in one go, so the trial
 3. **A real trial.** Done for the first question: agents flag, once they are told well. The second, whether a raw flag is enough for the owner to decide, is the owner's to answer.
 4. **The writer.** Done: `writer.json`, the skill `wv-card.md`, the start at the end of a turn, the card checked against its schema.
 5. **The complete card.** Done: the labels, the ties and the occurrences, correcting and reopening. The ledger of the reviews is gone, and what a review leaves is a card.
-6. **Afterwards.** The recall against regressions, defined with the owner first. Then the rest of the earlier plan: guards decided by a program and the comparison with the base, both in [to do later](todo-later.md), the distribution of Weaver, and the workbench, last.
+6. **Afterwards.** The workbench, which the owner sees as the likely next step: it is where the cards are browsed every day. The recall against regressions, guards decided by a program and the comparison with the base wait in [to do later](todo-later.md), and so does the distribution of Weaver. Putting Weaver in place of the source harness on the real work is the owner's to decide.
 
 An agent needs no path to the command: the hook answers in its place.

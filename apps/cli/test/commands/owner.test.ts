@@ -25,7 +25,7 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true })
 })
 
-test('what decides or changes is the owner’s: under an agent it does not run, and says whose it is', () => {
+test('what decides or changes is the owner’s: under an agent it does not run, and says whose it is', async () => {
   flag(top)
   write(top, 1)
   for (const session of ['session-2', 'session-3', 'session-4']) flag(top, { provenance: { ...cardOf(top, 1).record.provenance, session } })
@@ -42,7 +42,7 @@ test('what decides or changes is the owner’s: under an agent it does not run, 
 
     for (const agent of ['claude', 'codex']) {
       assert.deepEqual(
-        weaver(top, words, { under: agent, input: '## Observation\n\nRewritten.\n' }),
+        await weaver(top, words, { under: agent, input: '## Observation\n\nRewritten.\n' }),
         {
           status: 1,
           lines: [
@@ -62,10 +62,10 @@ test('what decides or changes is the owner’s: under an agent it does not run, 
   assert.equal(existsSync(join(top, '.claude')), false)
 })
 
-test('an agent may read: the list, a card, and the doctor', () => {
-  assert.equal(weaver(top, ['cards'], { under: 'claude' }).lines[0], '2 card(s) wait for you:')
-  assert.equal(weaver(top, ['cards', '--all'], { under: 'codex' }).lines[0], '4 card(s):')
-  assert.equal(weaver(top, ['cards', '1'], { under: 'codex' }).lines.join('\n'), cardOf(top, 1).markdown())
-  assert.ok(weaver(top, ['doctor'], { under: 'claude' }).lines.includes('ok      the registry: 2 card(s) wait for you'))
-  assert.equal(weaver(top, [], { under: 'claude' }).status, 0)
+test('an agent may read: the list, a card, and the doctor', async () => {
+  assert.equal((await weaver(top, ['cards'], { under: 'claude' })).lines[0], '2 card(s) wait for you:')
+  assert.equal((await weaver(top, ['cards', '--all'], { under: 'codex' })).lines[0], '4 card(s):')
+  assert.equal((await weaver(top, ['cards', '1'], { under: 'codex' })).lines.join('\n'), cardOf(top, 1).markdown())
+  assert.ok((await weaver(top, ['doctor'], { under: 'claude' })).lines.includes('ok      the registry: 2 card(s) wait for you'))
+  assert.equal((await weaver(top, [], { under: 'claude' })).status, 0)
 })

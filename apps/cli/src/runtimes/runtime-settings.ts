@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { Agent } from '@weaver/engine'
+import type { Agent, AgentName } from '@weaver/engine'
 import type { EngineLink } from '../link/engine-link.ts'
 
 interface HookEntry {
@@ -80,7 +80,16 @@ export abstract class RuntimeSettings {
 
     if (commands.length === 0) return 'absent'
 
-    return this.agent.events.every((event) => commands.includes(this.link.command(event, this.agent.name))) ? 'installed' : 'stale'
+    return this.commands().every((command) => commands.includes(command)) ? 'installed' : 'stale'
+  }
+
+  get runtime(): AgentName {
+    return this.agent.name
+  }
+
+  // The hooks an install writes, one an event.
+  commands(): string[] {
+    return this.agent.events.map((event) => this.link.command(event, this.agent.name))
   }
 
   private get path(): string {

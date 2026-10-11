@@ -6,6 +6,8 @@ import { isRecord, parseJson } from '../../lib/text/json.ts'
 import type { AgentExecution } from '../../ports/agent-execution.ts'
 import { AgentResult } from '../../ports/agent-result.ts'
 import type { AgentTask } from '../../ports/agent-task.ts'
+import type { RuntimeHooks } from '../../ports/runtime-hooks.ts'
+import { CodexHooks } from './codex-hooks.ts'
 
 type CodexEvent = Readonly<Record<string, unknown>>
 
@@ -31,6 +33,10 @@ export class CodexExecution implements AgentExecution {
 
   run(task: AgentTask): Promise<AgentResult> {
     return withScratch((scratch) => this.ask(task, scratch))
+  }
+
+  hooks(cwd: string): Promise<RuntimeHooks> {
+    return new CodexHooks(this.binary).of(cwd)
   }
 
   private async ask(task: AgentTask, scratch: string): Promise<AgentResult> {

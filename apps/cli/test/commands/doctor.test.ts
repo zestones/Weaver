@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { ExecutionCatalog, ScriptedExecution, type AgentExecution, type RuntimeHook } from '@weaver/agent-sdk'
 import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
 import { RuntimeCatalog } from '../../src/runtimes/runtime-catalog.ts'
@@ -23,8 +24,8 @@ beforeEach(() => {
   top = makeProject(join(scratch, `project-${String(counter)}`))
 })
 
-test('a project that was never wired is told that agents work there unsupervised', () => {
-  const { status, lines } = weaver(top, ['doctor'])
+test('a project that was never wired is told that agents work there unsupervised', async () => {
+  const { status, lines } = await weaver(top, ['doctor'])
 
   assert.equal(status, 1)
   assert.deepEqual(lines, [
@@ -36,10 +37,10 @@ test('a project that was never wired is told that agents work there unsupervised
   ])
 })
 
-test('after install everything is alive; a runtime left out is only noted', () => {
-  weaver(top, ['install', 'claude'])
+test('after install everything is alive; a runtime left out is only noted', async () => {
+  await weaver(top, ['install', 'claude'])
 
-  const { status, lines } = weaver(top, ['doctor'])
+  const { status, lines } = await weaver(top, ['doctor'])
 
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines, [
@@ -52,13 +53,13 @@ test('after install everything is alive; a runtime left out is only noted', () =
   ])
 })
 
-test('hooks that point to a Weaver that is no longer there are a problem, and so is a hook that does not start', () => {
+test('hooks that point to a Weaver that is no longer there are a problem, and so is a hook that does not start', async () => {
   const moved = new EngineLink(join(scratch, 'old-checkout/hook.js'), link.schemas)
 
   for (const runtime of new RuntimeCatalog().settings(top, moved, ['codex'])) runtime.install()
 
-  const stale = weaver(top, ['doctor'])
-  const dead = weaver(top, ['doctor'], { link: moved })
+  const stale = await weaver(top, ['doctor'])
+  const dead = await weaver(top, ['doctor'], { link: moved })
 
   assert.equal(stale.status, 1)
   assert.ok(stale.lines.includes('PROBLEM Codex: the hooks in .codex/hooks.json point somewhere else. Run weaver install.'))
@@ -66,37 +67,126 @@ test('hooks that point to a Weaver that is no longer there are a problem, and so
   assert.ok(dead.lines.includes(`PROBLEM the hook does not start: ${moved.hook}. Build Weaver with pnpm build.`))
 })
 
-test('a finish skill that is missing, that lists no headings, or that no longer shows one it lists, is a problem', () => {
+test('a finish skill that is missing, that lists no headings, or that no longer shows one it lists, is a problem', async () => {
   const header = '---\nheadings:\n  - Request\n  - To validate\n  - Found along the way\n---\n'
 
-  weaver(top, ['install', 'claude'])
+  await weaver(top, ['install', 'claude'])
   writeFileSync(join(top, SKILL), `${header}\n## Request\n\n## To validate\n`)
 
-  assert.ok(weaver(top, ['doctor']).lines.includes(`PROBLEM ${SKILL} does not show ## Found along the way, which its header lists.`))
+  assert.ok(
+    (await weaver(top, ['doctor'])).lines.includes(`PROBLEM ${SKILL} does not show ## Found along the way, which its header lists.`),
+  )
 
   writeFileSync(join(top, SKILL), '## Request\n\n## To validate\n')
   assert.equal(
-    weaver(top, ['doctor']).lines[0],
+    (await weaver(top, ['doctor'])).lines[0],
     `PROBLEM .weaver is not a valid project declaration: ${SKILL}: its header lists no \`headings\`: they are what tells Weaver that a task is finished`,
   )
 
   rmSync(join(top, SKILL))
 
-  const missing = weaver(top, ['doctor'])
+  const missing = await weaver(top, ['doctor'])
 
   assert.equal(missing.status, 1)
   assert.ok(missing.lines.includes(`PROBLEM ${SKILL} is missing, and agents are pointed to it. Run weaver install to write a template.`))
 })
 
+// Codex as the doctor finds it: what it says of the hooks of the project, each wired one in a standing.
+function codexHolding(standings: readonly (RuntimeHook['standing'] | null)[], failure: string | null = null): ExecutionCatalog {
+  const [runtime] = new RuntimeCatalog().settings(top, link, ['codex'])
+  const wired = (runtime?.commands() ?? []).flatMap((command, index) => {
+    const standing = standings[index] ?? null
+
+    return standing === null ? [] : [{ command, standing }]
+  })
+  const hooks: RuntimeHook[] = [{ command: 'node the-owner-s-own-hook.js', standing: 'waits' }, ...wired]
+
+  return new ExecutionCatalog([new ScriptedExecution('codex', [], { hooks: failure === null ? hooks : [], failure })])
+}
+
+test('Codex is asked whether it runs the hooks it was wired with: the ones of another tool do not count', async () => {
+  await weaver(top, ['install'])
+
+  const { status, lines } = await weaver(top, ['doctor'], { executions: codexHolding(['runs', 'runs', 'runs', 'runs']) })
+
+  assert.equal(status, 0, lines.join('\n'))
+  assert.deepEqual(lines.slice(-4), [
+    'ok      Claude Code: wired in .claude/settings.local.json',
+    'ok      Codex: wired in .codex/hooks.json',
+    'ok      Codex runs these hooks',
+    '-       an agent started outside these runtimes is not supervised',
+  ])
+})
+
+test('a Codex that loads none of the hooks works without Weaver, and that is a problem', async () => {
+  await weaver(top, ['install', 'codex'])
+
+  const { status, lines } = await weaver(top, ['doctor'], { executions: codexHolding([]) })
+
+  assert.equal(status, 1)
+  assert.ok(
+    lines.includes(
+      'PROBLEM Codex does not load these hooks: it works in this project without Weaver. It loads the hooks of a project it trusts: it asks when it is first opened in the folder, and keeps the answer in its own configuration.',
+    ),
+    lines.join('\n'),
+  )
+})
+
+test('hooks that wait for the owner’s approval, that are turned off, or that Codex does not hold, are each a problem', async () => {
+  await weaver(top, ['install', 'codex'])
+
+  const waiting = await weaver(top, ['doctor'], { executions: codexHolding(['waits', 'waits', 'waits', 'waits']) })
+  const mixed = await weaver(top, ['doctor'], { executions: codexHolding(['runs', 'waits', 'off', null]) })
+  const approve = 'until you approve them, and asks again whenever one changes: open Codex in this folder and approve them with /hooks.'
+
+  assert.equal(waiting.status, 1)
+  assert.deepEqual(waiting.lines.slice(-3, -1), [
+    'ok      Codex: wired in .codex/hooks.json',
+    `PROBLEM Codex does not run these hooks ${approve}`,
+  ])
+  assert.equal(mixed.status, 1)
+  assert.deepEqual(mixed.lines.slice(-4, -1), [
+    'PROBLEM Codex loads only 3 of these 4 hooks: /hooks, in Codex, shows the ones it holds.',
+    `PROBLEM Codex does not run 1 of these 4 hooks ${approve}`,
+    'PROBLEM Codex holds 1 of these 4 hooks turned off: turn them on there with /hooks.',
+  ])
+})
+
+test('a Codex that could not say is only noted, and nothing is asked of a runtime that is absent or wired to another Weaver', async () => {
+  const moved = new EngineLink(join(scratch, 'old-checkout/hook.js'), link.schemas)
+  const silent = codexHolding([], 'its app server gave no answer')
+  const absent: AgentExecution = {
+    runtime: 'codex',
+    isAvailable: () => false,
+    run: () => Promise.reject(new Error('absent')),
+    hooks: () => silent.find('codex')?.hooks(top) ?? Promise.resolve(null),
+  }
+  const said = (lines: readonly string[]): string[] => lines.filter((line) => line.includes('these hooks'))
+
+  await weaver(top, ['install', 'claude'])
+  assert.deepEqual(said((await weaver(top, ['doctor'], { executions: codexHolding([]) })).lines), [])
+
+  for (const runtime of new RuntimeCatalog().settings(top, moved, ['codex'])) runtime.install()
+  assert.deepEqual(said((await weaver(top, ['doctor'], { executions: codexHolding([]) })).lines), [])
+
+  await weaver(top, ['install', 'codex'])
+
+  const unsaid = await weaver(top, ['doctor'], { executions: silent })
+
+  assert.equal(unsaid.status, 0, unsaid.lines.join('\n'))
+  assert.deepEqual(said(unsaid.lines), ['-       Codex did not say whether it runs these hooks: its app server gave no answer'])
+  assert.deepEqual(said((await weaver(top, ['doctor'], { executions: new ExecutionCatalog([absent]) })).lines), [])
+})
+
 const RULES = { N1: 'A name says what it holds.' }
 
-test('a reviewer that starts, with its skill and rules to judge, is alive', () => {
+test('a reviewer that starts, with its skill and rules to judge, is alive', async () => {
   const reviewers = { ...REVIEW, runtime: 'codex', reviewers: { codex: { model: 'gpt-5.5' } }, skill: 'docs/review.md' }
 
   writeConfig(top, { settings: SETTINGS, reviewers, rules: RULES })
-  weaver(top, ['install', 'claude'])
+  await weaver(top, ['install', 'claude'])
 
-  const { status, lines } = weaver(top, ['doctor'])
+  const { status, lines } = await weaver(top, ['doctor'])
 
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines.slice(1, 5), [
@@ -107,12 +197,12 @@ test('a reviewer that starts, with its skill and rules to judge, is alive', () =
   ])
 })
 
-test('a reviewer whose command does not start, whose skill is missing, or that the end of a turn cannot wait for is a problem', () => {
+test('a reviewer whose command does not start, whose skill is missing, or that the end of a turn cannot wait for is a problem', async () => {
   const reviewers = { ...REVIEW, runtime: 'claude', skill: 'docs/review.md', waitSeconds: 3000 }
 
   writeConfig(top, { settings: SETTINGS, reviewers, rules: RULES })
 
-  const { status, lines } = weaver(top, ['doctor'])
+  const { status, lines } = await weaver(top, ['doctor'])
 
   assert.equal(status, 1)
   assert.deepEqual(lines.slice(1, 5), [
@@ -123,10 +213,10 @@ test('a reviewer whose command does not start, whose skill is missing, or that t
   ])
 })
 
-test('when either runtime may be the one that reviews, both must start', () => {
+test('when either runtime may be the one that reviews, both must start', async () => {
   writeConfig(top, { settings: SETTINGS, reviewers: { ...REVIEW, runtime: 'other', experiments: true }, rules: RULES })
 
-  assert.deepEqual(weaver(top, ['doctor']).lines.slice(1, 4), [
+  assert.deepEqual((await weaver(top, ['doctor'])).lines.slice(1, 4), [
     'ok      the review: by the runtime that did not write the change, for 1 rule(s), in a copy of the project where the reviewer may experiment',
     'PROBLEM claude may review here, and the claude command does not start: its reviews fail.',
     'ok      the reviewer codex starts',
@@ -134,20 +224,22 @@ test('when either runtime may be the one that reviews, both must start', () => {
 
   writeConfig(top, { settings: SETTINGS, reviewers: { ...REVIEW, runtime: 'codex', critical: { paths: ['src/auth/**'] } }, rules: RULES })
   assert.ok(
-    weaver(top, ['doctor']).lines.includes('PROBLEM claude may review here, and the claude command does not start: its reviews fail.'),
+    (await weaver(top, ['doctor'])).lines.includes(
+      'PROBLEM claude may review here, and the claude command does not start: its reviews fail.',
+    ),
   )
 })
 
-test('a review that has no rule to judge is noted', () => {
+test('a review that has no rule to judge is noted', async () => {
   writeConfig(top, { settings: SETTINGS, reviewers: { ...REVIEW, runtime: 'codex' } })
-  assert.ok(weaver(top, ['doctor']).lines.includes('-       the review is by codex, and it has no rule: it has nothing to judge'))
+  assert.ok((await weaver(top, ['doctor'])).lines.includes('-       the review is by codex, and it has no rule: it has nothing to judge'))
 })
 
-test('a configuration that cannot be read is a problem, with what is wrong in it', () => {
-  weaver(top, ['install'])
+test('a configuration that cannot be read is a problem, with what is wrong in it', async () => {
+  await weaver(top, ['install'])
   writeFileSync(join(top, '.weaver/settings.json'), JSON.stringify({ ...SETTINGS, chekcs: {} }))
 
-  const { status, lines } = weaver(top, ['doctor'])
+  const { status, lines } = await weaver(top, ['doctor'])
 
   assert.equal(status, 1)
   assert.match(lines[0] ?? '', /^PROBLEM \.weaver is not a valid project declaration: settings\.json: chekcs is not a known field$/)
@@ -155,13 +247,13 @@ test('a configuration that cannot be read is a problem, with what is wrong in it
 
 const WRITER = { runtime: 'codex', model: 'gpt-5.5', timeoutSeconds: 600, skill: '.weaver/skills/wv-card.md' }
 
-test('a writer that starts, with its skill, is alive, and the cards that wait are counted', () => {
+test('a writer that starts, with its skill, is alive, and the cards that wait are counted', async () => {
   writeConfig(top, { settings: SETTINGS, writer: WRITER })
-  weaver(top, ['install', 'claude'])
+  await weaver(top, ['install', 'claude'])
   flag(top)
   finding(top)
 
-  const { status, lines } = weaver(top, ['doctor'])
+  const { status, lines } = await weaver(top, ['doctor'])
 
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines, [
@@ -176,10 +268,10 @@ test('a writer that starts, with its skill, is alive, and the cards that wait ar
   ])
 })
 
-test('a writer whose command does not start, or whose skill is missing, is a problem', () => {
+test('a writer whose command does not start, or whose skill is missing, is a problem', async () => {
   writeConfig(top, { settings: SETTINGS, writer: { runtime: 'claude', timeoutSeconds: 600, skill: 'docs/card.md' } })
 
-  const { status, lines } = weaver(top, ['doctor'])
+  const { status, lines } = await weaver(top, ['doctor'])
 
   assert.equal(status, 1)
   assert.deepEqual(lines.slice(1, 3), [
@@ -188,41 +280,47 @@ test('a writer whose command does not start, or whose skill is missing, is a pro
   ])
 
   writeConfig(top, { settings: SETTINGS, writer: { runtime: 'codex', timeoutSeconds: 600 } })
-  assert.deepEqual(weaver(top, ['doctor']).lines.slice(1, 3), ['ok      the writer codex starts', `ok      the hook starts: ${link.hook}`])
+  assert.deepEqual((await weaver(top, ['doctor'])).lines.slice(1, 3), [
+    'ok      the writer codex starts',
+    `ok      the hook starts: ${link.hook}`,
+  ])
 })
 
-test('without a writer, the flags that wait are noted: they stay raw until one is declared', () => {
+test('without a writer, the flags that wait are noted: they stay raw until one is declared', async () => {
   const note = '-       1 flag(s) wait and no writer is declared: they stay raw. .weaver/llm/writer.json says who writes the cards.'
 
-  weaver(top, ['install', 'claude'])
-  assert.ok(!weaver(top, ['doctor']).lines.some((line) => line.includes('registry')), 'nothing is said of a registry that is not there')
+  await weaver(top, ['install', 'claude'])
+  assert.ok(
+    !(await weaver(top, ['doctor'])).lines.some((line) => line.includes('registry')),
+    'nothing is said of a registry that is not there',
+  )
 
   flag(top)
   finding(top)
 
-  const { status, lines } = weaver(top, ['doctor'])
+  const { status, lines } = await weaver(top, ['doctor'])
 
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines.slice(2, 4), ['ok      the registry: 2 card(s) wait for you', note])
 
   write(top, 1)
-  assert.ok(!weaver(top, ['doctor']).lines.includes(note), 'a flag closed or written up no longer waits for a writer')
+  assert.ok(!(await weaver(top, ['doctor'])).lines.includes(note), 'a flag closed or written up no longer waits for a writer')
 
   flag(top, {
     provenance: { author: 'owner', role: 'owner', session: null, subagent: null, unit: null, requests: [], commit: null, at: '' },
   })
   writeConfig(top, { settings: SETTINGS, writer: WRITER })
-  assert.ok(!weaver(top, ['doctor']).lines.some((line) => line.includes('no writer is declared')))
+  assert.ok(!(await weaver(top, ['doctor'])).lines.some((line) => line.includes('no writer is declared')))
 })
 
-test('a registry that cannot be read is a problem, in the words of the registry', () => {
+test('a registry that cannot be read is a problem, in the words of the registry', async () => {
   mkdirSync(join(top, '.git/weaver'), { recursive: true })
   writeFileSync(join(top, '.git/weaver/registry.sqlite'), 'not a database')
 
-  const { status, lines } = weaver(top, ['doctor'])
+  const { status, lines } = await weaver(top, ['doctor'])
   const problem = lines.find((line) => line.includes('registry.sqlite')) ?? ''
 
   assert.equal(status, 1)
   assert.match(problem, /^PROBLEM the registry at .*\/\.git\/weaver\/registry\.sqlite could not be used: /)
-  assert.deepEqual(weaver(top, ['cards']), { status: 1, lines: [problem.replace('PROBLEM ', 'weaver: ')] })
+  assert.deepEqual(await weaver(top, ['cards']), { status: 1, lines: [problem.replace('PROBLEM ', 'weaver: ')] })
 })

@@ -290,7 +290,12 @@ test('a flag that fails once is written up by the run that tries again', async (
 
 test('a runtime Weaver cannot start, or an agent that breaks, fails the flags instead of losing them', async () => {
   const [unknown, broken] = [flagged(1), flagged(1)]
-  const breaking: AgentExecution = { runtime: 'codex', isAvailable: () => true, run: () => Promise.reject(new Error('spawn ENOMEM')) }
+  const breaking: AgentExecution = {
+    runtime: 'codex',
+    isAvailable: () => true,
+    run: () => Promise.reject(new Error('spawn ENOMEM')),
+    hooks: () => Promise.resolve(null),
+  }
 
   await new WriterRun(JOB, new ExecutionCatalog([new ScriptedExecution('claude', [])]), unknown).run()
   await run(broken, breaking)
@@ -319,6 +324,7 @@ test('flags are written up a few at a time, and the ones made while the writer w
   const writer: AgentExecution = {
     runtime: 'codex',
     isAvailable: () => true,
+    hooks: () => Promise.resolve(null),
     run: (task) => {
       const numbers = [...task.prompt.matchAll(/### Flag #(\d+)/g)].map(([, number]) => Number(number))
 

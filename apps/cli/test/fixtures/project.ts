@@ -20,6 +20,8 @@ interface Around {
   // The agent runtime the command is started under.
   readonly under?: string
   readonly input?: string
+  // The agent runtimes of the machine.
+  readonly executions?: ExecutionCatalog
 }
 
 class RecordingOutput implements Output {
@@ -65,10 +67,11 @@ export function makeProject(top: string): string {
 const EXECUTIONS = new ExecutionCatalog([new ScriptedExecution('codex', []), new ClaudeCodeExecution('/nowhere/claude')])
 
 // These tests may themselves run under an agent: who runs a command is always given, never read from the processes.
-export function weaver(cwd: string, args: readonly string[], around: Around = {}): Run {
+export async function weaver(cwd: string, args: readonly string[], around: Around = {}): Promise<Run> {
   const output = new RecordingOutput()
   const caller = new GivenCaller(around.under ?? null)
-  const status = new CommandLine(cwd, output, around.link ?? null, EXECUTIONS, caller, new GivenInput(around.input ?? '')).run(args)
+  const input = new GivenInput(around.input ?? '')
+  const status = await new CommandLine(cwd, output, around.link ?? null, around.executions ?? EXECUTIONS, caller, input).run(args)
 
   return { status, lines: output.lines }
 }

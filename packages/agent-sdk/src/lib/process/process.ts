@@ -34,7 +34,7 @@ function collector(limit: number): { collect: (chunk: Buffer) => void; text: () 
   }
 }
 
-function signalGroup(pid: number | undefined, signal: NodeJS.Signals): void {
+export function signalGroup(pid: number | undefined, signal: NodeJS.Signals): void {
   if (pid === undefined) return
 
   try {

@@ -25,3 +25,15 @@ Work that is understood and deliberately postponed. Each entry says what it is, 
 **What would make it urgent.** Declaring the three families the lists cannot express: killing processes by a broad pattern, starting a substitute stack, and working around the harness itself.
 
 **Where to start.** A guard is a class of `guards/kinds/` that answers with a refusal or nothing; this one would run a process and read its answer, as a check does. The source harness holds the reasoning to move into scripts in `policy/rules/` (`kill.ts`, `stack.ts`, `harness.ts`) and in `policy/decision/edit-policy.ts`.
+
+## The recall against regressions
+
+**What.** When an agent is about to change code, Weaver tells it what the registry and the git history know of that code: the corrections and the decisions tied to the files it touches. The reviewer and the owner are told too. It is the second need the [memory](memory.md) was asked for, the first being to keep what agents discover.
+
+**Why it matters.** An agent remembers nothing of the sessions before its own. It can undo a correction or a decision without knowing there was one, and the owner does not reread everything.
+
+**Why it waits.** The owner deferred it on 2026-10-11. It is to be defined with the owner first, with real cards at hand, once the registry has been in use. Nothing of its design is decided.
+
+**What would make it urgent.** A correction or a decision undone by an agent that had no way to know of it.
+
+**Where to start.** The first idea started from git, at the line: when an agent changes lines that a commit of correction wrote, Weaver tells the agent, the reviewer and the owner. A review of the design showed where that breaks: a squash, a formatting commit, moved code, generated files, a fix that removes code, a regression that lands in another file. Adaptive has such a history: its commit `2331926a4` moves 852 files. What that review proposes instead is that the registry selects the decisions and the corrections tied to the files, and that git only adds hints. Three things are missing for that today. A closing as `wontfix` covers both "this is wanted" and "not now", and only the first should stop an agent. A correction made during a task is kept by its review, not by the registry. And Weaver does not keep the request of the owner once its unit of work is closed: what is not recorded cannot serve the recall later, so the journal has to start recording both before the recall is built. The source harness does its recall in `registry/knowledge/retrieval/` and in `history/`.

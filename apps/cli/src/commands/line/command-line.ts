@@ -46,7 +46,7 @@ export class CommandLine {
     this.input = input
   }
 
-  run(argv: readonly string[]): number {
+  async run(argv: readonly string[]): Promise<number> {
     const [name] = argv
 
     try {
@@ -61,7 +61,7 @@ export class CommandLine {
 
       const agent = command.ownerOnly ? this.caller.agent() : null
 
-      if (agent === null) return command.run(argv.slice(command.name.split(' ').length))
+      if (agent === null) return await command.run(argv.slice(command.name.split(' ').length))
 
       this.output.say(
         `weaver ${command.name} is the owner's: it decides or changes something, so it runs from a terminal of their own, and not under ${agent}.`,

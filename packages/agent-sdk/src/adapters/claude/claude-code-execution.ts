@@ -27,6 +27,10 @@ export class ClaudeCodeExecution implements AgentExecution {
     return withScratch((scratch) => this.ask(task, scratch))
   }
 
+  hooks(): Promise<null> {
+    return Promise.resolve(null)
+  }
+
   private async ask(task: AgentTask, scratch: string): Promise<AgentResult> {
     const result = await runProcess(this.binary, this.args(task, scratch), {
       cwd: task.cwd,

@@ -6,6 +6,6 @@ export interface Command {
   // It decides or changes something: it is the owner's, and does not run under an agent.
   readonly ownerOnly: boolean
 
-  // The exit status of the process.
-  run(args: readonly string[]): number
+  // The exit status of the process. A command that asks something of another process answers later.
+  run(args: readonly string[]): number | Promise<number>
 }

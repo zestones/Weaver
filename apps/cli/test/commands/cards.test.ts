@@ -28,18 +28,18 @@ beforeEach(() => {
   top = makeProject(join(scratch, `project-${String(counter)}`))
 })
 
-test('an empty list says that nothing waits, and a command that only reads creates no registry', () => {
-  assert.deepEqual(weaver(top, ['cards']), { status: 0, lines: ['Nothing waits for you.'] })
-  assert.deepEqual(weaver(top, ['cards', '--all']), { status: 0, lines: ['No card matches.'] })
-  assert.deepEqual(weaver(top, ['cards', '3']), { status: 1, lines: ['weaver: no card has the number 3'] })
+test('an empty list says that nothing waits, and a command that only reads creates no registry', async () => {
+  assert.deepEqual(await weaver(top, ['cards']), { status: 0, lines: ['Nothing waits for you.'] })
+  assert.deepEqual(await weaver(top, ['cards', '--all']), { status: 0, lines: ['No card matches.'] })
+  assert.deepEqual(await weaver(top, ['cards', '3']), { status: 1, lines: ['weaver: no card has the number 3'] })
   assert.equal(
-    weaver(top, ['doctor']).lines.some((line) => line.includes('registry')),
+    (await weaver(top, ['doctor'])).lines.some((line) => line.includes('registry')),
     false,
   )
   assert.equal(existsSync(join(top, '.git/weaver')), false)
 })
 
-test('cards lists the cards that wait, one line each, newest first; --all adds the others', () => {
+test('cards lists the cards that wait, one line each, newest first; --all adds the others', async () => {
   flag(top)
   finding(top)
   flag(top, { text: OTHER_FLAG, places: [] })
@@ -49,7 +49,7 @@ test('cards lists the cards that wait, one line each, newest first; --all adds t
     registry.merge(4, 1, 'the same cache')
   })
 
-  assert.deepEqual(weaver(top, ['cards']), {
+  assert.deepEqual(await weaver(top, ['cards']), {
     status: 0,
     lines: [
       '2 card(s) wait for you:',
@@ -58,7 +58,7 @@ test('cards lists the cards that wait, one line each, newest first; --all adds t
       HINT,
     ],
   })
-  assert.deepEqual(weaver(top, ['cards', '--all']), {
+  assert.deepEqual(await weaver(top, ['cards', '--all']), {
     status: 0,
     lines: [
       '4 card(s):',
@@ -71,7 +71,7 @@ test('cards lists the cards that wait, one line each, newest first; --all adds t
   })
 })
 
-test('the list is narrowed to a file, named from where the owner stands, and to a label', () => {
+test('the list is narrowed to a file, named from where the owner stands, and to a label', async () => {
   flag(top)
   finding(top)
   write(top, 1)
@@ -79,17 +79,17 @@ test('the list is narrowed to a file, named from where the owner stands, and to 
 
   const onFile = ['1 card(s) wait for you:', '  #2 open  src/api/user.ts:7  The response is cast to User without being parsed.', HINT]
 
-  assert.deepEqual(weaver(top, ['cards', '--file', 'src/api/user.ts']).lines, onFile)
-  assert.deepEqual(weaver(join(top, 'src/api'), ['cards', '--file', 'user.ts']).lines, onFile)
-  assert.deepEqual(weaver(top, ['cards', '--label', 'area:auth']).lines, [
+  assert.deepEqual((await weaver(top, ['cards', '--file', 'src/api/user.ts'])).lines, onFile)
+  assert.deepEqual((await weaver(join(top, 'src/api'), ['cards', '--file', 'user.ts'])).lines, onFile)
+  assert.deepEqual((await weaver(top, ['cards', '--label', 'area:auth'])).lines, [
     '1 card(s) wait for you:',
     '  #1 open  src/auth/token.ts:42  Nothing refreshes the token',
     HINT,
   ])
-  assert.deepEqual(weaver(top, ['cards', '--label', 'area:api', '--file', 'src/auth/token.ts']).lines, ['No card matches.'])
+  assert.deepEqual((await weaver(top, ['cards', '--label', 'area:api', '--file', 'src/auth/token.ts'])).lines, ['No card matches.'])
 })
 
-test('a card that waits and points at a line that no longer reads as it did says so on its line', () => {
+test('a card that waits and points at a line that no longer reads as it did says so on its line', async () => {
   mkdirSync(join(top, 'src/api'), { recursive: true })
   writeFileSync(join(top, 'src/token.ts'), 'export function getToken() {\n  return cached\n}\n')
   writeFileSync(join(top, 'src/api/user.ts'), 'const user = raw as User\n')
@@ -98,7 +98,7 @@ test('a card that waits and points at a line that no longer reads as it did says
   inRegistry(top, (registry) => registry.closeCard(2, 'fixed', null))
   finding(top, { review: '3f9a2c1/F2', quote: 'const user = raw as User' }, { places: [{ file: 'src/api/user.ts', line: 1 }] })
 
-  assert.deepEqual(weaver(top, ['cards']).lines.slice(1, 3), [
+  assert.deepEqual((await weaver(top, ['cards'])).lines.slice(1, 3), [
     '  #3 open  src/api/user.ts:1  The response is cast to User without being parsed.',
     '  #1 raw  src/token.ts:2  no call of refresh() exists under src/.',
   ])
@@ -106,7 +106,7 @@ test('a card that waits and points at a line that no longer reads as it did says
   writeFileSync(join(top, 'src/token.ts'), '// The token of the session.\nexport function getToken() {\n  return refreshed()\n}\n')
   rmSync(join(top, 'src/api/user.ts'))
 
-  assert.deepEqual(weaver(top, ['cards', '--all']).lines.slice(1, 4), [
+  assert.deepEqual((await weaver(top, ['cards', '--all'])).lines.slice(1, 4), [
     '  #3 open  src/api/user.ts:1  The response is cast to User without being parsed.  (changed since: src/api/user.ts:1)',
     '  #2 closed (fixed)  src/api/user.ts:1  The response is cast to User without being parsed.',
     '  #1 raw  src/token.ts:2  no call of refresh() exists under src/.  (changed since: src/token.ts:2)',
@@ -114,11 +114,11 @@ test('a card that waits and points at a line that no longer reads as it did says
   assert.equal(cardOf(top, 1).state, 'raw', 'a hint closes nothing')
 })
 
-test('a number prints the card as Markdown', () => {
+test('a number prints the card as Markdown', async () => {
   flag(top)
   write(top, 1)
 
-  const { status, lines } = weaver(top, ['cards', '1'])
+  const { status, lines } = await weaver(top, ['cards', '1'])
 
   assert.equal(status, 0)
   assert.equal(lines.join('\n'), cardOf(top, 1).markdown())
@@ -126,11 +126,11 @@ test('a number prints the card as Markdown', () => {
     lines.join('\n'),
     /^# Nothing refreshes the token\n\n- Card: #1\n[^]*\n## Observation\n[^]*\n## Flag\n\n```text\nSeen: no call of refresh\(\)/,
   )
-  assert.deepEqual(weaver(top, ['cards', '7']), { status: 1, lines: ['weaver: no card has the number 7'] })
+  assert.deepEqual(await weaver(top, ['cards', '7']), { status: 1, lines: ['weaver: no card has the number 7'] })
 })
 
-test('words that cards does not know are answered with how it is written', () => {
-  assert.deepEqual(weaver(top, ['cards', '--closed']), { status: 2, lines: [USAGE] })
-  assert.deepEqual(weaver(top, ['cards', '--file']), { status: 2, lines: [USAGE] })
-  assert.deepEqual(weaver(top, ['cards', 'reopened', '1']), { status: 2, lines: [USAGE] })
+test('words that cards does not know are answered with how it is written', async () => {
+  assert.deepEqual(await weaver(top, ['cards', '--closed']), { status: 2, lines: [USAGE] })
+  assert.deepEqual(await weaver(top, ['cards', '--file']), { status: 2, lines: [USAGE] })
+  assert.deepEqual(await weaver(top, ['cards', 'reopened', '1']), { status: 2, lines: [USAGE] })
 })

@@ -39,8 +39,8 @@ beforeEach(() => {
 const weaverGroups = (settings: Settings, event: string): Group[] =>
   (settings.hooks[event] ?? []).filter((group) => group.hooks.some((hook) => link.owns(hook.command)))
 
-test('install wires each runtime to the events it fires and the tools Weaver reads, and starts a valid configuration', () => {
-  const { status, lines } = weaver(top, ['install'])
+test('install wires each runtime to the events it fires and the tools Weaver reads, and starts a valid configuration', async () => {
+  const { status, lines } = await weaver(top, ['install'])
   const claude = readJson<Settings>(top, CLAUDE)
   const codex = readJson<Settings>(top, CODEX)
 
@@ -82,8 +82,8 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   assert.ok(lines.some((line) => line.includes('This is temporary')))
 })
 
-test('the command install writes is one the runtime can run as it is', () => {
-  weaver(top, ['install'])
+test('the command install writes is one the runtime can run as it is', async () => {
+  await weaver(top, ['install'])
 
   const command = readJson<Settings>(top, CLAUDE).hooks.Stop?.[0]?.hooks[0]?.command ?? ''
   const result = spawnSync('sh', ['-c', command], { cwd: top, input: JSON.stringify({ session_id: 's', cwd: top }), encoding: 'utf8' })
@@ -92,15 +92,15 @@ test('the command install writes is one the runtime can run as it is', () => {
   assert.equal(result.stdout, '{}')
 })
 
-test('install twice wires once, and leaves what the owner put in the files', () => {
+test('install twice wires once, and leaves what the owner put in the files', async () => {
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine', timeout: 5 }] }
   const declared = JSON.stringify({ version: 1, checks: { ...LIMITS, maxRefusals: 5 } })
 
   writeJson(top, CLAUDE, { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine], Notification: [mine] } })
   writeJson(top, CONFIG, JSON.parse(declared))
-  weaver(top, ['install'])
+  await weaver(top, ['install'])
 
-  const { lines } = weaver(top, ['install'])
+  const { lines } = await weaver(top, ['install'])
   const claude = readJson<Settings>(top, CLAUDE)
 
   assert.deepEqual(claude.permissions, { deny: ['Read(.env)'] })
@@ -116,23 +116,23 @@ test('install twice wires once, and leaves what the owner put in the files', () 
   assert.equal(existsSync(join(top, SKILL)), false, 'a project that names no skill gets none')
 })
 
-test('a skill the settings name is written once, with the headings a task ends by in its header, and never written over', () => {
+test('a skill the settings name is written once, with the headings a task ends by in its header, and never written over', async () => {
   writeJson(top, CONFIG, { ...SETTINGS, finish: { skill: 'docs/fin.md' } })
-  weaver(top, ['install', 'claude'])
+  await weaver(top, ['install', 'claude'])
 
   const written = readFileSync(join(top, 'docs/fin.md'), 'utf8')
 
   assert.match(written, /^---\ndescription: [^\n]*\nheadings:\n {2}- Request\n {2}- To validate\n {2}- Found along the way\n---\n/)
   assert.deepEqual(DeclarationFolder.in(top).load()?.finish.headings, ['Request', 'To validate', 'Found along the way'])
   writeJson(top, 'docs/fin.md', 'mine now')
-  assert.ok(!weaver(top, ['install', 'claude']).lines.some((line) => line.includes('docs/fin.md created')))
+  assert.ok(!(await weaver(top, ['install', 'claude'])).lines.some((line) => line.includes('docs/fin.md created')))
   assert.equal(readJson<string>(top, 'docs/fin.md'), 'mine now')
 })
 
-test('the skill of the reviewer is written the same way, where the configuration says', () => {
+test('the skill of the reviewer is written the same way, where the configuration says', async () => {
   writeConfig(top, { settings: SETTINGS, reviewers: { ...REVIEW, runtime: 'codex', skill: 'docs/review.md' } })
 
-  const { lines } = weaver(top, ['install', 'claude'])
+  const { lines } = await weaver(top, ['install', 'claude'])
 
   assert.ok(
     lines.includes('docs/review.md created: it tells the reviewer how this project wants its changes reviewed. Adapt it to your project.'),
@@ -141,15 +141,15 @@ test('the skill of the reviewer is written the same way, where the configuration
     readFileSync(join(top, 'docs/review.md'), 'utf8'),
     /## What counts as a finding\n\n- A finding is a place where the change breaks one of the rules/,
   )
-  assert.ok(!weaver(top, ['install', 'claude']).lines.some((line) => line.includes('docs/review.md created')))
+  assert.ok(!(await weaver(top, ['install', 'claude'])).lines.some((line) => line.includes('docs/review.md created')))
 })
 
-test('the skill of the writer is written when the configuration names it, with the sections of a card in its header, and never written over', () => {
+test('the skill of the writer is written when the configuration names it, with the sections of a card in its header, and never written over', async () => {
   const mine = '---\nsections:\n  - What\n  - Why\n---\n\nWrite short cards.\n'
 
   writeConfig(top, { settings: SETTINGS, writer: { runtime: 'codex', timeoutSeconds: 600, skill: 'docs/card.md' } })
 
-  const { lines } = weaver(top, ['install', 'claude'])
+  const { lines } = await weaver(top, ['install', 'claude'])
   const written = readFileSync(join(top, 'docs/card.md'), 'utf8')
 
   assert.ok(lines.includes('docs/card.md created: it tells the writer how this project wants its cards written. Adapt it to your project.'))
@@ -166,25 +166,25 @@ test('the skill of the writer is written when the configuration names it, with t
   assert.match(written, /\n- No emoji\.\n/)
 
   writeFileSync(join(top, 'docs/card.md'), mine)
-  assert.ok(!weaver(top, ['install', 'claude']).lines.some((line) => line.includes('docs/card.md created')))
+  assert.ok(!(await weaver(top, ['install', 'claude'])).lines.some((line) => line.includes('docs/card.md created')))
   assert.equal(readFileSync(join(top, 'docs/card.md'), 'utf8'), mine)
   assert.deepEqual(DeclarationFolder.in(top).load()?.writer?.sections, ['What', 'Why'])
 })
 
-test('install may name the runtimes to wire, and refuses a name it does not know', () => {
-  assert.equal(weaver(top, ['install', 'codex']).status, 0)
+test('install may name the runtimes to wire, and refuses a name it does not know', async () => {
+  assert.equal((await weaver(top, ['install', 'codex'])).status, 0)
   assert.equal(existsSync(join(top, CODEX)), true)
   assert.equal(existsSync(join(top, CLAUDE)), false)
 
-  const unknown = weaver(top, ['install', 'vim'])
+  const unknown = await weaver(top, ['install', 'vim'])
 
   assert.equal(unknown.status, 1)
   assert.deepEqual(unknown.lines, ['weaver: unknown agent runtime vim: Weaver reads claude, codex'])
 })
 
-test('nothing is written when the hook cannot start, or outside a git repository', () => {
-  const dead = weaver(top, ['install'], { link: new EngineLink(join(scratch, 'nowhere/hook.js'), link.schemas) })
-  const outside = weaver(scratch, ['install'])
+test('nothing is written when the hook cannot start, or outside a git repository', async () => {
+  const dead = await weaver(top, ['install'], { link: new EngineLink(join(scratch, 'nowhere/hook.js'), link.schemas) })
+  const outside = await weaver(scratch, ['install'])
 
   assert.equal(dead.status, 1)
   assert.match(dead.lines[0] ?? '', /^The hook does not start/)
@@ -194,17 +194,17 @@ test('nothing is written when the hook cannot start, or outside a git repository
   assert.match(outside.lines[0] ?? '', /is not inside a git repository$/)
 })
 
-test('a file that is not JSON is left alone and named', () => {
+test('a file that is not JSON is left alone and named', async () => {
   writeJson(top, CLAUDE, {})
   spawnSync('sh', ['-c', `printf '{ not json' > ${CLAUDE}`], { cwd: top })
 
-  assert.deepEqual(weaver(top, ['install', 'claude']).lines, [
+  assert.deepEqual((await weaver(top, ['install', 'claude'])).lines, [
     `weaver: ${CLAUDE} is not valid JSON: fix it or remove it, then run the command again`,
   ])
 })
 
-test('without a command, or with one it does not know, weaver lists what it can do', () => {
-  const usage = weaver(top, [])
+test('without a command, or with one it does not know, weaver lists what it can do', async () => {
+  const usage = await weaver(top, [])
 
   assert.equal(usage.status, 0)
   assert.equal(usage.lines[0], 'weaver <command>')
@@ -226,7 +226,7 @@ test('without a command, or with one it does not know, weaver lists what it can 
       'close <number> fixed|wontfix|issue [reason]',
     ],
   )
-  assert.deepEqual(weaver(top, ['help']), usage)
-  assert.deepEqual(weaver(top, ['status']).status, 2, 'status went away with the ledger')
-  assert.equal(weaver(top, ['frobnicate']).status, 2)
+  assert.deepEqual(await weaver(top, ['help']), usage)
+  assert.deepEqual((await weaver(top, ['status'])).status, 2, 'status went away with the ledger')
+  assert.equal((await weaver(top, ['frobnicate'])).status, 2)
 })

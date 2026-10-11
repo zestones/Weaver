@@ -19,3 +19,10 @@ test('a scripted agent gives its answers in order, keeps the tasks it was given,
     ['review this', 'review this', 'review this'],
   )
 })
+
+test('of the hooks of a folder, a scripted agent says what it was handed, and nothing by default', async () => {
+  const held = { hooks: [{ command: 'hook Stop', standing: 'waits' as const }], failure: null }
+
+  assert.equal(await new ScriptedExecution('claude', []).hooks(), null)
+  assert.equal(await new ScriptedExecution('codex', [], held).hooks(), held)
+})
