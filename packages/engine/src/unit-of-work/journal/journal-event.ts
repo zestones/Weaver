@@ -46,7 +46,6 @@ interface RefuseEvent {
   readonly kind: 'refuse'
   readonly tool: string
   readonly guard: string
-  readonly rule: string
   readonly what: string
 }
 

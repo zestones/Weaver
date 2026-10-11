@@ -8,7 +8,7 @@ export class DeclarationSchema {
   private readonly validate: ValidateFunction<DeclarationDocument>
 
   constructor() {
-    this.validate = new Ajv({ allErrors: true, useDefaults: true }).compile<DeclarationDocument>(schema)
+    this.validate = new Ajv({ allErrors: true, useDefaults: true, allowUnionTypes: true }).compile<DeclarationDocument>(schema)
   }
 
   // An accepted value comes out with the defaults it left out filled in.
@@ -19,6 +19,10 @@ export class DeclarationSchema {
   get problems(): string[] {
     // A refused key is reported twice: once for its pattern, once as a key.
     return (this.validate.errors ?? []).filter((error) => error.propertyName === undefined).map((error) => this.problem(error))
+  }
+
+  private kinds(type: unknown): string {
+    return (Array.isArray(type) ? type : [type]).map((kind) => TYPES[String(kind)] ?? String(kind)).join(' or ')
   }
 
   private problem(error: ErrorObject): string {
@@ -38,7 +42,7 @@ export class DeclarationSchema {
       case 'const':
         return `${at} must be ${String(params.allowedValue)}`
       case 'type':
-        return `${at === '' ? 'the file' : at} must be ${TYPES[String(params.type)] ?? String(params.type)}`
+        return `${at === '' ? 'the file' : at} must be ${this.kinds(params.type)}`
       case 'minItems':
       case 'minLength':
         return `${at} must not be empty`

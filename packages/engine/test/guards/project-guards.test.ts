@@ -15,14 +15,12 @@ const catalog = new AgentCatalog()
 const DECLARATION = {
   version: 1,
   guards: {
-    'tool-config': { writes: ['client/eslint.config.js', 'client/tsconfig*.json', '.github/workflows/**'], rule: 'H5' },
-    'git-writes': { runs: ['git commit', 'git push'], rule: 'H7' },
-    installs: { runs: ['npm install', 'pnpm add'], rule: 'A8' },
-  },
-  rules: {
-    H5: { level: 'gate', statement: 'Tool configuration is the owner’s.' },
-    H7: { level: 'gate', statement: 'Commits are the owner’s.' },
-    A8: { level: 'human', statement: 'Installing a dependency is the owner’s decision.' },
+    'tool-config': {
+      statement: 'Tool configuration is the owner’s.',
+      writes: ['client/eslint.config.js', 'client/tsconfig*.json', '.github/workflows/**'],
+    },
+    'git-writes': { statement: 'Commits are the owner’s.', runs: ['git commit', 'git push'] },
+    installs: { statement: 'Installing a dependency is the owner’s decision.', runs: ['npm install', 'pnpm add'] },
   },
 }
 let repo: Repository
@@ -50,11 +48,11 @@ test('an edit of a guarded file is refused with the rule it breaks, whichever ru
 
   assert.equal(
     refusalOf('Edit', { file_path: join(repo.top, 'client/eslint.config.js') }),
-    '[weaver H5] Writing client/eslint.config.js is refused by the guard tool-config. H5: Tool configuration is the owner’s.',
+    '[weaver tool-config] Writing client/eslint.config.js is refused. Tool configuration is the owner’s.',
   )
   assert.match(
     refusalOf('apply_patch', { command: patch }, 'codex') ?? '',
-    /Writing client\/tsconfig\.app\.json is refused by the guard tool-config/,
+    /^\[weaver tool-config\] Writing client\/tsconfig\.app\.json is refused/,
   )
   assert.match(refusalOf('Write', { file_path: join(repo.top, '.github/workflows/ci.yml') }) ?? '', /tool-config/)
   assert.equal(refusalOf('Write', { file_path: join(repo.top, 'src/a.ts') }), null)
@@ -65,7 +63,7 @@ test('a shell command is refused for the guarded file it names, and for the guar
   assert.match(bash('echo "export default [1]" > client/eslint.config.js') ?? '', /Writing client\/eslint\.config\.js/)
   assert.match(bash('cd client && sed -i s/a/b/ eslint.config.js') ?? '', /Writing client\/eslint\.config\.js/)
   assert.match(bash('npx prettier --write src && mv src/a.ts client/tsconfig.json') ?? '', /Writing client\/tsconfig\.json/)
-  assert.match(bash('rm -rf client') ?? '', /Writing client is refused by the guard tool-config/)
+  assert.match(bash('rm -rf client') ?? '', /^\[weaver tool-config\] Writing client is refused/)
   assert.equal(bash('cp src/a.ts client'), null, 'writing into a folder does not remove what it holds')
   assert.equal(bash('cat client/eslint.config.js && rm -rf src/old'), null)
 })
@@ -84,12 +82,12 @@ test('a command is refused by the words that name it, through the wrappers that 
     'bash -c "git commit -m x"',
     'git add . && git push',
   ]) {
-    assert.match(bash(command) ?? '', /is refused by the guard git-writes\. H7: Commits are the owner’s\./, command)
+    assert.match(bash(command) ?? '', /^\[weaver git-writes\] .* is refused\. Commits are the owner’s\.$/, command)
   }
 
   assert.equal(
     bash('npm install left-pad'),
-    '[weaver A8] Running `npm install` is refused by the guard installs. A8: Installing a dependency is the owner’s decision.',
+    '[weaver installs] Running `npm install` is refused. Installing a dependency is the owner’s decision.',
   )
 
   for (const command of ['git status', 'git log --oneline', 'git add .', 'npm test', 'echo git commit'])
@@ -113,7 +111,7 @@ test('Weaver’s configuration, its state and the agent’s hook settings are gu
   ]) {
     assert.match(
       refusal('Write', { file_path: join(repo.top, path) }) ?? '',
-      /^\[weaver weaver:protected\] Writing .* is refused by the guard weaver\./,
+      /^\[weaver weaver:protected\] Writing .* is refused\. Weaver's configuration/,
       path,
     )
   }
@@ -139,7 +137,7 @@ test('the skill that says how a task ends is guarded as soon as the configuratio
 
   assert.match(
     (call === null ? null : new ProjectGuards(declared, repo).refusal(call)?.reason) ?? '',
-    /Writing \.agents\/skills\/wv-finish\.md is refused by the guard weaver/,
+    /^\[weaver weaver:protected\] Writing \.agents\/skills\/wv-finish\.md is refused/,
   )
   assert.equal(call === null ? null : guards.refusal(call), null, 'not guarded when no configuration names it')
 })

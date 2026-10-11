@@ -8,10 +8,4 @@ export class GateRule extends Rule {
   override isReviewCriterion(): boolean {
     return false
   }
-
-  protected override levelProblem(guards: readonly string[]): string | null {
-    const enforced = this.check !== null || guards.length > 0
-
-    return enforced ? null : `rules.${this.id} is a gate rule and nothing enforces it: it needs a check or a guard`
-  }
 }

@@ -36,11 +36,13 @@ const found = new ReviewOutcome({ ...BY, summary: 'One point.', findings: [FINDI
 const clean = new ReviewOutcome({ ...BY, seconds: 30 })
 const reviewed = (review: Record<string, unknown> = {}) =>
   declaration({
-    review: { runtime: 'codex', ...review },
-    rules: {
-      L1: { level: 'gate', statement: 'The code passes the linter.', check: 'lint' },
-      N1: { level: 'llm', statement: 'One level of abstraction per function.', source: 'docs/conventions.md', scope: ['src/**'] },
-      N2: { level: 'llm', statement: 'SQL is formatted the house way.', scope: ['**/*.sql'] },
+    review: {
+      runtime: 'codex',
+      rules: {
+        N1: { statement: 'One level of abstraction per function.', scope: ['src/**'] },
+        N2: { statement: 'SQL is formatted the house way.', scope: ['**/*.sql'] },
+      },
+      ...review,
     },
   })
 let session: Session
@@ -63,13 +65,13 @@ const finish = (reviewer = stubReviewer([]), project = reviewed(), message?: str
   finishWith(session, stubChecks([PASSING]), project, message, reviewer)
 const standings = () => eventsOf(session, 'review').map((event) => event.standing)
 
-test('once the checks pass, the reviewer is given the rules of level llm that apply, what the owner asked and the change itself', async () => {
+test('once the checks pass, the reviewer is given the rules of the review that apply, what the owner asked and the change itself', async () => {
   const reviewer = stubReviewer([clean])
   const output = await finish(reviewer)
   const asked = reviewer.requests[0]?.prompt(null) ?? ''
 
   assert.equal(reviewer.requests.length, 1)
-  assert.match(asked, /- N1: One level of abstraction per function\. \(explained in docs\/conventions\.md\)/)
+  assert.match(asked, /\n- N1: One level of abstraction per function\.\n/)
   assert.doesNotMatch(asked, /N2|L1/, 'neither a rule out of scope nor a rule a program settles')
   assert.match(asked, /\n- M src\/a\.ts: lines 1\n/)
   assert.match(asked, /\n {4}1 \+ export const a = 2\n/, 'each line of the diff carries its number in the new file')
@@ -90,7 +92,7 @@ test('findings send the author back, and each one needs its answer: fixed with a
   assert.match(sentBack.reason ?? '', /one line each: `F1 fixed: <what you changed>` or `F1 not fixed: <why>`/)
   assert.match(
     sentBack.reason ?? '',
-    /\nF1 N1 src\/a\.ts:1: two levels of abstraction in one function\n {2}Quote: `export const a = 2`\n {2}Suggestion: split it in two\n/,
+    /\nF1 N1 src\/a\.ts:1: two levels of abstraction in one function\n {2}Rule: One level of abstraction per function\.\n {2}Quote: `export const a = 2`\n {2}Suggestion: split it in two\n/,
   )
   assert.deepEqual(unitFiles(session), [A_FILE])
   assert.match(
@@ -205,7 +207,7 @@ test('a review that cannot be read holds nobody: the unit ends, and the owner is
     /The review by codex did not give its findings: write #review in a request to have it tried again\. 1 item\(s\) to validate\./,
   )
   assert.match(reportOf(output.systemMessage ?? ''), /- weaver:review the review by codex did not give its findings: no answer after 900 s/)
-  assert.match(reportOf(output.systemMessage ?? ''), /## Rules of level llm, which no review judged\n\n- N1:/)
+  assert.match(reportOf(output.systemMessage ?? ''), /## Rules for a reviewer, which no review judged\n\n- N1:/)
   assert.deepEqual(unitFiles(session), [])
   assert.deepEqual(standings(), ['failed'])
 })
@@ -249,7 +251,7 @@ test('the owner’s words in a request decide the review of its work: none, or b
   assert.match(skipped.systemMessage ?? '', /No review: #no-review in the request\./)
   assert.match(
     reportOf(skipped.systemMessage ?? ''),
-    /## Review\n\n- no review: #no-review in the request\n[^]*## Rules of level llm, which no review judged/,
+    /## Review\n\n- no review: #no-review in the request\n[^]*## Rules for a reviewer, which no review judged/,
   )
   assert.deepEqual(standings(), ['skipped'])
 
@@ -264,14 +266,10 @@ test('the owner’s words in a request decide the review of its work: none, or b
   assert.deepEqual([reviewer.assignments[1]?.runtime, reviewer.assignments[1]?.reason], ['claude', 'the runtime that wrote the change'])
 })
 
-test('no review is asked when the checks fail, when no rule of level llm applies, or when the project declares no reviewer', async () => {
+test('no review is asked when the checks fail, when no rule of the review applies, or when the project declares no review', async () => {
   const reviewer = stubReviewer([found, found, found])
   const sqlOnly = declaration({
-    review: { runtime: 'codex' },
-    rules: {
-      L1: { level: 'gate', statement: 'The code passes the linter.', check: 'lint' },
-      N2: { level: 'llm', statement: 'SQL is formatted the house way.', scope: ['**/*.sql'] },
-    },
+    review: { runtime: 'codex', rules: { N2: { statement: 'SQL is formatted the house way.', scope: ['**/*.sql'] } } },
   })
 
   assert.equal((await finishWith(session, stubChecks([FAILING]), reviewed(), undefined, reviewer)).decision, 'block')
@@ -283,16 +281,8 @@ test('no review is asked when the checks fail, when no rule of level llm applies
   prompt(session, 'once more')
   agentWrites(session, { [A_FILE]: 'export const a = 5\n' })
 
-  const unreviewed = await finish(
-    reviewer,
-    declaration({
-      rules: {
-        ...{ L1: { level: 'gate', statement: 'x', check: 'lint' } },
-        N1: { level: 'llm', statement: 'One level.', scope: ['src/**'] },
-      },
-    }),
-  )
+  const unreviewed = await finish(reviewer, declaration())
 
   assert.equal(reviewer.requests.length, 0)
-  assert.match(reportOf(unreviewed.systemMessage ?? ''), /## Rules of level llm, which no review judged\n\n- N1: One level\./)
+  assert.doesNotMatch(reportOf(unreviewed.systemMessage ?? ''), /## Review|for a reviewer/)
 })

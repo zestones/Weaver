@@ -86,19 +86,19 @@ test('a finish skill that is missing, or that no longer shows a heading the conf
   )
 })
 
-const RULES = { N1: { level: 'llm', statement: 'A name says what it holds.' } }
+const RULES = { N1: 'A name says what it holds.' }
 
 test('a reviewer that starts, with its skill and rules to judge, is alive', () => {
-  const review = { runtime: 'codex', reviewers: { codex: { model: 'gpt-5.5' } }, skill: 'docs/review.md' }
+  const review = { runtime: 'codex', reviewers: { codex: { model: 'gpt-5.5' } }, skill: 'docs/review.md', rules: RULES }
 
-  writeJson(top, 'weaver.config.json', { version: 1, review, rules: RULES })
+  writeJson(top, 'weaver.config.json', { version: 1, review })
   weaver(top, ['install', 'claude'])
 
   const { status, lines } = weaver(top, ['doctor'])
 
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines.slice(1, 5), [
-    'ok      the review: by codex, for 1 rule(s) of level llm',
+    'ok      the review: by codex, for 1 rule(s)',
     '-       the claude command does not start: a request marked #critical has no reviewer',
     'ok      the reviewer codex on gpt-5.5 starts',
     'ok      the review skill: docs/review.md',
@@ -106,15 +106,15 @@ test('a reviewer that starts, with its skill and rules to judge, is alive', () =
 })
 
 test('a reviewer whose command does not start, whose skill is missing, or that the end of a turn cannot wait for is a problem', () => {
-  const review = { runtime: 'claude', skill: 'docs/review.md', waitSeconds: 3000 }
+  const review = { runtime: 'claude', skill: 'docs/review.md', waitSeconds: 3000, rules: RULES }
 
-  writeJson(top, 'weaver.config.json', { version: 1, review, rules: RULES })
+  writeJson(top, 'weaver.config.json', { version: 1, review })
 
   const { status, lines } = weaver(top, ['doctor'])
 
   assert.equal(status, 1)
   assert.deepEqual(lines.slice(1, 5), [
-    'ok      the review: by claude, for 1 rule(s) of level llm',
+    'ok      the review: by claude, for 1 rule(s)',
     'PROBLEM claude may review here, and the claude command does not start: its reviews fail.',
     'PROBLEM docs/review.md is missing, and the reviewer is pointed to it. Run weaver install to write a template.',
     'PROBLEM the checks (1200 s) and the wait for a review (3000 s) may last longer than the 3600 s the end of a turn is given: lower finish.deadlineSeconds or review.waitSeconds.',
@@ -122,26 +122,23 @@ test('a reviewer whose command does not start, whose skill is missing, or that t
 })
 
 test('when either runtime may be the one that reviews, both must start', () => {
-  writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'other', experiments: true }, rules: RULES })
+  writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'other', experiments: true, rules: RULES } })
 
   assert.deepEqual(weaver(top, ['doctor']).lines.slice(1, 4), [
-    'ok      the review: by the runtime that did not write the change, for 1 rule(s) of level llm, in a copy of the project where the reviewer may experiment',
+    'ok      the review: by the runtime that did not write the change, for 1 rule(s), in a copy of the project where the reviewer may experiment',
     'PROBLEM claude may review here, and the claude command does not start: its reviews fail.',
     'ok      the reviewer codex starts',
   ])
 
-  writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'codex', critical: { paths: ['src/auth/**'] } }, rules: RULES })
+  writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'codex', critical: { paths: ['src/auth/**'] }, rules: RULES } })
   assert.ok(
     weaver(top, ['doctor']).lines.includes('PROBLEM claude may review here, and the claude command does not start: its reviews fail.'),
   )
 })
 
-test('rules of level llm without a reviewer, and a reviewer without such rules, are noted', () => {
-  writeJson(top, 'weaver.config.json', { version: 1, rules: RULES })
-  assert.ok(weaver(top, ['doctor']).lines.includes('-       1 rule(s) of level llm and no review section: no one judges them'))
-
+test('a review that has no rule to judge is noted', () => {
   writeJson(top, 'weaver.config.json', { version: 1, review: { runtime: 'codex' } })
-  assert.ok(weaver(top, ['doctor']).lines.includes('-       the review is by codex, and no rule is of level llm: it has nothing to judge'))
+  assert.ok(weaver(top, ['doctor']).lines.includes('-       the review is by codex, and it has no rule: it has nothing to judge'))
 })
 
 test('a configuration that cannot be read is a problem, with what is wrong in it', () => {

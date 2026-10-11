@@ -7,6 +7,8 @@ import type { UnitVerdict } from './unit-verdict.ts'
 
 const ANSWER_HOW =
   'Answer each finding in your final message, one line each: `F1 fixed: <what you changed>` or `F1 not fixed: <why>`. A finding answered `fixed` needs a change in its file. Then finish again.'
+// The name of a rule is a handle for the project: the owner reads what the rule asks.
+const IN_WORDS = 'When you speak of a rule to the owner, say what it asks: its name alone tells them nothing.'
 const HEADS: Readonly<Record<string, string>> = {
   'sent-back': 'sent back to the agent, which answers each finding:',
   'answers-wanted': 'the agent was asked again for its answers:',
@@ -43,6 +45,7 @@ export class Report {
 
     return [
       `[weaver] The checks fail on this unit of work (round ${String(round)} of ${String(maxRounds)}): fix what follows, then finish again.`,
+      IN_WORDS,
       '',
       ...blocking.flatMap((outcome) => this.failureBlock(outcome)),
       ...this.repairedLines(),
@@ -68,6 +71,7 @@ export class Report {
       `[weaver] The checks pass, and the reviewer (${outcome.runtime}) found ${String(outcome.findings.length)} point(s) on this unit of work (review round ${String(round)} of ${String(maxRounds)}).`,
       'Fix each one, or decide to leave it: a finding never holds your change by itself, but each one needs your answer.',
       ANSWER_HOW,
+      IN_WORDS,
       '',
       ...outcome.findings.flatMap((_, index) => this.findingLines(review, index, '', '  ')),
       '',
@@ -125,10 +129,8 @@ export class Report {
         verdict.toValidate().map((line) => `- ${line}`),
       ),
       ...this.section(
-        'Rules of level llm, which no review judged',
-        (verdict.review?.judged === true ? [] : declaration.reviewCriteria(diff.paths)).map(
-          (rule) => `- ${rule.id}: ${rule.statement}${rule.source === null ? '' : ` (${rule.source})`}`,
-        ),
+        'Rules for a reviewer, which no review judged',
+        (verdict.review?.judged === true ? [] : declaration.reviewCriteria(diff.paths)).map((rule) => `- ${rule.id}: ${rule.statement}`),
       ),
       '',
     ].join('\n')
@@ -216,8 +218,11 @@ export class Report {
 
     if (finding === undefined) return []
 
+    const rule = this.declaration.statementOf(finding.rule)
+
     return [
       `${bullet}${review.outcome.line(index)}`,
+      ...(rule === '' ? [] : [`${under}Rule: ${rule}`]),
       ...(finding.quote === null ? [] : [`${under}Quote: \`${finding.quote}\``]),
       ...(finding.suggestion === null ? [] : [`${under}Suggestion: ${finding.suggestion}`]),
       ...(finding.evidence === null ? [] : [`${under}Evidence: ${finding.evidence}`]),

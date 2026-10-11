@@ -6,21 +6,19 @@ interface DocumentCheck {
   readonly reads: 'exit' | 'findings'
   readonly timeoutSeconds: number
   readonly after?: string
+  readonly rules: Readonly<Record<string, DocumentCheckRule>>
 }
+
+// A rule is its sentence, or an object when it says more.
+export type DocumentCheckRule = string | { readonly statement: string; readonly level: 'gate' | 'human' }
+
+export type DocumentReviewRule =
+  string | { readonly statement: string; readonly scope?: readonly string[]; readonly evidence: boolean; readonly candidates?: string }
 
 interface DocumentGuard {
-  readonly rule: string
+  readonly statement: string
   readonly writes: readonly string[]
   readonly runs: readonly string[]
-}
-
-interface DocumentRule {
-  readonly level: 'gate' | 'llm' | 'human'
-  readonly statement: string
-  readonly source?: string
-  readonly scope?: readonly string[]
-  readonly check?: string
-  readonly evidence: boolean
 }
 
 interface DocumentReviewer {
@@ -50,10 +48,10 @@ export interface DeclarationDocument {
     readonly waitSeconds: number
     readonly maxRounds: number
     readonly skill?: string
+    readonly rules: Readonly<Record<string, DocumentReviewRule>>
     readonly issue?: readonly string[]
   }
   readonly scripts: { readonly writers: readonly string[]; readonly readers: readonly string[] }
   readonly checks: Readonly<Record<string, DocumentCheck>>
   readonly guards: Readonly<Record<string, DocumentGuard>>
-  readonly rules: Readonly<Record<string, DocumentRule>>
 }

@@ -21,7 +21,7 @@ export interface ReviewedWork {
   readonly unit: UnitOfWork
   readonly diff: UnitDiff
   readonly lastMessage: string | null
-  // The places the checks of the rules of level llm listed.
+  // The places the checks listed for the rules of the review.
   readonly candidates: readonly Finding[]
 }
 
@@ -90,7 +90,7 @@ export class ReviewRounds {
     store.keep(content, {
       state: 'running',
       request: {
-        rules: declaration.reviewCriteria(diff.paths).map(({ id, statement, source, evidence }) => ({ id, statement, source, evidence })),
+        rules: declaration.reviewCriteria(diff.paths).map(({ id, statement, evidence }) => ({ id, statement, evidence })),
         files: diff.files,
         patch: diff.patch(),
         skill: policy.skill,

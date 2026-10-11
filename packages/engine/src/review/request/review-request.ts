@@ -6,7 +6,6 @@ import { FINDINGS_LIMIT } from '../findings/review-finding.ts'
 export interface ReviewCriterion {
   readonly id: string
   readonly statement: string
-  readonly source: string | null
   readonly evidence: boolean
 }
 
@@ -131,9 +130,7 @@ export class ReviewRequest {
   }
 
   private notes(rule: ReviewCriterion): string {
-    const source = rule.source === null ? '' : ` (explained in ${rule.source})`
-
-    return rule.evidence ? `${source} A finding under this rule needs the experiment that shows it.` : source
+    return rule.evidence ? ' A finding under this rule needs the experiment that shows it.' : ''
   }
 
   private section(title: string, lines: readonly string[]): string[] {

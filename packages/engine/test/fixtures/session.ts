@@ -39,14 +39,15 @@ export const A_FILE = 'src/a.ts'
 export const B_FILE = 'src/b.ts'
 const FINISHED = '## Request\n\nDone.\n\n## To validate\n\nNothing.\n'
 const AGENTS = new AgentCatalog()
+// The one check of the project these tests declare, with the rule it stands behind.
+export const LINT = { verify: ['true'], rules: { L1: 'The code passes the linter.' } }
 const REVIEW_POLL_MS = 2
 
 export const declaration = (extra: Raw = {}): Declaration =>
   new DeclarationFile('weaver.config.json').parse(
     JSON.stringify({
       version: 1,
-      checks: { lint: { verify: ['true'] } },
-      rules: { L1: { level: 'gate', statement: 'The code passes the linter.', check: 'lint' } },
+      checks: { lint: LINT },
       ...extra,
     }),
   )

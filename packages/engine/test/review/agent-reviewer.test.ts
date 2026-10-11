@@ -18,10 +18,13 @@ const FILES: ChangedFile[] = [{ status: 'M', path: 'src/a.ts', oldPath: 'src/a.t
 const { rules } = new DeclarationFile('weaver.config.json').parse(
   JSON.stringify({
     version: 1,
-    rules: {
-      N1: { level: 'llm', statement: 'One level of abstraction per function.' },
-      N2: { level: 'llm', statement: 'No cast of external data.', source: 'docs/data.md' },
-      BUG: { level: 'llm', statement: 'The change has no defect.', evidence: true },
+    review: {
+      runtime: 'codex',
+      rules: {
+        N1: 'One level of abstraction per function.',
+        N2: 'No cast of external data.',
+        BUG: { statement: 'The change has no defect.', evidence: true },
+      },
     },
   }),
 )
@@ -96,7 +99,7 @@ test('the reviewer is told the rules, the way of the project, what the owner ask
   const first = request().prompt(null)
   const second = request({ earlier: ['F1 N2 src/a.ts:1: cast of external data (answered not fixed: the owner asked for it)'] }).prompt(null)
 
-  assert.match(first, /- N2: No cast of external data\. \(explained in docs\/data\.md\)/)
+  assert.match(first, /\n- N2: No cast of external data\.\n/)
   assert.match(first, /- BUG: The change has no defect\. A finding under this rule needs the experiment that shows it\./)
   assert.match(first, /Read \.agents\/skills\/wv-review\.md first, and follow it\./)
   assert.match(first, /## What the owner asked for\n\n1\. read the user from the response/)

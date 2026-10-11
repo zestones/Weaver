@@ -3,7 +3,6 @@ import { Refusal } from '../results/refusal.ts'
 
 export interface GuardFields {
   readonly id: string
-  readonly rule: string
   readonly statement: string
 }
 
@@ -11,18 +10,16 @@ export interface GuardFields {
 // a script that writes a guarded file, is not seen here.
 export abstract class Guard {
   readonly id: string
-  private readonly rule: string
   private readonly statement: string
 
   constructor(fields: GuardFields) {
     this.id = fields.id
-    this.rule = fields.rule
     this.statement = fields.statement
   }
 
   abstract refusal(call: ToolCall): Refusal | null
 
   protected refuse(what: string): Refusal {
-    return new Refusal({ guard: this.id, rule: this.rule, statement: this.statement, what })
+    return new Refusal({ guard: this.id, statement: this.statement, what })
   }
 }

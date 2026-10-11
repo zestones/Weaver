@@ -56,7 +56,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["runtime"],
-      "description": "The independent review of a unit of work against the rules of level `llm`: an agent that did not write the change judges it once the checks pass, and the agent that wrote it answers each finding, fixed or not fixed with a reason. A finding never holds the change by itself. Without this section, those rules are only listed in the report. The owner has four words for a request: `#no-review` asks for no review of that work, `#review` takes it back and has a review that failed tried again, `#critical` asks for the runtime that did not write the change, `#simple` for the one that did.",
+      "description": "What a reviewer judges: the independent review of a unit of work against the rules written here. An agent that did not write the change judges it once the checks pass, and the agent that wrote it answers each finding, fixed or not fixed with a reason. A finding never holds the change by itself. The owner has four words for a request: `#no-review` asks for no review of that work, `#review` takes it back and has a review that failed tried again, `#critical` asks for the runtime that did not write the change, `#simple` for the one that did.",
       "properties": {
         "runtime": {
           "enum": ["claude", "codex", "same", "other"],
@@ -119,6 +119,13 @@
           "minLength": 1,
           "description": "The file that tells the reviewer how this project wants its changes reviewed, relative to the repository root. Weaver guards it."
         },
+        "rules": {
+          "type": "object",
+          "default": {},
+          "description": "The rules the reviewer judges. Each key is the name of a rule, as the agent and the owner read it: `external-data-parsed` says more than a code.",
+          "propertyNames": { "$ref": "#/definitions/identifier" },
+          "additionalProperties": { "$ref": "#/definitions/reviewRule" }
+        },
         "issue": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
@@ -150,23 +157,16 @@
     "checks": {
       "type": "object",
       "default": {},
-      "description": "The project's own programs, run on the diff of a unit of work. Each key is the identifier of a check.",
+      "description": "What a program judges at the end of a task: the project's own programs, run on the diff of a unit of work, each with the rules it stands behind. Each key is the name of a check.",
       "propertyNames": { "$ref": "#/definitions/identifier" },
       "additionalProperties": { "$ref": "#/definitions/check" }
     },
     "guards": {
       "type": "object",
       "default": {},
-      "description": "What is refused before a tool runs. Each key is the identifier of a guard.",
+      "description": "What is refused before a tool runs, each with the sentence that says why. Each key is the name of a guard.",
       "propertyNames": { "$ref": "#/definitions/identifier" },
       "additionalProperties": { "$ref": "#/definitions/guard" }
-    },
-    "rules": {
-      "type": "object",
-      "default": {},
-      "description": "The rules of the project. Each key is the identifier of a rule.",
-      "propertyNames": { "$ref": "#/definitions/identifier" },
-      "additionalProperties": { "$ref": "#/definitions/rule" }
     }
   },
   "definitions": {
@@ -202,25 +202,32 @@
         "reads": {
           "enum": ["exit", "findings"],
           "default": "exit",
-          "description": "How the verdict is read. `exit`: from the exit status. `findings`: from the last line printed, `{\"findings\": [...]}`, where each finding gives a `rule`, a `file`, a `message` and optionally a `line`."
+          "description": "How the verdict is read. `exit`: from the exit status. `findings`: from the last line printed, `{\"findings\": [...]}`, where each finding gives the name of a `rule`, a `file`, a `message` and optionally a `line`."
         },
         "timeoutSeconds": { "type": "integer", "minimum": 1, "default": 600 },
         "after": {
           "type": "string",
           "minLength": 1,
           "description": "The check that must be done before this one starts, for a check that reads another's output."
+        },
+        "rules": {
+          "type": "object",
+          "default": {},
+          "description": "The rules this check stands behind. Each key is the name of a rule, as the agent and the owner read it: `no-any` says more than a code. A check with no rule of its own lists places for a rule of the review that names it as its `candidates`.",
+          "propertyNames": { "$ref": "#/definitions/identifier" },
+          "additionalProperties": { "$ref": "#/definitions/checkRule" }
         }
       }
     },
     "guard": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["rule"],
+      "required": ["statement"],
       "properties": {
-        "rule": {
+        "statement": {
           "type": "string",
           "minLength": 1,
-          "description": "The rule the guard enforces. Its statement is the reason given to the agent."
+          "description": "The rule the guard holds, as it is told to the agent it refuses."
         },
         "writes": {
           "type": "array",
@@ -236,39 +243,51 @@
         }
       }
     },
-    "rule": {
-      "type": "object",
+    "checkRule": {
+      "type": ["string", "object"],
+      "minLength": 1,
       "additionalProperties": false,
-      "required": ["level", "statement"],
+      "required": ["statement"],
+      "description": "A rule a check stands behind: the sentence told to whoever broke it, or an object when the rule says more.",
       "properties": {
-        "level": {
-          "enum": ["gate", "llm", "human"],
-          "description": "Who settles the rule. `gate`: a program, and a failure holds the agent. `llm`: an independent reviewer. `human`: the owner."
-        },
         "statement": {
           "type": "string",
           "minLength": 1,
           "description": "What the rule says, as it is told to whoever broke it."
         },
-        "source": {
+        "level": {
+          "enum": ["gate", "human"],
+          "default": "gate",
+          "description": "Who a failure is for. `gate`: the agent, which is held until it is fixed. `human`: the owner, who reads it in the report; the agent is not held."
+        }
+      }
+    },
+    "reviewRule": {
+      "type": ["string", "object"],
+      "minLength": 1,
+      "additionalProperties": false,
+      "required": ["statement"],
+      "description": "A rule the reviewer judges: the sentence it is given, or an object when the rule says more.",
+      "properties": {
+        "statement": {
           "type": "string",
           "minLength": 1,
-          "description": "The guide the rule comes from, relative to the repository root."
+          "description": "What the rule says, as it is given to the reviewer and told to whoever broke it."
         },
         "scope": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "description": "Where the rule applies, as globs. Without it, everywhere."
         },
-        "check": {
-          "type": "string",
-          "minLength": 1,
-          "description": "The check that observes the rule. A gate rule needs a check or a guard. The check of an llm rule settles nothing: it reads `findings`, and lists the places the reviewer must judge."
-        },
         "evidence": {
           "type": "boolean",
           "default": false,
-          "description": "For a rule of level `llm` about what the code does, such as a defect: a finding must carry the experiment that shows it. Without one it is a suspicion, which the owner reads and the agent does not."
+          "description": "For a rule about what the code does, such as a defect: a finding must carry the experiment that shows it. Without one it is a suspicion, which the owner reads and the agent does not."
+        },
+        "candidates": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The check that lists the places this rule is about, for the reviewer to judge one by one. That check reads `findings`."
         }
       }
     },

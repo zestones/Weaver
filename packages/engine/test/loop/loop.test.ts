@@ -16,17 +16,18 @@ const DECLARATION = {
   version: 1,
   finish: { headings: ['Request', 'To validate'], maxRounds: 2 },
   checks: {
-    syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] },
-    markers: { verify: ['node', 'tools/markers.mjs'], when: ['src/**'], reads: 'findings' },
+    syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } },
+    markers: {
+      verify: ['node', 'tools/markers.mjs'],
+      when: ['src/**'],
+      reads: 'findings',
+      rules: {
+        M1: 'No FIXME in the lines a unit adds.',
+        M2: { statement: 'A lint suppression needs the owner’s approval.', level: 'human' },
+      },
+    },
   },
-  guards: { tools: { writes: ['tools/**'], runs: ['git commit'], rule: 'T1' } },
-  rules: {
-    T1: { level: 'gate', statement: 'The checks and the history are the owner’s.' },
-    S1: { level: 'gate', statement: 'Source files parse.', check: 'syntax' },
-    M1: { level: 'gate', statement: 'No FIXME in the lines a unit adds.', check: 'markers' },
-    M2: { level: 'human', statement: 'A lint suppression needs the owner’s approval.', check: 'markers' },
-    N1: { level: 'llm', statement: 'Each function stays at one level of abstraction.', scope: ['src/**'] },
-  },
+  guards: { tools: { statement: 'The checks and the history are the owner’s.', writes: ['tools/**'], runs: ['git commit'] } },
 }
 
 const PARSE = `import { execFileSync } from 'node:child_process'
@@ -157,7 +158,6 @@ test('a finding under a human rule waits for the owner and does not hold the age
   assert.equal(answer.decision, undefined)
   assert.match(answer.systemMessage ?? '', /1 item\(s\) to validate\./)
   assert.match(report, /- M2 src\/c\.js:1: lint suppression added/)
-  assert.match(report, /- N1: Each function stays at one level of abstraction\./)
 })
 
 test('what the owner saves while the agent runs its tests is never charged to the agent', () => {
@@ -178,9 +178,9 @@ test('a call a guard refuses does not verify: the runtime is told to deny it, wi
   assert.equal(edit.hookSpecificOutput?.permissionDecision, 'deny')
   assert.equal(
     edit.hookSpecificOutput?.permissionDecisionReason,
-    '[weaver T1] Writing tools/markers.mjs is refused by the guard tools. T1: The checks and the history are the owner’s.',
+    '[weaver tools] Writing tools/markers.mjs is refused. The checks and the history are the owner’s.',
   )
-  assert.match(commit.hookSpecificOutput?.permissionDecisionReason ?? '', /Running `git commit` is refused by the guard tools/)
+  assert.match(commit.hookSpecificOutput?.permissionDecisionReason ?? '', /^\[weaver tools\] Running `git commit` is refused\./)
   assert.match(own.hookSpecificOutput?.permissionDecisionReason ?? '', /weaver:protected/)
   assert.deepEqual(kinds(), ['refuse', 'refuse', 'refuse'])
   assert.deepEqual(stop(), {}, 'nothing was written, so nothing is left to check')
@@ -213,12 +213,13 @@ process.exitCode = judging && untidy ? 1 : 0
   const declared = {
     version: 1,
     checks: {
-      tidy: { fix: ['node', 'tools/tidy.mjs', '{files}'], verify: ['node', 'tools/tidy.mjs', '--check', '{files}'], when: ['src/**/*.js'] },
-      syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] },
-    },
-    rules: {
-      F1: { level: 'gate', statement: 'No space at the end of a line.', check: 'tidy' },
-      S1: { level: 'gate', statement: 'Source files parse.', check: 'syntax' },
+      tidy: {
+        fix: ['node', 'tools/tidy.mjs', '{files}'],
+        verify: ['node', 'tools/tidy.mjs', '--check', '{files}'],
+        when: ['src/**/*.js'],
+        rules: { F1: 'No space at the end of a line.' },
+      },
+      syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } },
     },
   }
 
@@ -254,12 +255,8 @@ process.stdin.on('end', () => {
 `
   const declared = {
     version: 1,
-    review: { runtime: 'codex' },
-    checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] } },
-    rules: {
-      S1: { level: 'gate', statement: 'Source files parse.', check: 'syntax' },
-      N1: { level: 'llm', statement: 'A name says what it holds.', scope: ['src/**'] },
-    },
+    review: { runtime: 'codex', rules: { N1: { statement: 'A name says what it holds.', scope: ['src/**'] } } },
+    checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
   }
 
   writeFiles(repo.top, { 'weaver.config.json': JSON.stringify(declared) })
@@ -302,12 +299,8 @@ process.stdin.on('end', () => {
 `
   const declared = {
     version: 1,
-    review: { runtime: 'codex' },
-    checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'] } },
-    rules: {
-      S1: { level: 'gate', statement: 'Source files parse.', check: 'syntax' },
-      N1: { level: 'llm', statement: 'A name says what it holds.', scope: ['src/**'] },
-    },
+    review: { runtime: 'codex', rules: { N1: { statement: 'A name says what it holds.', scope: ['src/**'] } } },
+    checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
   }
 
   writeFiles(repo.top, { 'weaver.config.json': JSON.stringify(declared) })
@@ -431,7 +424,7 @@ test('a repository that declares nothing is left alone, and a declaration that c
 
   writeFiles(repo.top, { 'weaver.config.json': '{"version":1,"checks":{"lint":{"verify":["true"]}}}' })
 
-  assert.match(stop().systemMessage ?? '', /Nothing is checked: .*checks\.lint enforces no rule/)
+  assert.match(stop().systemMessage ?? '', /Nothing is checked: .*checks\.lint stands behind no rule/)
 })
 
 test('the user’s index and object store never see the loop', () => {

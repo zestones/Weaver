@@ -27,7 +27,7 @@ export class CheckOutcome {
   readonly reason: string | null
   readonly failures: readonly Finding[]
   readonly toValidate: readonly Finding[]
-  // Places a rule of level llm is about, for the reviewer to judge one by one.
+  // Places a rule of the review is about, for the reviewer to judge one by one.
   readonly candidates: readonly Finding[]
 
   constructor(fields: OutcomeFields) {

@@ -12,10 +12,7 @@ export class ProjectGuards {
   private readonly guards: readonly Guard[]
 
   constructor(declaration: Declaration, repo: Repository) {
-    this.guards = [
-      new EngineGuard(repo, declaration.skills),
-      ...declaration.guards.flatMap((declared) => this.guardsOf(declared, declaration, repo)),
-    ]
+    this.guards = [new EngineGuard(repo, declaration.skills), ...declaration.guards.flatMap((declared) => this.guardsOf(declared, repo))]
   }
 
   refusal(call: ToolCall): Refusal | null {
@@ -28,8 +25,8 @@ export class ProjectGuards {
     return null
   }
 
-  private guardsOf(declared: DeclaredGuard, declaration: Declaration, repo: Repository): Guard[] {
-    const fields = { id: declared.id, rule: declared.rule, statement: `${declared.rule}: ${declaration.statementOf(declared.rule)}` }
+  private guardsOf(declared: DeclaredGuard, repo: Repository): Guard[] {
+    const fields = { id: declared.id, statement: declared.statement }
 
     return [
       ...(declared.writes.length > 0 ? [new WritesGuard(fields, repo.top, declared.writes)] : []),

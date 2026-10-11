@@ -9,7 +9,7 @@ import { GateRule } from '../rules/gate-rule.ts'
 import { HumanRule } from '../rules/human-rule.ts'
 import { LlmRule } from '../rules/llm-rule.ts'
 import type { Rule } from '../rules/rule.ts'
-import type { DeclarationDocument } from '../schema/declaration-document.ts'
+import type { DeclarationDocument, DocumentCheckRule, DocumentReviewRule } from '../schema/declaration-document.ts'
 import { DeclarationSchema } from '../schema/declaration-schema.ts'
 import { DeclarationError } from './declaration-error.ts'
 
@@ -17,7 +17,6 @@ export class DeclarationFile {
   static readonly NAME = 'weaver.config.json'
 
   readonly path: string
-  private readonly levels = { gate: GateRule, llm: LlmRule, human: HumanRule }
 
   constructor(path: string) {
     this.path = path
@@ -34,23 +33,21 @@ export class DeclarationFile {
   parse(text: string): Declaration {
     const { scope, finish, review, scripts, ...document } = this.document(text)
     const checks = Object.entries(document.checks).map(([id, check]): DeclaredCheck => ({
-      ...check,
       id,
+      verify: check.verify,
       fix: check.fix ?? null,
+      cwd: check.cwd,
       when: check.when ?? null,
+      reads: check.reads,
+      timeoutSeconds: check.timeoutSeconds,
       after: check.after ?? null,
     }))
-    const rules = Object.entries(document.rules).map(
-      ([id, rule]) =>
-        new this.levels[rule.level]({
-          id,
-          statement: rule.statement,
-          source: rule.source ?? null,
-          scope: rule.scope ?? null,
-          check: rule.check ?? null,
-          evidence: rule.evidence,
-        }),
-    )
+    const rules = [
+      ...Object.entries(document.checks).flatMap(([check, { rules: own }]) =>
+        Object.entries(own).map(([id, rule]) => this.checkRule(id, check, rule)),
+      ),
+      ...Object.entries(review?.rules ?? {}).map(([id, rule]) => this.reviewRule(id, rule)),
+    ]
     const guards = Object.entries(document.guards).map(([id, guard]): DeclaredGuard => ({ ...guard, id }))
     const problems = [...this.bindingProblems(checks, guards, rules), ...this.finishProblems(finish)]
 
@@ -64,6 +61,26 @@ export class DeclarationFile {
       checks,
       guards,
       rules,
+    })
+  }
+
+  // Where a rule is written says who settles it: a program when it is in a check, a reviewer when it is in the review.
+  private checkRule(id: string, check: string, rule: DocumentCheckRule): Rule {
+    const { statement, level } = typeof rule === 'string' ? { statement: rule, level: 'gate' as const } : rule
+    const fields = { id, statement, scope: null, check, evidence: false }
+
+    return level === 'human' ? new HumanRule(fields) : new GateRule(fields)
+  }
+
+  private reviewRule(id: string, rule: DocumentReviewRule): Rule {
+    const said = typeof rule === 'string' ? { statement: rule, evidence: false } : rule
+
+    return new LlmRule({
+      id,
+      statement: said.statement,
+      scope: said.scope ?? null,
+      check: said.candidates ?? null,
+      evidence: said.evidence,
     })
   }
 
@@ -115,32 +132,35 @@ export class DeclarationFile {
   // A schema describes the shape of each entry, not what ties one entry to another.
   private bindingProblems(checks: readonly DeclaredCheck[], guards: readonly DeclaredGuard[], rules: readonly Rule[]): string[] {
     const known = new Set(checks.map((check) => check.id))
-    const enforced = new Set(rules.flatMap((rule) => rule.check ?? []))
-    const guardsOf = (rule: Rule): string[] => guards.filter((guard) => guard.rule === rule.id).map((guard) => guard.id)
+    const behind = new Set(rules.flatMap((rule) => rule.check ?? []))
+    const twice = [...new Set(rules.map((rule) => rule.id).filter((id, index, ids) => ids.indexOf(id) !== index))]
 
     return [
-      ...rules.flatMap((rule) => rule.bindingProblem(known, guardsOf(rule)) ?? []),
-      ...rules.flatMap((rule) => {
-        const lister = rule.level === 'llm' ? checks.find((check) => check.id === rule.check) : undefined
-
-        return lister === undefined || lister.reads === 'findings'
-          ? []
-          : [
-              `rules.${rule.id}.check names ${lister.id}, which reads ${lister.reads}: the check of an llm rule lists places for the reviewer, so it reads findings`,
-            ]
-      }),
-      ...guards.flatMap((guard) => {
-        if (!rules.some((rule) => rule.id === guard.rule)) return [`guards.${guard.id}.rule names ${guard.rule}, which is not a rule`]
-        if (guard.writes.length + guard.runs.length === 0) return [`guards.${guard.id} refuses nothing: it needs writes or runs`]
-
-        return []
-      }),
+      ...twice.map((id) => `the rule ${id} is written twice: a name stands for one rule in the whole project`),
+      ...rules.filter((rule) => rule.level === 'llm').flatMap((rule) => this.candidatesProblem(rule, checks)),
+      ...guards.flatMap((guard) =>
+        guard.writes.length + guard.runs.length === 0 ? [`guards.${guard.id} refuses nothing: it needs writes or runs`] : [],
+      ),
       ...checks.flatMap((check) => {
-        if (!enforced.has(check.id)) return [`checks.${check.id} enforces no rule`]
+        if (!behind.has(check.id))
+          return [`checks.${check.id} stands behind no rule: give it rules, or name it as the candidates of a rule of the review`]
         if (check.after !== null && !known.has(check.after)) return [`checks.${check.id}.after names ${check.after}, which is not a check`]
 
         return []
       }),
     ]
+  }
+
+  private candidatesProblem(rule: Rule, checks: readonly DeclaredCheck[]): string[] {
+    const lister = checks.find((check) => check.id === rule.check)
+
+    if (rule.check === null) return []
+    if (lister === undefined) return [`review.rules.${rule.id}.candidates names ${rule.check}, which is not a check`]
+
+    return lister.reads === 'findings'
+      ? []
+      : [
+          `review.rules.${rule.id}.candidates names ${lister.id}, which reads ${lister.reads}: a check that lists places for the reviewer reads findings`,
+        ]
   }
 }

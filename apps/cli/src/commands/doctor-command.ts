@@ -95,12 +95,7 @@ export class DoctorCommand implements Command {
     const declaration = project.readableDeclaration()
     const judged = declaration?.rules.filter((rule) => rule.level === 'llm').length ?? 0
 
-    if (declaration === null) return []
-    if (declaration.review === null) {
-      return judged === 0
-        ? []
-        : [{ state: 'note', text: `${String(judged)} rule(s) of level llm and no review section: no one judges them` }]
-    }
+    if (declaration === null || declaration.review === null) return []
 
     return [...this.reviewers(declaration.review, judged), ...this.reviewSkill(project), ...this.reviewTime(declaration)]
   }
@@ -112,8 +107,8 @@ export class DoctorCommand implements Command {
     const routed = policy.runtime in WHO || policy.criticalPaths.length > 0 || policy.criticalLines !== null
     const review: Finding =
       judged === 0
-        ? { state: 'note', text: `the review is by ${who}, and no rule is of level llm: it has nothing to judge` }
-        : { state: 'ok', text: `the review: by ${who}, for ${String(judged)} rule(s) of level llm${where}` }
+        ? { state: 'note', text: `the review is by ${who}, and it has no rule: it has nothing to judge` }
+        : { state: 'ok', text: `the review: by ${who}, for ${String(judged)} rule(s)${where}` }
 
     return [review, ...REVIEWERS.flatMap((name) => this.reviewer(name, policy, routed || policy.runtime === name))]
   }

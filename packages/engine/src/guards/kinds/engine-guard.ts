@@ -15,8 +15,7 @@ export class EngineGuard extends Guard {
 
   constructor(repo: Repository, skills: readonly string[]) {
     super({
-      id: 'weaver',
-      rule: 'weaver:protected',
+      id: 'weaver:protected',
       statement:
         "Weaver's configuration, its state, the agent's hook settings and the skills Weaver relies on are the owner's. Describe the change you need; the owner makes it.",
     })

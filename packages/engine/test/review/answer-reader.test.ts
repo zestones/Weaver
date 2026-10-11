@@ -27,9 +27,9 @@ const FILES: ChangedFile[] = [{ status: 'M', path: 'src/a.ts', oldPath: 'src/a.t
 const { rules } = new DeclarationFile('weaver.config.json').parse(
   JSON.stringify({
     version: 1,
-    rules: {
-      T10: { level: 'llm', statement: 'External data is parsed, never cast.' },
-      BUG: { level: 'llm', statement: 'The change has no defect.', evidence: true },
+    review: {
+      runtime: 'codex',
+      rules: { T10: 'External data is parsed, never cast.', BUG: { statement: 'The change has no defect.', evidence: true } },
     },
   }),
 )

@@ -43,6 +43,7 @@ export class FinishSkill extends ProjectSkill {
       '- Write one point per subject, and nothing under a heading when there is nothing to say.',
       '- When the checks fail, Weaver sends you back with each failure. Fix them, then end again with the same sections.',
       '- When a reviewer found points on your change, Weaver sends you back with them, numbered F1, F2 and so on. Fix each one or decide to leave it, then answer each in your final message, one line each: `F1 fixed: <what you changed>` or `F1 not fixed: <why>`.',
+      '- When you speak of a rule, say what it asks: its name alone tells the owner nothing.',
       '- This file is the project owner’s: describe the change you need rather than editing it.',
       '',
     ].join('\n')

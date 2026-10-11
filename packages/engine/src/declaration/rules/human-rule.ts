@@ -8,8 +8,4 @@ export class HumanRule extends Rule {
   override isReviewCriterion(): boolean {
     return false
   }
-
-  protected override levelProblem(): string | null {
-    return null
-  }
 }

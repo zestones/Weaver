@@ -53,7 +53,7 @@ export class UnitReview {
     return HOLDING.has(this.standing)
   }
 
-  // Whether the rules of level llm were judged at all.
+  // Whether the rules of the review were judged at all.
   get judged(): boolean {
     return this.standing !== 'failed' && this.standing !== 'skipped' && this.standing !== 'running'
   }

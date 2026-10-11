@@ -18,7 +18,7 @@ export interface DeclarationFields {
 export class Declaration {
   readonly exclude: readonly string[]
   readonly finish: FinishPolicy
-  // null when the project asks for no review: its rules of level llm are then only listed.
+  // null when the project asks for no review.
   readonly review: ReviewPolicy | null
   readonly scripts: ScriptHints
   readonly checks: readonly DeclaredCheck[]

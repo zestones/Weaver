@@ -42,23 +42,16 @@ const FINDING = {
 const found = new ReviewOutcome({ ...BY, findings: [FINDING], seconds: 42 })
 const clean = new ReviewOutcome({ ...BY, seconds: 30 })
 const broken = new ReviewOutcome({ ...BY, seconds: 900, failure: 'no answer after 900 s' })
+const REVIEW_RULES = { N1: { statement: 'One level of abstraction per function.', scope: ['src/**'] } }
 const reviewed = (review: Record<string, unknown> = {}) =>
   declaration({
-    review: { runtime: 'codex', ...review },
-    rules: {
-      L1: { level: 'gate', statement: 'The code passes the linter.', check: 'lint' },
-      N1: { level: 'llm', statement: 'One level of abstraction per function.', scope: ['src/**'] },
-    },
+    review: { runtime: 'codex', rules: REVIEW_RULES, ...review },
   })
 // A project whose work is finished by a message with headings: a reply without them ends nothing.
 const finishing = () =>
   declaration({
     finish: { headings: ['Request', 'To validate'] },
-    review: { runtime: 'codex' },
-    rules: {
-      L1: { level: 'gate', statement: 'The code passes the linter.', check: 'lint' },
-      N1: { level: 'llm', statement: 'One level of abstraction per function.', scope: ['src/**'] },
-    },
+    review: { runtime: 'codex', rules: REVIEW_RULES },
   })
 let session: Session
 let counter = 0
@@ -213,7 +206,7 @@ test('what a review leaves for the owner is kept across sessions until the owner
   )
 })
 
-test('the places a program of the project lists under a rule of level llm reach its reviewer', async () => {
+test('the places a program of the project lists under a rule of the review reach its reviewer', async () => {
   const reviewer = stubReviewer([clean])
   const listing = new CheckOutcome({
     id: 'comments',

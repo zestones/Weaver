@@ -23,14 +23,30 @@ const VALID = {
   finish: { headings: ['Request', 'To validate'], maxRounds: 2 },
   scripts: { writers: ['npm run api:types'], readers: ['make verify'] },
   checks: {
-    types: { verify: ['npx', 'tsc', '--noEmit'], when: ['src/**/*.ts'], cwd: 'client', timeoutSeconds: 120 },
-    markers: { verify: ['node', 'tools/markers.mjs'], reads: 'findings', after: 'types' },
+    types: {
+      verify: ['npx', 'tsc', '--noEmit'],
+      when: ['src/**/*.ts'],
+      cwd: 'client',
+      timeoutSeconds: 120,
+      rules: { 'types-compile': 'The code type-checks.' },
+    },
+    markers: {
+      verify: ['node', 'tools/markers.mjs'],
+      reads: 'findings',
+      after: 'types',
+      rules: {
+        'no-fixme': 'No FIXME in the lines a unit adds.',
+        'suppression-approved': { statement: 'A lint suppression needs approval.', level: 'human' },
+      },
+    },
   },
-  rules: {
-    T1: { level: 'gate', statement: 'The code type-checks.', check: 'types' },
-    M2: { level: 'human', statement: 'A lint suppression needs approval.', check: 'markers' },
-    N1: { level: 'llm', statement: 'One level of abstraction per function.', source: 'docs/conventions.md', scope: ['src/**'] },
-    A8: { level: 'human', statement: 'Installing a dependency is the owner’s decision.' },
+  guards: { installs: { statement: 'Installing a dependency is the owner’s decision.', runs: ['npm install'] } },
+  review: {
+    runtime: 'codex',
+    rules: {
+      'one-level': { statement: 'One level of abstraction per function.', scope: ['src/**'] },
+      'names-say-what': 'A name says what it holds.',
+    },
   },
 }
 
@@ -54,8 +70,13 @@ test('a declaration is read with its defaults', () => {
   })
   assert.deepEqual(
     config.rules.map((rule) => `${rule.id} ${rule.level} ${rule.check ?? '-'}`),
-    ['T1 gate types', 'M2 human markers', 'N1 llm -', 'A8 human -'],
+    ['types-compile gate types', 'no-fixme gate markers', 'suppression-approved human markers', 'one-level llm -', 'names-say-what llm -'],
+    'where a rule is written says who settles it',
   )
+  assert.equal(config.statementOf('no-fixme'), 'No FIXME in the lines a unit adds.')
+  assert.deepEqual(config.guards, [
+    { id: 'installs', statement: 'Installing a dependency is the owner’s decision.', runs: ['npm install'], writes: [] },
+  ])
 })
 
 test('the smallest declaration supervises a repository without checking anything', () => {
@@ -65,54 +86,54 @@ test('the smallest declaration supervises a repository without checking anything
   assert.equal(config.finish.headings, null)
 })
 
-test('a level says who settles a rule, so it says whether a program may stand behind it', () => {
-  assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'gate', statement: 'x' } } }), [
-    'rules.T1 is a gate rule and nothing enforces it: it needs a check or a guard',
-  ])
+test('a rule is its sentence, or an object when it says more; under a check it is for the agent unless it says the owner', () => {
+  const rules = { plain: 'A sentence.', owner: { statement: 'For the owner.', level: 'human' } }
+
   assert.deepEqual(
-    problemsOf({ version: 1, checks: { c: { verify: ['true'] } }, rules: { N1: { level: 'llm', statement: 'x', check: 'c' } } }),
-    ['rules.N1.check names c, which reads exit: the check of an llm rule lists places for the reviewer, so it reads findings'],
+    parse({ version: 1, checks: { c: { verify: ['true'], rules } } }).rules.map((rule) => [rule.id, rule.level, rule.statement]),
+    [
+      ['plain', 'gate', 'A sentence.'],
+      ['owner', 'human', 'For the owner.'],
+    ],
   )
-  assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'machine', statement: 'x' } } }), [
-    'rules.T1.level must be one of gate, llm, human',
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { verify: ['true'], rules: { r: { statement: 'x', level: 'llm' } } } } }), [
+    'checks.c.rules.r.level must be one of gate, human',
+  ])
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { verify: ['true'], rules: { r: 3, s: '', t: {} } } } }), [
+    'checks.c.rules.r must be a text or an object',
+    'checks.c.rules.s must not be empty',
+    'checks.c.rules.t.statement is missing',
   ])
 })
 
-test('what ties entries together is checked: a check enforces a rule, and a name used for a check is one', () => {
-  const gate = { level: 'gate', statement: 'x', check: 'c' }
+test('what ties entries together is checked: a check stands behind a rule, and a name stands for one rule', () => {
+  const lint = { verify: ['true'], rules: { clean: 'x' } }
 
-  assert.deepEqual(problemsOf({ version: 1, checks: { lint: { verify: ['true'] } } }), ['checks.lint enforces no rule'])
-  assert.deepEqual(problemsOf({ version: 1, rules: { T1: { level: 'gate', statement: 'x', check: 'types' } } }), [
-    'rules.T1.check names types, which is not a check',
+  assert.deepEqual(problemsOf({ version: 1, checks: { lint: { verify: ['true'] } } }), [
+    'checks.lint stands behind no rule: give it rules, or name it as the candidates of a rule of the review',
   ])
-  assert.deepEqual(problemsOf({ version: 1, checks: { c: { verify: ['true'], after: 'd' } }, rules: { T1: gate } }), [
-    'checks.c.after names d, which is not a check',
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { ...lint, after: 'd' } } }), ['checks.c.after names d, which is not a check'])
+  assert.deepEqual(problemsOf({ version: 1, checks: { a: lint, b: lint }, review: { runtime: 'codex', rules: { clean: 'y' } } }), [
+    'the rule clean is written twice: a name stands for one rule in the whole project',
   ])
 })
 
 test('everything wrong with the shape of the file is reported at once, in words that name the field', () => {
-  assert.deepEqual(problemsOf({ version: 2, finish: { maxRounds: 0 }, chekcs: {}, rules: { '9x': {}, T1: { level: 'machine' } } }), [
-    'chekcs is not a known field',
-    'version must be 1',
-    'finish.maxRounds must be at least 1',
-    'rules.9x is not a valid identifier',
-    'rules.9x.level is missing',
-    'rules.9x.statement is missing',
-    'rules.T1.statement is missing',
-    'rules.T1.level must be one of gate, llm, human',
-  ])
   assert.deepEqual(
-    problemsOf({
-      version: 1,
-      checks: { c: { verify: [], reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } },
-      rules: { T1: { level: 'gate', statement: '' } },
-    }),
+    problemsOf({ version: 2, finish: { maxRounds: 0 }, chekcs: {}, rules: {}, guards: { '9x': {}, g: { statement: '' } } }),
     [
-      'checks.c.verify must not be empty',
-      'checks.c.reads must be one of exit, findings',
-      'checks.c.timeoutSeconds must be a whole number',
-      'rules.T1.statement must not be empty',
+      'chekcs is not a known field',
+      'rules is not a known field',
+      'version must be 1',
+      'finish.maxRounds must be at least 1',
+      'guards.9x is not a valid identifier',
+      'guards.9x.statement is missing',
+      'guards.g.statement must not be empty',
     ],
+  )
+  assert.deepEqual(
+    problemsOf({ version: 1, checks: { c: { verify: [], reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } } }),
+    ['checks.c.verify must not be empty', 'checks.c.reads must be one of exit, findings', 'checks.c.timeoutSeconds must be a whole number'],
     'the links between entries are judged once the shape is right',
   )
   assert.deepEqual(problemsOf('['), ['the file must be an object'])
@@ -125,7 +146,7 @@ test('a file that is not JSON says so, and a file may name the schema it follows
 })
 
 test('each level is its own kind of rule: who a failure holds, who a finding waits for, who reviews', () => {
-  const [gate, human, llm] = parse(VALID).rules
+  const [gate, , human, llm] = parse(VALID).rules
 
   assert.deepEqual([gate?.blocks, gate?.waitsForOwner, gate?.isReviewCriterion(['src/a.ts'])], [true, false, false])
   assert.deepEqual([human?.blocks, human?.waitsForOwner, human?.isReviewCriterion(['src/a.ts'])], [false, true, false])
@@ -147,23 +168,20 @@ test('a project says when its work is finished: with headings, a final message t
   ])
 })
 
-test('a guard enforces a rule that exists and that a program may enforce, and refuses something', () => {
-  const rules = { H5: { level: 'gate', statement: 'Tool configuration is the owner’s.' }, N1: { level: 'llm', statement: 'x' } }
-  const guarded = parse({ version: 1, guards: { config: { writes: ['eslint.config.js'], rule: 'H5' } }, rules: { H5: rules.H5 } })
+test('a guard holds its own sentence, and refuses something', () => {
+  const guarded = parse({
+    version: 1,
+    guards: { config: { statement: 'Tool configuration is the owner’s.', writes: ['eslint.config.js'] } },
+  })
 
-  assert.deepEqual(
-    guarded.guards,
-    [{ id: 'config', rule: 'H5', writes: ['eslint.config.js'], runs: [] }],
-    'a guard is enough for a gate rule',
-  )
-  assert.deepEqual(problemsOf({ version: 1, guards: { g: { runs: ['git commit'], rule: 'H7' } } }), [
-    'guards.g.rule names H7, which is not a rule',
+  assert.deepEqual(guarded.guards, [
+    { id: 'config', statement: 'Tool configuration is the owner’s.', writes: ['eslint.config.js'], runs: [] },
   ])
-  assert.deepEqual(problemsOf({ version: 1, guards: { g: { rule: 'H5' } }, rules: { H5: rules.H5 } }), [
-    'guards.g refuses nothing: it needs writes or runs',
-  ])
-  assert.deepEqual(problemsOf({ version: 1, guards: { g: { runs: ['claude'], rule: 'N1' } }, rules: { N1: rules.N1 } }), [
-    'rules.N1 is an llm rule and g enforces it: a reviewer settles it',
+  assert.deepEqual(guarded.rules, [], 'what a guard holds is not a rule a program or a reviewer judges afterwards')
+  assert.deepEqual(problemsOf({ version: 1, guards: { g: { runs: ['git commit'] } } }), ['guards.g.statement is missing'])
+  assert.deepEqual(problemsOf({ version: 1, guards: { g: { statement: 'x' } } }), ['guards.g refuses nothing: it needs writes or runs'])
+  assert.deepEqual(problemsOf({ version: 1, guards: { g: { statement: 'x', runs: ['claude'], rule: 'N1' } } }), [
+    'guards.g.rule is not a known field',
   ])
 })
 
@@ -205,35 +223,53 @@ test('a project says who reviews its changes, where a mistake costs the most, an
   assert.match(problemsOf({ version: 1, review: { runtime: 'gemini' } }).join(' '), /review\.runtime/)
 })
 
-test('the check of a rule of level llm settles nothing: it lists the places its reviewer judges', () => {
+test('a rule of the review may name the check that lists its places, and may ask for the experiment behind each finding', () => {
+  const comments = { verify: ['node', 'tools/new-comments.mjs'], reads: 'findings' }
+  const review = (rules: unknown) => ({ runtime: 'codex', rules })
   const listed = parse({
     version: 1,
-    checks: { comments: { verify: ['node', 'tools/new-comments.mjs'], reads: 'findings' } },
-    rules: { C1: { level: 'llm', statement: 'A comment explains a real difficulty.', check: 'comments' } },
+    checks: { comments },
+    review: review({
+      'comments-explain': { statement: 'A comment explains a real difficulty.', candidates: 'comments' },
+      'no-defect': { statement: 'The change has no defect.', evidence: true },
+    }),
   })
 
-  assert.deepEqual([listed.rules[0]?.check, listed.rulesOf('comments').map((rule) => rule.id)], ['comments', ['C1']])
-})
-
-test('a rule of level llm may ask for the experiment behind each finding; a rule a program or the owner settles may not', () => {
-  const defect = { level: 'llm', statement: 'The change has no defect.', evidence: true }
-
   assert.deepEqual(
-    parse({ version: 1, rules: { BUG: defect, N1: { level: 'llm', statement: 'x' } } }).rules.map((rule) => rule.evidence),
-    [true, false],
+    listed.rules.map((rule) => [rule.id, rule.level, rule.check, rule.evidence]),
+    [
+      ['comments-explain', 'llm', 'comments', false],
+      ['no-defect', 'llm', null, true],
+    ],
   )
-  assert.deepEqual(problemsOf({ version: 1, rules: { A8: { level: 'human', statement: 'x', evidence: true } } }), [
-    'rules.A8.evidence is for a rule of level llm: only a reviewer runs experiments',
+  assert.deepEqual(
+    listed.rulesOf('comments').map((rule) => rule.id),
+    ['comments-explain'],
+  )
+  assert.deepEqual(problemsOf({ version: 1, review: review({ r: { statement: 'x', candidates: 'nowhere' } }) }), [
+    'review.rules.r.candidates names nowhere, which is not a check',
+  ])
+  assert.deepEqual(
+    problemsOf({ version: 1, checks: { c: { verify: ['true'] } }, review: review({ r: { statement: 'x', candidates: 'c' } }) }),
+    ['review.rules.r.candidates names c, which reads exit: a check that lists places for the reviewer reads findings'],
+  )
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { verify: ['true'], rules: { r: { statement: 'x', evidence: true } } } } }), [
+    'checks.c.rules.r.evidence is not a known field',
   ])
 })
 
 test('a check may carry the command that repairs before it judges', () => {
   const [check] = parse({
     version: 1,
-    checks: { format: { fix: ['npx', 'prettier', '--write', '{files}'], verify: ['npx', 'prettier', '--check', '{files}'] } },
-    rules: { L19: { level: 'gate', statement: 'Prettier decides formatting.', check: 'format' } },
+    checks: {
+      format: {
+        fix: ['npx', 'prettier', '--write', '{files}'],
+        verify: ['npx', 'prettier', '--check', '{files}'],
+        rules: { formatted: 'Prettier decides formatting.' },
+      },
+    },
   }).checks
 
   assert.deepEqual(check?.fix, ['npx', 'prettier', '--write', '{files}'])
-  assert.deepEqual(problemsOf({ version: 1, checks: { c: { verify: ['true'], fix: [] } }, rules: {} }), ['checks.c.fix must not be empty'])
+  assert.deepEqual(problemsOf({ version: 1, checks: { c: { verify: ['true'], fix: [] } } }), ['checks.c.fix must not be empty'])
 })

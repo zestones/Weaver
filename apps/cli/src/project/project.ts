@@ -36,7 +36,7 @@ export class Project {
 
     const finish = { headings: FinishSkill.HEADINGS, skill: FinishSkill.PATH }
 
-    writeFileSync(path, `${JSON.stringify({ $schema: schema, version: 1, finish, rules: {}, checks: {}, guards: {} }, null, 2)}\n`)
+    writeFileSync(path, `${JSON.stringify({ $schema: schema, version: 1, finish, checks: {}, guards: {} }, null, 2)}\n`)
 
     return true
   }

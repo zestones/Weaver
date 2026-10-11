@@ -16,6 +16,7 @@ import {
   eventsOf,
   FAILING,
   finishWith,
+  LINT,
   PASSING,
   prompt,
   stateOf,
@@ -128,12 +129,9 @@ test('with headings declared, a turn that ends without them checks nothing; the 
 test('what waits for the owner is counted, listed in the report and never blocks the agent; a script that rewrote the configuration is caught there', async () => {
   const finding = { rule: 'S1', file: A_FILE, line: 1, message: 'eslint-disable added' }
   const project = declaration({
-    checks: { lint: { verify: ['true'] }, markers: { verify: ['true'], reads: 'findings' } },
-    rules: {
-      L1: { level: 'gate', statement: 'The code passes the linter.', check: 'lint' },
-      S1: { level: 'human', statement: 'A suppression needs approval.', check: 'markers' },
-      N1: { level: 'llm', statement: 'One level of abstraction per function.', source: 'docs/conventions.md', scope: ['src/**'] },
-      N2: { level: 'llm', statement: 'SQL is formatted the house way.', scope: ['**/*.sql'] },
+    checks: {
+      lint: LINT,
+      markers: { verify: ['true'], reads: 'findings', rules: { S1: { statement: 'A suppression needs approval.', level: 'human' } } },
     },
   })
 
@@ -152,10 +150,6 @@ test('what waits for the owner is counted, listed in the report and never blocks
   assert.match(
     report,
     /## To validate\n\n- S1 src\/a\.ts:1: eslint-disable added\n- weaver:declaration weaver\.config\.json: the unit changed the project's declaration/,
-  )
-  assert.match(
-    report,
-    /## Rules of level llm, which no review judged\n\n- N1: One level of abstraction per function\. \(docs\/conventions\.md\)\n\n?$/,
   )
   assert.equal(checksOf()[0]?.toValidate, 2)
   assert.deepEqual(unitFiles(session), [])
