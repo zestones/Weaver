@@ -2,7 +2,7 @@
 
 Weaver supervises the coding agents that work in a repository. It plugs into the hooks of Claude Code and Codex. From there it knows which files each agent changed, refuses what the project forbids, runs the project's own checks when a task ends, has another agent review the change, and keeps what agents discover along the way for you to decide on later.
 
-Weaver knows no rule by itself. Everything it enforces is declared by the project, in a `.weaver/` folder.
+Weaver knows no rule by itself. Everything it enforces is declared by the supervised project, in a `.weaver/` folder.
 
 > [!NOTE]
 > Weaver runs today from a checkout of this repository, on the command line. It is not distributed as a package yet, and its web interface, the workbench, is not built. [What is not there yet](#what-is-not-there-yet) lists the rest.
@@ -21,9 +21,9 @@ Weaver knows no rule by itself. Everything it enforces is declared by the projec
 
 ## How it plugs in
 
-![How Weaver plugs in: you, the agent, the packages of Weaver, the project, and the agents Weaver starts.](_docs/assets/weaver-wiring.svg)
+![How Weaver plugs in: you, the agent, Weaver, the supervised project, and the agents Weaver starts.](_docs/assets/weaver-wiring.svg)
 
-The agent calls Weaver at each of its hooks, in a process that lasts a little over a tenth of a second and answers with nothing, a message, or a refusal. Weaver reads what the project declares, runs the project's commands, and keeps its own state under `.git/weaver/`: the index and the objects of your repository are never touched.
+The agent calls Weaver at each of its hooks, in a process that lasts a little over a tenth of a second and answers with nothing, a message, or a refusal. Weaver reads what the supervised project declares, runs its commands, and keeps its own state under `.git/weaver/`: the index and the objects of your repository are never touched. It starts the reviewer and the writer itself.
 
 | Package              | What it holds                                                                                                         |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -40,7 +40,7 @@ A turn starts with your request and ends when the agent stops. In between, Weave
 
 ### When the agent stops
 
-![What happens when the agent stops: the writer starts, repairs, checks, a review, and the unit of work is settled.](_docs/assets/weaver-end-of-turn.svg)
+![What happens when the agent says it has finished: repairs, checks, a review, and the unit of work is settled.](_docs/assets/weaver-end-of-turn.svg)
 
 A task is finished when the last message of the agent carries the headings the project's finish skill lists. Until then the unit of work stays open, and the agent is pointed to the skill once a request.
 
@@ -88,7 +88,7 @@ weaver close 12 fixed        # or wontfix, or issue, with a reason
 
 `weaver cards` is what an agent runs in a conversation as well, to read the registry. Closing a card, correcting it or tying two cards together is yours: those commands refuse to run under an agent. The [memory design](_docs/memory.md) says the rest.
 
-## What a project declares
+## What a supervised project declares
 
 A repository is supervised as soon as it has a `.weaver/settings.json`. The other files are optional, and each has a JSON Schema that an editor completes and checks.
 
