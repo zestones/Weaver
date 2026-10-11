@@ -87,7 +87,7 @@ test('findings send the author back, and each one needs its answer: fixed with a
   const sentBack = await finish(reviewer)
 
   assert.equal(sentBack.decision, 'block')
-  assert.match(sentBack.reason ?? '', /the reviewer \(codex\) found 1 point\(s\) on this unit of work \(review round 1 of 1\)/)
+  assert.match(sentBack.reason ?? '', /the reviewer \(codex\) found 1 point\(s\) on this unit of work \(refusal 1 of 1\)/)
   assert.match(sentBack.reason ?? '', /a finding never holds your change by itself, but each one needs your answer\./)
   assert.match(sentBack.reason ?? '', /one line each: `F1 fixed: <what you changed>` or `F1 not fixed: <why>`/)
   assert.match(
@@ -97,7 +97,7 @@ test('findings send the author back, and each one needs its answer: fixed with a
   assert.deepEqual(unitFiles(session), [A_FILE])
   assert.match(
     reportOf(sentBack.reason ?? ''),
-    /## Review\n\n- by codex \(the runtime the project names\) in 42 s, \$0\.0312, review round 1 of 1\n- One point\.\n- sent back to the agent, which answers each finding:\n {2}- F1 N1 src\/a\.ts:1:/,
+    /## Review\n\n- by codex \(the runtime the project names\) in 42 s, \$0\.0312, review round 1, 1 refusal\(s\) allowed\n- One point\.\n- sent back to the agent, which answers each finding:\n {2}- F1 N1 src\/a\.ts:1:/,
   )
 
   const silent = await finish(reviewer)
@@ -188,13 +188,13 @@ test('work that goes beyond the findings is new work, reviewed on its own, with 
   assert.deepEqual(standings(), ['sent-back', 'sent-back', 'for-owner'])
 })
 
-test('the project says how many reviews may send the author back for one request', async () => {
+test('the project says how many times the review may send the author back for one request', async () => {
   const reviewer = stubReviewer([found, found])
-  const project = reviewed({ maxRounds: 2 })
+  const project = reviewed({ maxRefusals: 2 })
 
-  assert.match((await finish(reviewer, project)).reason ?? '', /review round 1 of 2/)
+  assert.match((await finish(reviewer, project)).reason ?? '', /refusal 1 of 2/)
   agentWrites(session, { [B_FILE]: 'export const b = 2\n'.repeat(60) })
-  assert.match((await finish(reviewer, project, saying('F1 not fixed: it is clearer as one function'))).reason ?? '', /review round 2 of 2/)
+  assert.match((await finish(reviewer, project, saying('F1 not fixed: it is clearer as one function'))).reason ?? '', /refusal 2 of 2/)
 })
 
 test('a review that cannot be read holds nobody: the unit ends, and the owner is told the rules were not judged', async () => {

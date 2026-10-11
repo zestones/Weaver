@@ -15,7 +15,8 @@ const scratch = mkdtempSync(join(tmpdir(), 'weaver-loop-'))
 
 const DECLARATION = {
   version: 1,
-  finish: { headings: ['Request', 'To validate'], maxRounds: 2 },
+  finish: { headings: ['Request', 'To validate'] },
+  limits: { maxRefusals: 2 },
   checks: {
     syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } },
     markers: {

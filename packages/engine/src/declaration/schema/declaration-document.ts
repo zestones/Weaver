@@ -32,11 +32,11 @@ interface DocumentReviewer {
 // means "none" when it is. A file that names its schema carries a `$schema` line, which is no entry of the file.
 export interface SettingsDocument {
   readonly version: 1
-  readonly finish: {
-    readonly skill?: string
-    readonly maxRounds: number
-    readonly deadlineSeconds: number
-    readonly concurrency: number
+  readonly finish: { readonly skill?: string }
+  readonly checks: {
+    readonly maxRefusals: number
+    readonly totalTimeoutSeconds: number
+    readonly parallel: number
   }
 }
 
@@ -57,7 +57,7 @@ export interface ReviewersDocument {
   readonly experiments: boolean
   readonly timeoutSeconds: number
   readonly waitSeconds: number
-  readonly maxRounds: number
+  readonly maxRefusals: number
   readonly skill?: string
   readonly issue?: readonly string[]
 }

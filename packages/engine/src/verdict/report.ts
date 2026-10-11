@@ -13,7 +13,7 @@ const HEADS: Readonly<Record<string, string>> = {
   'sent-back': 'sent back to the agent, which answers each finding:',
   'answers-wanted': 'the agent was asked again for its answers:',
   answered: 'answered by the agent:',
-  'for-owner': 'found after the last round, left to the owner:',
+  'for-owner': 'found once the review may refuse no more, left to the owner:',
 }
 
 export class Report {
@@ -41,10 +41,10 @@ export class Report {
   }
 
   refusal(reportPath: string): string {
-    const { round, maxRounds, blocking } = this.verdict
+    const { round, maxRefusals, blocking } = this.verdict
 
     return [
-      `[weaver] The checks fail on this unit of work (round ${String(round)} of ${String(maxRounds)}): fix what follows, then finish again.`,
+      `[weaver] The checks fail on this unit of work (refusal ${String(round)} of ${String(maxRefusals)}): fix what follows, then finish again.`,
       IN_WORDS,
       '',
       ...blocking.flatMap((outcome) => this.failureBlock(outcome)),
@@ -54,7 +54,7 @@ export class Report {
   }
 
   reviewRefusal(review: UnitReview, reportPath: string): string {
-    const { outcome, round, maxRounds } = review
+    const { outcome, round, maxRefusals } = review
 
     if (review.standing === 'answers-wanted') {
       return [
@@ -68,7 +68,7 @@ export class Report {
     }
 
     return [
-      `[weaver] The checks pass, and the reviewer (${outcome.runtime}) found ${String(outcome.findings.length)} point(s) on this unit of work (review round ${String(round)} of ${String(maxRounds)}).`,
+      `[weaver] The checks pass, and the reviewer (${outcome.runtime}) found ${String(outcome.findings.length)} point(s) on this unit of work (refusal ${String(round)} of ${String(maxRefusals)}).`,
       'Fix each one, or decide to leave it: a finding never holds your change by itself, but each one needs your answer.',
       ANSWER_HOW,
       IN_WORDS,
@@ -181,7 +181,7 @@ export class Report {
     if (standing === 'skipped') return [`- no review: ${outcome.reason}`]
 
     const cost = outcome.costUsd === null ? '' : `, $${outcome.costUsd.toFixed(4)}`
-    const head = `- by ${outcome.runtime} (${outcome.reason}) in ${String(Math.round(outcome.seconds))} s${cost}, review round ${String(review.round)} of ${String(review.maxRounds)}`
+    const head = `- by ${outcome.runtime} (${outcome.reason}) in ${String(Math.round(outcome.seconds))} s${cost}, review round ${String(review.round)}, ${String(review.maxRefusals)} refusal(s) allowed`
 
     if (standing === 'running') {
       return [

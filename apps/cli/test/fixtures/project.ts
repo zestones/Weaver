@@ -38,9 +38,9 @@ export function weaver(cwd: string, args: readonly string[], link: EngineLink | 
 }
 
 // The limits every project writes, with the values a new project starts with.
-export const LIMITS = { maxRounds: 3, deadlineSeconds: 1200, concurrency: 3 }
-export const SETTINGS = { version: 1, finish: LIMITS }
-export const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRounds: 1 }
+export const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 }
+export const SETTINGS = { version: 1, checks: LIMITS }
+export const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
 
 // What a project declares, each part in the file Weaver reads it from.
 export function writeConfig(top: string, parts: Readonly<Partial<Record<PartName, unknown>>>): void {

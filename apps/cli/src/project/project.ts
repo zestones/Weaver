@@ -16,7 +16,7 @@ import type { ProjectSkill } from '../skills/project-skill.ts'
 import { ReviewSkill } from '../skills/review-skill.ts'
 
 // What a new project starts with: every limit Weaver applies is written in its settings, where the owner changes it.
-const STARTING_LIMITS = { maxRounds: 3, deadlineSeconds: 1200, concurrency: 3 }
+const STARTING_LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 }
 
 export class Project {
   readonly top: string
@@ -46,7 +46,7 @@ export class Project {
   createConfig(link: EngineLink): boolean {
     const folder = DeclarationFolder.in(this.top)
     const starter: Readonly<Partial<Record<PartName, object>>> = {
-      settings: { version: 1, finish: { skill: FinishSkill.PATH, ...STARTING_LIMITS } },
+      settings: { version: 1, finish: { skill: FinishSkill.PATH }, checks: STARTING_LIMITS },
       guards: {},
       checks: {},
       scripts: {},

@@ -47,14 +47,14 @@ test('a failing gate keeps the unit open and tells the agent what to fix, with t
   const output = await finishWith(session, stubChecks([FAILING]))
 
   assert.equal(output.decision, 'block')
-  assert.match(output.reason ?? '', /round 1 of 3/)
+  assert.match(output.reason ?? '', /refusal 1 of 3/)
   assert.match(output.reason ?? '', /FAIL lint \(L1: The code passes the linter\.\)\n {2}src\/a\.ts:1:1 error max-lines-per-function/)
   assert.deepEqual(unitFiles(session), [A_FILE])
   assert.match(reportOf(output.reason ?? ''), /# Unit 1, round 1: checks failed/)
 })
 
-test('after the rounds the project allows the agent may stop, with its unit still open; a new request starts them again', async () => {
-  const project = declaration({ finish: { maxRounds: 2 } })
+test('after the refusals the project allows the agent may stop, with its unit still open; a new request starts them again', async () => {
+  const project = declaration({ limits: { maxRefusals: 2 } })
   const checks = stubChecks([FAILING])
 
   prompt(session, 'change it')
@@ -66,7 +66,7 @@ test('after the rounds the project allows the agent may stop, with its unit stil
   const third = await finishWith(session, checks, project)
 
   assert.equal(third.decision, undefined)
-  assert.match(third.systemMessage ?? '', /still fail after 2 rounds; the agent may stop/)
+  assert.match(third.systemMessage ?? '', /still fail after 2 refusal\(s\); the agent may stop/)
   assert.deepEqual(unitFiles(session), [A_FILE])
 
   prompt(session, 'try again')

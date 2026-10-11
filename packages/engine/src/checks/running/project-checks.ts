@@ -15,17 +15,21 @@ export class ProjectChecks implements CheckRunner {
   }
 
   // One after the other: two repairs at once could rewrite the same file.
-  async repair(declaration: Declaration, unit: UnitDiff): Promise<void> {
+  async repair(declaration: Declaration, unit: UnitDiff, deadline: number): Promise<void> {
     const env = unit.environment()
 
     for (const declared of declaration.checks) {
-      await this.checkOf(declaration, declared).repair(unit, env, declaration.finish.deadlineSeconds * 1000)
+      const left = deadline - Date.now()
+
+      // A repair is only an attempt: out of time, it is not started, and the checks still give their verdict.
+      if (left <= 0) return
+
+      await this.checkOf(declaration, declared).repair(unit, env, left)
     }
   }
 
-  async verify(declaration: Declaration, unit: UnitDiff): Promise<CheckOutcome[]> {
-    const { concurrency, deadlineSeconds } = declaration.finish
-    const deadline = Date.now() + deadlineSeconds * 1000
+  async verify(declaration: Declaration, unit: UnitDiff, deadline: number): Promise<CheckOutcome[]> {
+    const { parallel } = declaration.checkLimits
     const env = unit.environment()
     const checks = declaration.checks.map((declared) => this.checkOf(declaration, declared))
     const queue = [...checks]
@@ -33,7 +37,7 @@ export class ProjectChecks implements CheckRunner {
     const running = new Map<string, Promise<void>>()
 
     while (queue.length > 0 || running.size > 0) {
-      while (running.size < concurrency) {
+      while (running.size < parallel) {
         const check = this.takeReady(queue, done)
 
         if (check === null) break

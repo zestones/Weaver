@@ -1,5 +1,6 @@
 import type { ScriptHints } from '../../lib/shell/writes/hints.ts'
 import type { Rule } from '../rules/rule.ts'
+import type { CheckLimits } from './check-limits.ts'
 import type { DeclaredCheck } from './declared-check.ts'
 import type { DeclaredGuard } from './declared-guard.ts'
 import type { FinishPolicy } from './finish-policy.ts'
@@ -8,6 +9,7 @@ import type { ReviewPolicy } from './review-policy.ts'
 export interface DeclarationFields {
   readonly exclude: readonly string[]
   readonly finish: FinishPolicy
+  readonly checkLimits: CheckLimits
   readonly review: ReviewPolicy | null
   readonly scripts: ScriptHints
   readonly checks: readonly DeclaredCheck[]
@@ -18,6 +20,7 @@ export interface DeclarationFields {
 export class Declaration {
   readonly exclude: readonly string[]
   readonly finish: FinishPolicy
+  readonly checkLimits: CheckLimits
   // null when the project asks for no review.
   readonly review: ReviewPolicy | null
   readonly scripts: ScriptHints
@@ -28,6 +31,7 @@ export class Declaration {
   constructor(fields: DeclarationFields) {
     this.exclude = fields.exclude
     this.finish = fields.finish
+    this.checkLimits = fields.checkLimits
     this.review = fields.review
     this.scripts = fields.scripts
     this.checks = fields.checks

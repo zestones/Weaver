@@ -6,7 +6,7 @@ import type { ReviewOutcome } from '../results/review-outcome.ts'
 
 // running: the review goes on after this end of turn. sent-back: the author has findings to answer. answers-wanted:
 // its answers are missing or cannot be taken. answered: each finding has its answer, or the author was asked enough.
-// for-owner: found after the last round.
+// for-owner: found once the review may refuse no more.
 export type ReviewStanding = 'running' | 'sent-back' | 'answers-wanted' | 'answered' | 'clean' | 'for-owner' | 'failed' | 'skipped'
 
 export interface UnitReviewFields {
@@ -15,7 +15,7 @@ export interface UnitReviewFields {
   readonly content: string
   readonly outcome: ReviewOutcome
   readonly round: number
-  readonly maxRounds: number
+  readonly maxRefusals: number
   readonly answers?: readonly FindingAnswer[]
   readonly problems?: readonly string[]
 }
@@ -33,7 +33,7 @@ export class UnitReview {
   readonly content: string
   readonly outcome: ReviewOutcome
   readonly round: number
-  readonly maxRounds: number
+  readonly maxRefusals: number
   readonly answers: readonly FindingAnswer[]
   // What keeps the author's answers from being taken.
   readonly problems: readonly string[]
@@ -43,7 +43,7 @@ export class UnitReview {
     this.content = fields.content
     this.outcome = fields.outcome
     this.round = fields.round
-    this.maxRounds = fields.maxRounds
+    this.maxRefusals = fields.maxRefusals
     this.answers = fields.answers ?? []
     this.problems = fields.problems ?? []
   }

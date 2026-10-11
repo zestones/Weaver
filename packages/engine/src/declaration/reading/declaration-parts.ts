@@ -1,3 +1,4 @@
+import { CheckLimits } from '../content/check-limits.ts'
 import { Declaration } from '../content/declaration.ts'
 import type { DeclaredCheck } from '../content/declared-check.ts'
 import type { DeclaredGuard } from '../content/declared-guard.ts'
@@ -86,7 +87,8 @@ export class DeclarationParts {
 
     return new Declaration({
       exclude: scripts.scope.exclude,
-      finish: new FinishPolicy({ ...finish, headings, skill: finish.skill ?? null }),
+      finish: new FinishPolicy({ headings, skill: finish.skill ?? null }),
+      checkLimits: new CheckLimits(settings.checks),
       review: reviewers === null ? null : this.reviewPolicy(reviewers),
       scripts: { writers: scripts.writers, readers: scripts.readers },
       checks,
@@ -156,7 +158,7 @@ export class DeclarationParts {
       experiments: review.experiments,
       timeoutSeconds: review.timeoutSeconds,
       waitSeconds: review.waitSeconds,
-      maxRounds: review.maxRounds,
+      maxRefusals: review.maxRefusals,
       skill: review.skill ?? null,
       issue: review.issue ?? null,
     })

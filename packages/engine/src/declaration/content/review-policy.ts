@@ -13,7 +13,7 @@ export interface ReviewFields {
   readonly experiments: boolean
   readonly timeoutSeconds: number
   readonly waitSeconds: number
-  readonly maxRounds: number
+  readonly maxRefusals: number
   readonly skill: string | null
   readonly issue: readonly string[] | null
 }
@@ -30,7 +30,7 @@ export class ReviewPolicy {
   readonly timeoutSeconds: number
   // How long the end of a turn waits for a review, which may run longer by itself.
   readonly waitSeconds: number
-  readonly maxRounds: number
+  readonly maxRefusals: number
   readonly skill: string | null
   // The command that files an issue for a point the owner closes as one.
   readonly issue: readonly string[] | null
@@ -43,7 +43,7 @@ export class ReviewPolicy {
     this.experiments = fields.experiments
     this.timeoutSeconds = fields.timeoutSeconds
     this.waitSeconds = fields.waitSeconds
-    this.maxRounds = fields.maxRounds
+    this.maxRefusals = fields.maxRefusals
     this.skill = fields.skill
     this.issue = fields.issue
   }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
@@ -33,13 +33,18 @@ beforeEach(() => {
 
 const reporter = (findings: unknown, exit = 0): string[] => ['node', 'reporter.mjs', JSON.stringify(findings), String(exit)]
 
-async function run(declaration: Record<string, unknown>): Promise<Record<string, CheckOutcome>> {
-  const project = declarationOf(declaration)
+function unitDiff(): UnitDiff {
   const { dir } = new Session(repo, 's', 'claude')
   const base = git(repo.top, ['rev-parse', 'HEAD^{tree}'])
   const head = new WorkingTreeSnapshot(repo, dir).tree()
   const files = new TreeDiff(repo, base, head).files([])
-  const outcomes = await new ProjectChecks().verify(project, new UnitDiff({ repo, dir, base, head, files, excluded: [] }))
+
+  return new UnitDiff({ repo, dir, base, head, files, excluded: [] })
+}
+
+async function run(declaration: Record<string, unknown>): Promise<Record<string, CheckOutcome>> {
+  const project = declarationOf(declaration)
+  const outcomes = await new ProjectChecks().verify(project, unitDiff(), project.checkLimits.deadlineFrom(Date.now()))
 
   return Object.fromEntries(outcomes.map((outcome) => [outcome.id, outcome]))
 }
@@ -131,7 +136,7 @@ test('a check that cannot give its verdict fails: no output, no JSON, a crash or
   assert.match(outcomes.missing?.output ?? '', /ENOENT/)
 })
 
-test('a check that outlives its deadline times out, and the check that reads its output does not run', async () => {
+test('a check that outlives its own timeout times out, and the check that reads its output does not run', async () => {
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
 
   const outcomes = await run({
@@ -143,6 +148,41 @@ test('a check that outlives its deadline times out, and the check that reads its
 
   assert.deepEqual([outcomes.slow?.status, outcomes.slow?.blocking], ['timeout', true])
   assert.deepEqual([outcomes.reader?.status, outcomes.reader?.reason], ['skip', 'slow did not finish'])
+})
+
+test('the checks share one time: a check still running when it ends times out, whatever its own timeout', async () => {
+  writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
+
+  const outcomes = await run({
+    limits: { totalTimeoutSeconds: 1 },
+    checks: { slow: { verify: ['sleep', '30'], rules: gate('G1') }, quick: { verify: ['true'], rules: gate('G2') } },
+  })
+
+  assert.deepEqual([outcomes.slow?.status, outcomes.quick?.status], ['timeout', 'pass'])
+})
+
+test('the repairs take their time from the one the checks share: out of time, a repair is not started', async () => {
+  writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
+
+  const project = declarationOf({
+    limits: { totalTimeoutSeconds: 1 },
+    checks: {
+      slow: { fix: ['sleep', '30'], verify: ['true'], rules: gate('G1') },
+      late: { fix: ['sh', '-c', 'echo repaired > late.txt'], verify: ['true'], rules: gate('G2') },
+    },
+  })
+  const deadline = project.checkLimits.deadlineFrom(Date.now())
+  const checks = new ProjectChecks()
+
+  await checks.repair(project, unitDiff(), deadline)
+
+  assert.ok(Date.now() >= deadline, 'the repair that sleeps held the whole time, and no longer')
+  assert.equal(existsSync(join(repo.top, 'late.txt')), false)
+  assert.deepEqual(
+    (await checks.verify(project, unitDiff(), deadline)).map((outcome) => outcome.status),
+    ['pass', 'pass'],
+    'the checks still give their verdict',
+  )
 })
 
 test('a check is told the two trees and reads the diff of the unit as a file, added lines included', async () => {

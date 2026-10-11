@@ -1,5 +1,5 @@
 import type { ExecutionCatalog } from '@weaver/agent-sdk'
-import type { Declaration, ReviewPolicy, ReviewerName } from '@weaver/engine'
+import { DeclarationParts, type Declaration, type ReviewPolicy, type ReviewerName } from '@weaver/engine'
 import type { EngineLink } from '../link/engine-link.ts'
 import type { Output } from '../output/output.ts'
 import { Project } from '../project/project.ts'
@@ -140,16 +140,17 @@ export class DoctorCommand implements Command {
   // A hook the runtime stops before its end says nothing: the unit of work would stay open without a word. A review
   // that takes longer than the wait goes on by itself, so only the wait counts.
   private reviewTime(declaration: Declaration): Finding[] {
-    const checks = declaration.finish.deadlineSeconds
+    const checks = declaration.checkLimits.totalTimeoutSeconds
     const wait = declaration.review?.waitSeconds ?? 0
     const given = RuntimeSettings.END_OF_TURN_SECONDS
+    const files = DeclarationParts.FILES
 
     return checks + wait <= given
       ? []
       : [
           {
             state: 'problem',
-            text: `the checks (${String(checks)} s) and the wait for a review (${String(wait)} s) may last longer than the ${String(given)} s the end of a turn is given: lower finish.deadlineSeconds or review.waitSeconds.`,
+            text: `the checks (${String(checks)} s) and the wait for a review (${String(wait)} s) may last longer than the ${String(given)} s the end of a turn is given: lower checks.totalTimeoutSeconds in ${files.settings} or waitSeconds in ${files.reviewers}.`,
           },
         ]
   }

@@ -118,7 +118,7 @@ test('a reviewer whose command does not start, whose skill is missing, or that t
     'ok      the review: by claude, for 1 rule(s)',
     'PROBLEM claude may review here, and the claude command does not start: its reviews fail.',
     'PROBLEM docs/review.md is missing, and the reviewer is pointed to it. Run weaver install to write a template.',
-    'PROBLEM the checks (1200 s) and the wait for a review (3000 s) may last longer than the 3600 s the end of a turn is given: lower finish.deadlineSeconds or review.waitSeconds.',
+    'PROBLEM the checks (1200 s) and the wait for a review (3000 s) may last longer than the 3600 s the end of a turn is given: lower checks.totalTimeoutSeconds in settings.json or waitSeconds in llm/reviewers.json.',
   ])
 })
 

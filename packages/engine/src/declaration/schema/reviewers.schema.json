@@ -4,7 +4,7 @@
   "description": "Who reviews a unit of work, and with what means. An agent that did not write the change judges it against the rules of `llm/rules.json` once the checks pass, and the agent that wrote it answers each finding, fixed or not fixed with a reason. A finding never holds the change by itself. The owner has four words for a request: `#no-review` asks for no review of that work, `#review` takes it back and has a review that failed tried again, `#critical` asks for the runtime that did not write the change, `#simple` for the one that did.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["runtime", "experiments", "timeoutSeconds", "waitSeconds", "maxRounds"],
+  "required": ["runtime", "experiments", "timeoutSeconds", "waitSeconds", "maxRefusals"],
   "properties": {
     "$schema": {
       "type": "string",
@@ -64,10 +64,10 @@
       "minimum": 1,
       "description": "How long the end of a turn waits for a review. A review that runs longer goes on by itself: the unit of work stays open, and the next end of turn gives its findings."
     },
-    "maxRounds": {
+    "maxRefusals": {
       "type": "integer",
       "minimum": 1,
-      "description": "How many reviews may send the agent back to work, for one request. What a later review finds waits for the owner."
+      "description": "How many times the review may refuse the end of a turn and send the agent back to its findings, for one request. What a later review finds waits for the owner."
     },
     "skill": {
       "type": "string",

@@ -7,7 +7,7 @@ import type { CheckOutcome } from '../checks/results/check-outcome.ts'
 
 export interface VerdictFields {
   readonly unit: UnitOfWork
-  readonly maxRounds: number
+  readonly maxRefusals: number
   readonly diff: UnitDiff
   readonly outcomes: readonly CheckOutcome[]
   readonly repaired: readonly string[]
@@ -21,7 +21,7 @@ const DECLARATION_RULE = 'weaver:declaration'
 export class UnitVerdict {
   readonly unit: number
   readonly round: number
-  readonly maxRounds: number
+  readonly maxRefusals: number
   readonly diff: UnitDiff
   readonly unattributed: readonly string[]
   readonly outcomes: readonly CheckOutcome[]
@@ -34,7 +34,7 @@ export class UnitVerdict {
   constructor(fields: VerdictFields) {
     this.unit = fields.unit.number
     this.round = fields.unit.rounds + 1
-    this.maxRounds = fields.maxRounds
+    this.maxRefusals = fields.maxRefusals
     this.diff = fields.diff
     this.unattributed = fields.unit.unattributed
     this.outcomes = fields.outcomes

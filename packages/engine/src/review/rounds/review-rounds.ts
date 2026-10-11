@@ -153,7 +153,7 @@ export class ReviewRounds {
     const record = await this.awaited(store, content, policy.waitSeconds * 1000)
     const { runtime, reason } = record.assignment
     const round = work.unit.reviewRounds + 1
-    const about = { content, round, maxRounds: policy.maxRounds }
+    const about = { content, round, maxRefusals: policy.maxRefusals }
 
     if (record.state === 'running') {
       const seconds = (Date.now() - Date.parse(record.startedAt)) / 1000
@@ -166,7 +166,7 @@ export class ReviewRounds {
     if (record.state === 'failed' || outcome.failure !== null) return new UnitReview({ ...about, standing: 'failed', outcome })
     if (!outcome.found) return new UnitReview({ ...about, standing: 'clean', outcome })
 
-    return new UnitReview({ ...about, standing: round <= policy.maxRounds ? 'sent-back' : 'for-owner', outcome })
+    return new UnitReview({ ...about, standing: round <= policy.maxRefusals ? 'sent-back' : 'for-owner', outcome })
   }
 
   // The review is in the hands of another process: the end of the turn waits for it as long as the project allows,
@@ -217,7 +217,7 @@ export class ReviewRounds {
     const unchanged = this.unchangedSince(record, work.session)
     const given = new AuthorAnswers(work.lastMessage)
     const problems = given.problems(outcome.findings, unchanged)
-    const about = { content, outcome, round: work.unit.reviewRounds, maxRounds: policy.maxRounds }
+    const about = { content, outcome, round: work.unit.reviewRounds, maxRefusals: policy.maxRefusals }
 
     if (problems.length > 0 && record.asked < ANSWER_REMINDERS) {
       store.keep(content, { ...record, asked: record.asked + 1 })
@@ -235,7 +235,7 @@ export class ReviewRounds {
   private skipped(unit: UnitOfWork, policy: ReviewPolicy, reason: string): UnitReview {
     const outcome = new ReviewOutcome({ runtime: '', reason, seconds: 0 })
 
-    return new UnitReview({ standing: 'skipped', content: unit.content(), outcome, round: 0, maxRounds: policy.maxRounds })
+    return new UnitReview({ standing: 'skipped', content: unit.content(), outcome, round: 0, maxRefusals: policy.maxRefusals })
   }
 
   private isNewWork(record: ReviewRecord, { unit, diff }: ReviewedWork): boolean {

@@ -52,12 +52,12 @@ export class EndOfTurn implements Moment {
     return Answer.empty()
   }
 
-  private async repair(session: Session, declaration: Declaration, unit: UnitOfWork): Promise<readonly string[]> {
+  private async repair(session: Session, declaration: Declaration, unit: UnitOfWork, deadline: number): Promise<readonly string[]> {
     if (!this.checks.repairs(declaration)) return []
 
     const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
 
-    return session.repair(() => this.checks.repair(declaration, diff))
+    return session.repair(() => this.checks.repair(declaration, diff, deadline))
   }
 
   // The only way to speak to an agent that has stopped is to refuse its stop.
@@ -67,17 +67,18 @@ export class EndOfTurn implements Moment {
 
   private async check(session: Session, declaration: Declaration, finished: UnitOfWork, lastMessage: string | null): Promise<Answer> {
     const startedAt = Date.now()
-    const repaired = finished.isEmpty ? [] : await this.repair(session, declaration, finished)
+    const deadline = declaration.checkLimits.deadlineFrom(startedAt)
+    const repaired = finished.isEmpty ? [] : await this.repair(session, declaration, finished, deadline)
     const unit = repaired.length === 0 ? finished : session.unit()
     const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
-    const outcomes = unit.isEmpty ? [] : await this.checks.verify(declaration, diff)
+    const outcomes = unit.isEmpty ? [] : await this.checks.verify(declaration, diff, deadline)
     // The reviewer judges what the checks let through: a change they refuse will be rewritten anyway.
     const blocked = outcomes.some((outcome) => outcome.blocking)
     const candidates = outcomes.flatMap((outcome) => outcome.candidates)
     const review = blocked ? null : await this.reviews.next({ session, declaration, unit, diff, lastMessage, candidates })
     const verdict = new UnitVerdict({
       unit,
-      maxRounds: declaration.finish.maxRounds,
+      maxRefusals: declaration.checkLimits.maxRefusals,
       diff,
       outcomes,
       repaired,
@@ -102,9 +103,9 @@ export class EndOfTurn implements Moment {
       return Answer.saying(report.summary(reportPath))
     }
 
-    return declaration.finish.isExhaustedAfter(session.failRound())
+    return declaration.checkLimits.isExhaustedAfter(session.failRound())
       ? Answer.saying(
-          `[weaver] The checks still fail after ${String(declaration.finish.maxRounds)} rounds; the agent may stop. Report: ${reportPath}`,
+          `[weaver] The checks still fail after ${String(declaration.checkLimits.maxRefusals)} refusal(s); the agent may stop. Report: ${reportPath}`,
         )
       : Answer.blocking(report.refusal(reportPath))
   }

@@ -4,7 +4,7 @@
   "description": "How Weaver works in this project. A repository is supervised as soon as this file exists; the other files of `.weaver/` are optional. Every limit Weaver applies is written here: none has a value the file does not show.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "finish"],
+  "required": ["version", "checks"],
   "properties": {
     "$schema": {
       "type": "string",
@@ -17,30 +17,38 @@
     "finish": {
       "type": "object",
       "additionalProperties": false,
-      "description": "How a task ends, and how long the checks may hold the agent.",
+      "default": {},
+      "description": "How a task ends.",
       "properties": {
         "skill": {
           "type": "string",
           "minLength": 1,
           "description": "The file that tells the agent how to write the final message, relative to the repository root. Its header lists the `headings` of that message: a final message that carries them all is what tells Weaver that a task is finished. Weaver guards the file, and names it to an agent that stops with changed files and without the headings. Without a skill, every end of turn ends the task."
-        },
-        "maxRounds": {
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the checks of `project/checks.json` are run. Each time the agent says it has finished, Weaver runs them all; when one fails, the end of the turn is refused and the agent goes back to work.",
+      "properties": {
+        "maxRefusals": {
           "type": "integer",
           "minimum": 1,
-          "description": "How many times in a row the checks may refuse the end of a turn. After that the agent may stop, its unit of work still open."
+          "description": "How many times in a row the checks may refuse the end of a turn. When they fail once more, the agent may stop, its unit of work still open."
         },
-        "deadlineSeconds": {
+        "totalTimeoutSeconds": {
           "type": "integer",
           "minimum": 1,
-          "description": "How long one run of all the checks may take."
+          "description": "The time the repairs and the checks are given all together, each time the agent says it has finished. A check still running then is stopped and counts as failed. Each check also has a `timeoutSeconds` of its own."
         },
-        "concurrency": {
+        "parallel": {
           "type": "integer",
           "minimum": 1,
-          "description": "How many checks run at once."
+          "description": "How many checks run at the same time."
         }
       },
-      "required": ["maxRounds", "deadlineSeconds", "concurrency"]
+      "required": ["maxRefusals", "totalTimeoutSeconds", "parallel"]
     }
   }
 }

@@ -29,11 +29,12 @@ const problems = (project: Record<string, unknown>) => problemsOf(() => parse(pr
 const problemsIn = (texts: PartTexts) => problemsOf(() => new DeclarationParts('.weaver', texts).declaration())
 
 // The settings every project writes: its limits, with the values a new project starts with.
-const SETTINGS = '{"version":1,"finish":{"maxRounds":3,"deadlineSeconds":1200,"concurrency":3}}'
+const SETTINGS = '{"version":1,"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3}}'
 
 const VALID = {
   scope: { exclude: ['design/lab'] },
-  finish: { headings: ['Request', 'To validate'], maxRounds: 2 },
+  finish: { headings: ['Request', 'To validate'] },
+  limits: { maxRefusals: 2 },
   scripts: { writers: ['npm run api:types'], readers: ['make verify'] },
   checks: {
     types: {
@@ -85,10 +86,8 @@ test('a declaration is read from the files of .weaver, each part in its own', ()
   ])
   assert.deepEqual(config?.exclude, ['design/lab'])
   assert.deepEqual(config?.scripts, { writers: ['npm run api:types'], readers: ['make verify'] })
-  assert.deepEqual(
-    { ...config?.finish },
-    { headings: ['Request', 'To validate'], skill: '.weaver/skills/wv-finish.md', maxRounds: 2, deadlineSeconds: 1200, concurrency: 3 },
-  )
+  assert.deepEqual({ ...config?.finish }, { headings: ['Request', 'To validate'], skill: '.weaver/skills/wv-finish.md' })
+  assert.deepEqual({ ...config?.checkLimits }, { maxRefusals: 2, totalTimeoutSeconds: 1200, parallel: 3 })
   assert.deepEqual(config?.checks[1], {
     id: 'markers',
     verify: ['node', 'tools/markers.mjs'],
@@ -166,15 +165,22 @@ test('what ties entries together is checked: a check stands behind a rule, a nam
 test('everything wrong with the shape of the files is reported at once, each with the file and the field', () => {
   assert.deepEqual(
     problemsIn({
-      settings: JSON.stringify({ version: 2, finish: { maxRounds: 0, deadlineSeconds: 1200, concurrency: 3 }, chekcs: {} }),
+      settings: JSON.stringify({ version: 2, checks: { maxRefusals: 0, totalTimeoutSeconds: 1200, parallel: 3 }, chekcs: {} }),
       guards: JSON.stringify({ '9x': {}, g: { statement: '' } }),
       checks: JSON.stringify({ c: { verify: [], cwd: '.', reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } }),
-      reviewers: JSON.stringify({ runtime: 'gemini', experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRounds: 1, rules: {} }),
+      reviewers: JSON.stringify({
+        runtime: 'gemini',
+        experiments: false,
+        timeoutSeconds: 900,
+        waitSeconds: 1500,
+        maxRefusals: 1,
+        rules: {},
+      }),
     }),
     [
       'settings.json: chekcs is not a known field',
       'settings.json: version must be 1',
-      'settings.json: finish.maxRounds must be at least 1',
+      'settings.json: checks.maxRefusals must be at least 1',
       'project/guards.json: 9x is not a valid name',
       'project/guards.json: 9x.statement is missing',
       'project/guards.json: g.statement must not be empty',
@@ -187,7 +193,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
     'the links between entries are judged once the shape is right',
   )
   assert.deepEqual(problemsIn({ settings: '[]' }), ['settings.json: the file must be an object'])
-  assert.deepEqual(problemsIn({ settings: '{}' }), ['settings.json: version is missing', 'settings.json: finish is missing'])
+  assert.deepEqual(problemsIn({ settings: '{}' }), ['settings.json: version is missing', 'settings.json: checks is missing'])
   assert.match(problemsIn({ settings: SETTINGS, guards: '{' }).join(' '), /^project\/guards\.json: .*JSON/)
   assert.throws(
     () => new DeclarationParts('.weaver', { settings: '{' }).declaration(),
@@ -197,15 +203,15 @@ test('everything wrong with the shape of the files is reported at once, each wit
 
 test('a file writes every limit Weaver applies: one left out is a problem, never a value the file does not show', () => {
   const written = {
-    settings: '{"version":1,"finish":{}}',
+    settings: '{"version":1,"checks":{}}',
     checks: JSON.stringify({ c: { verify: ['true'], rules: { plain: 'x', owner: { statement: 'y' } } } }),
     reviewers: '{"runtime":"codex"}',
   }
 
   assert.deepEqual(problemsIn(written), [
-    'settings.json: finish.maxRounds is missing',
-    'settings.json: finish.deadlineSeconds is missing',
-    'settings.json: finish.concurrency is missing',
+    'settings.json: checks.maxRefusals is missing',
+    'settings.json: checks.totalTimeoutSeconds is missing',
+    'settings.json: checks.parallel is missing',
     'project/checks.json: c.cwd is missing',
     'project/checks.json: c.reads is missing',
     'project/checks.json: c.timeoutSeconds is missing',
@@ -213,7 +219,7 @@ test('a file writes every limit Weaver applies: one left out is a problem, never
     'llm/reviewers.json: experiments is missing',
     'llm/reviewers.json: timeoutSeconds is missing',
     'llm/reviewers.json: waitSeconds is missing',
-    'llm/reviewers.json: maxRounds is missing',
+    'llm/reviewers.json: maxRefusals is missing',
   ])
   assert.deepEqual(
     problemsIn({ settings: SETTINGS, guards: '{"g":{"statement":"x","runs":["git commit"]}}', rules: '{}' }),
@@ -235,7 +241,7 @@ test('each level is its own kind of rule: who a failure holds, who a finding wai
 test('a project says when its work is finished in its finish skill: a final message that carries all the headings its header lists', () => {
   const { finish } = parse(VALID)
   const skilled = (skill: string) =>
-    new DeclarationParts('.weaver', { settings: SETTINGS.replace('"finish":{', '"finish":{"skill":"docs/finish.md",') }, () => skill)
+    new DeclarationParts('.weaver', { settings: SETTINGS.replace('"checks"', '"finish":{"skill":"docs/finish.md"},"checks"') }, () => skill)
 
   assert.equal(finish.declaresFinished('## request\n\ndone\n\n## To Validate ##\n\nnothing\n'), true)
   assert.equal(finish.declaresFinished('## Request\n\nWhich name do you prefer?'), false)
@@ -254,7 +260,7 @@ test('a project says when its work is finished in its finish skill: a final mess
     problemsOf(() => skilled('---\ndescription: How to end.\n---\n\n## Done\n').declaration()),
     ['docs/finish.md: its header lists no `headings`: they are what tells Weaver that a task is finished'],
   )
-  assert.deepEqual(problemsIn({ settings: SETTINGS.replace('"finish":{', '"finish":{"headings":["Done"],') }), [
+  assert.deepEqual(problemsIn({ settings: SETTINGS.replace('"checks"', '"finish":{"headings":["Done"]},"checks"') }), [
     'settings.json: finish.headings is not a known field',
   ])
 })
@@ -293,7 +299,7 @@ test('a project says who reviews its changes, where a mistake costs the most, an
       plain?.criticalLines,
       plain?.experiments,
       plain?.timeoutSeconds,
-      plain?.maxRounds,
+      plain?.maxRefusals,
     ],
     ['codex', { claude: NO_SETTINGS, codex: NO_SETTINGS }, [], null, false, 900, 1],
   )

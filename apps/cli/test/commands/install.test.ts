@@ -60,9 +60,10 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
     assert.equal(readJson<{ $schema: string }>(top, file).$schema, link.schemaOf(part), 'each file names the schema it follows')
   }
 
+  assert.deepEqual(readJson<{ finish: unknown }>(top, CONFIG).finish, { skill: SKILL })
   assert.deepEqual(
-    readJson<{ finish: unknown }>(top, CONFIG).finish,
-    { skill: SKILL, ...LIMITS },
+    readJson<{ checks: unknown }>(top, CONFIG).checks,
+    LIMITS,
     'every limit Weaver applies is written in the settings, where the owner changes it',
   )
   assert.equal(existsSync(join(top, '.weaver/llm')), false, 'who reviews is the owner’s to add')
@@ -90,7 +91,7 @@ test('the command install writes is one the runtime can run as it is', () => {
 
 test('install twice wires once, and leaves what the owner put in the files', () => {
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine', timeout: 5 }] }
-  const declared = JSON.stringify({ version: 1, finish: { ...LIMITS, maxRounds: 5 } })
+  const declared = JSON.stringify({ version: 1, checks: { ...LIMITS, maxRefusals: 5 } })
 
   writeJson(top, CLAUDE, { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine], Notification: [mine] } })
   writeJson(top, CONFIG, JSON.parse(declared))
@@ -113,7 +114,7 @@ test('install twice wires once, and leaves what the owner put in the files', () 
 })
 
 test('a skill the settings name is written once, with the headings a task ends by in its header, and never written over', () => {
-  writeJson(top, CONFIG, { version: 1, finish: { ...LIMITS, skill: 'docs/fin.md' } })
+  writeJson(top, CONFIG, { ...SETTINGS, finish: { skill: 'docs/fin.md' } })
   weaver(top, ['install', 'claude'])
 
   const written = readFileSync(join(top, 'docs/fin.md'), 'utf8')

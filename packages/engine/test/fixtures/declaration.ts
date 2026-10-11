@@ -16,19 +16,20 @@ interface Split {
 
 const FINISH_SKILL = '.weaver/skills/wv-finish.md'
 // A file writes every limit Weaver applies. A test gives the ones it is about, and these stand for the others.
-const LIMITS = { maxRounds: 3, deadlineSeconds: 1200, concurrency: 3 }
+const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 }
 const CHECK = { cwd: '.', reads: 'exit', timeoutSeconds: 600 }
-const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRounds: 1 }
+const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
 
 // A test says what a project declares as one object; here it is split into the files Weaver reads it from. The
 // headings a test gives for the final message go where a project writes them: in the header of its finish skill.
+// `limits` are the ones the settings give the checks, `checks` the checks themselves.
 function split(project: Raw): Split {
-  const { finish, scope, scripts, review, checks, guards } = project
-  const { headings, ...limits } = (finish ?? {}) as { headings?: readonly string[]; skill?: string }
-  const skill = headings === undefined ? limits.skill : (limits.skill ?? FINISH_SKILL)
+  const { finish, limits, scope, scripts, review, checks, guards } = project
+  const { headings, skill: named } = (finish ?? {}) as { headings?: readonly string[]; skill?: string }
+  const skill = headings === undefined ? named : (named ?? FINISH_SKILL)
   const { rules, ...reviewers } = (review ?? {}) as Raw
   const parts: Partial<Record<PartName, unknown>> = {
-    settings: { version: 1, finish: { ...LIMITS, ...limits, ...(skill === undefined ? {} : { skill }) } },
+    settings: { version: 1, ...(skill === undefined ? {} : { finish: { skill } }), checks: { ...LIMITS, ...(limits as Raw | undefined) } },
     guards,
     checks:
       checks === undefined
