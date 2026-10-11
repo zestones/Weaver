@@ -1,0 +1,14 @@
+{
+  "session_id": "01a12c01-222e-7262-b07a-edad11d2f200",
+  "turn_id": "01a12c01-226c-7b21-a6c2-8403ceb39df7",
+  "transcript_path": "/transcripts/session.jsonl",
+  "cwd": "/repo",
+  "hook_event_name": "PreToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "weaver flag src/one.js:1 <<'EOF2'\nSeen: the constant is named one but the file exports nothing else.\nExpected: a second export, since \"tools/parse.mjs\" reads two names.\nFound: I was reading src/one.js for another task; it's short.\nChecked: grep over src/ for `two`. I did not run anything.\nDid: left as it is.\nEOF2"
+  },
+  "tool_use_id": "exec-76167610-24af-4b81-ab4e-2ad9bb9529db"
+}

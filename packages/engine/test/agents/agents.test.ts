@@ -38,8 +38,9 @@ test('an event is read into one shape whatever is missing from its payload', () 
   const event = claude.read(new Payload({ session_id: 's', cwd: TOP, prompt: 'go', agent_id: 'sub', last_assistant_message: 'done' }))
   const empty = claude.read(Payload.parse(''))
 
-  assert.deepEqual([event.sessionId, event.prompt, event.subagent, event.lastMessage, event.call], ['s', 'go', true, 'done', null])
-  assert.deepEqual([empty.sessionId, empty.callId, empty.subagent, empty.cwd], [null, null, false, process.cwd()])
+  assert.deepEqual([event.sessionId, event.prompt, event.lastMessage, event.call], ['s', 'go', 'done', null])
+  assert.deepEqual([event.agentId, event.subagent], ['sub', true], 'the subagent that made the call')
+  assert.deepEqual([empty.sessionId, empty.callId, empty.agentId, empty.subagent, empty.cwd], [null, null, null, false, process.cwd()])
 })
 
 test('each of Claude Code’s editing tools names the one file it writes, relative to where the call runs', () => {

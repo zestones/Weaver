@@ -5,6 +5,7 @@ import type { DeclaredCheck } from './declared-check.ts'
 import type { DeclaredGuard } from './declared-guard.ts'
 import type { FinishPolicy } from './finish-policy.ts'
 import type { ReviewPolicy } from './review-policy.ts'
+import type { WriterPolicy } from './writer-policy.ts'
 
 export interface DeclarationFields {
   readonly exclude: readonly string[]
@@ -15,6 +16,9 @@ export interface DeclarationFields {
   readonly checks: readonly DeclaredCheck[]
   readonly guards: readonly DeclaredGuard[]
   readonly rules: readonly Rule[]
+  readonly labels: Readonly<Record<string, Readonly<Record<string, string>>>>
+  readonly writer: WriterPolicy | null
+  readonly issue: readonly string[] | null
 }
 
 export class Declaration {
@@ -27,6 +31,12 @@ export class Declaration {
   readonly checks: readonly DeclaredCheck[]
   readonly guards: readonly DeclaredGuard[]
   readonly rules: readonly Rule[]
+  // A family of labels, then each of its values with what it means. {} when the project declares none.
+  readonly labels: Readonly<Record<string, Readonly<Record<string, string>>>>
+  // null when the project declares no writer: its flags stay raw.
+  readonly writer: WriterPolicy | null
+  // The command that files an issue; null when the project names none.
+  readonly issue: readonly string[] | null
 
   constructor(fields: DeclarationFields) {
     this.exclude = fields.exclude
@@ -37,11 +47,14 @@ export class Declaration {
     this.checks = fields.checks
     this.guards = fields.guards
     this.rules = fields.rules
+    this.labels = fields.labels
+    this.writer = fields.writer
+    this.issue = fields.issue
   }
 
-  // The files that tell agents how Weaver wants a task ended and a change reviewed.
+  // The files that tell agents how Weaver wants a task ended, a change reviewed and a card written.
   get skills(): string[] {
-    return [this.finish.skill, this.review?.skill ?? null].flatMap((skill) => skill ?? [])
+    return [this.finish.skill, this.review?.skill ?? null, this.writer?.skill ?? null].flatMap((skill) => skill ?? [])
   }
 
   rulesOf(check: string): Rule[] {

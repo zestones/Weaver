@@ -1,3 +1,4 @@
+import { DetachedWriterLauncher, type WriterLauncher } from '@weaver/memory'
 import { Payload } from '../../agents/events/payload.ts'
 import { AgentCatalog } from '../../agents/runtimes/agent-catalog.ts'
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
@@ -21,7 +22,11 @@ export class Loop {
   private readonly agents = new AgentCatalog()
   private readonly moments: ReadonlyMap<string, Moment>
 
-  constructor(checks: CheckRunner = new ProjectChecks(), launcher: ReviewLauncher = new DetachedLauncher()) {
+  constructor(
+    checks: CheckRunner = new ProjectChecks(),
+    launcher: ReviewLauncher = new DetachedLauncher(),
+    writers: WriterLauncher = new DetachedWriterLauncher(),
+  ) {
     const afterCall = new AfterCall()
 
     this.moments = new Map<string, Moment>([
@@ -30,7 +35,7 @@ export class Loop {
       ['PostToolUse', afterCall],
       // A command that fails may have written files before it did.
       ['PostToolUseFailure', afterCall],
-      ['Stop', new EndOfTurn(checks, new ReviewRounds(launcher))],
+      ['Stop', new EndOfTurn(checks, new ReviewRounds(launcher), writers)],
     ])
   }
 

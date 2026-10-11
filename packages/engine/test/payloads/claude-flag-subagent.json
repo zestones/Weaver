@@ -1,0 +1,19 @@
+{
+  "session_id": "a5ccf2df-9152-404f-b36d-b6f6a18b8966",
+  "transcript_path": "/transcripts/session.jsonl",
+  "cwd": "/repo",
+  "prompt_id": "da7ca4a7-2029-4a24-8e76-12319d72820a",
+  "permission_mode": "bypassPermissions",
+  "agent_id": "a406db5d5f6bb15fe",
+  "agent_type": "general-purpose",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "weaver flag src/one.js <<'EOF2'\nSeen: a call made by a subagent.\nExpected: unknown\nFound: a test of attribution.\nChecked: nothing.\nDid: left as it is.\nEOF2",
+    "description": "Run weaver flag command with heredoc input"
+  },
+  "tool_use_id": "toolu_01Qj4A2H5jBdxn39q64XdK1b"
+}

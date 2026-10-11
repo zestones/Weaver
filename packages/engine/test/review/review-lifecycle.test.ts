@@ -5,22 +5,24 @@ import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeEach, test } from 'vitest'
 import { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
-import { ReviewLedger } from '../../src/review/ledger/review-ledger.ts'
 import { ReviewOutcome } from '../../src/review/results/review-outcome.ts'
 import { ReviewStore } from '../../src/review/results/review-store.ts'
 import { ReviewRounds } from '../../src/review/rounds/review-rounds.ts'
 import type { Reviewer } from '../../src/review/running/reviewer.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
-import { SAMPLE_REPO, makeRepo } from '../fixtures/repo.ts'
+import { cardsOf, FLAG_BODY, flagCommand, withRegistry } from '../fixtures/cards.ts'
+import { SAMPLE_REPO, git, makeRepo } from '../fixtures/repo.ts'
 import {
   A_FILE,
   agentWrites,
+  bashCall,
   declaration,
   eventsOf,
   finishThrough,
   finishWith,
   PASSING,
   prompt,
+  refusalOf,
   stubChecks,
   stubReviewer,
   unitFiles,
@@ -161,49 +163,144 @@ test('a failed review is not tried again on work that has changed since, and #re
   assert.deepEqual(await finish(reviewer), {}, 'nothing failed any more')
 })
 
-test('what a review leaves for the owner is kept across sessions until the owner closes it, and a later reviewer is told', async () => {
+test('when a unit settles, each point its review leaves for the owner becomes a card, with what the review said of it', async () => {
+  const careful = new ReviewOutcome({
+    ...BY,
+    findings: [{ ...FINDING, quote: 'export const a = 2', suggestion: 'split it in two', evidence: 'ran it: both levels show' }],
+    suspicions: [
+      { file: A_FILE, note: 'may be read before it is set' },
+      { file: null, note: 'the change may slow the start' },
+    ],
+    seconds: 5,
+  })
+  const reviewer = stubReviewer([careful])
+
+  await finish(reviewer)
+  assert.deepEqual(cardsOf(session.repo), [], 'nothing waits for the owner while the author has not answered')
+  await finish(reviewer, reviewed(), saying('F1 not fixed: clearer as one function'))
+
+  const [finding, suspicion, nowhere] = cardsOf(session.repo)
+  const { review, ...content } = finding?.record.review ?? { review: '' }
+
+  assert.deepEqual([finding?.origin, finding?.state, finding?.places], ['finding', 'open', [{ file: A_FILE, line: 1 }]])
+  assert.match(review, /^\w{7}\/F1$/)
+  assert.deepEqual(content, {
+    rule: 'N1',
+    statement: 'One level of abstraction per function.',
+    message: 'two levels of abstraction in one function',
+    quote: 'export const a = 2',
+    suggestion: 'split it in two',
+    evidence: 'ran it: both levels show',
+    standing: 'not fixed by the agent: clearer as one function',
+  })
+  assert.deepEqual(
+    { ...finding?.record.provenance, at: null },
+    {
+      author: 'codex',
+      role: 'reviewer',
+      session: 's',
+      subagent: null,
+      unit: 1,
+      requests: ['change it'],
+      commit: git(session.repo.top, ['rev-parse', 'HEAD']),
+      at: null,
+    },
+  )
+  assert.deepEqual([suspicion?.origin, suspicion?.places], ['suspicion', [{ file: A_FILE, line: null }]])
+  assert.deepEqual(
+    { ...suspicion?.record.review, review: suspicion?.record.review?.review.slice(-3) },
+    {
+      review: '/S1',
+      rule: null,
+      statement: null,
+      message: 'may be read before it is set',
+      quote: null,
+      suggestion: null,
+      evidence: null,
+      standing: 'suspected by the reviewer, not verified',
+    },
+  )
+  assert.deepEqual([nowhere?.origin, nowhere?.places, nowhere?.record.review?.message], ['suspicion', [], 'the change may slow the start'])
+})
+
+test('a finding its author fixed leaves no card, and neither does a review that found nothing', async () => {
+  const reviewer = stubReviewer([found, clean])
+
+  await finish(reviewer)
+  agentWrites(session, { [A_FILE]: 'export const a = 3\n' })
+  await finish(reviewer, reviewed(), saying('F1 fixed: split the function in two'))
+
+  prompt(session, 'once more')
+  agentWrites(session, { [A_FILE]: 'export const a = 4\n' })
+  await finish(reviewer)
+
+  assert.equal(reviewer.requests.length, 2)
+  assert.deepEqual(unitFiles(session), [])
+  assert.deepEqual(cardsOf(session.repo), [])
+})
+
+test('the next reviewer of a file is told what its cards say, and a point that comes again is an occurrence, not a second card', async () => {
   const careful = new ReviewOutcome({
     ...BY,
     findings: [FINDING],
     suspicions: [{ file: A_FILE, note: 'may be read before it is set' }],
     seconds: 5,
   })
-  const reviewer = stubReviewer([careful, clean])
-  const ledger = new ReviewLedger(session.repo)
+  const reviewer = stubReviewer([careful, found, clean])
 
   await finish(reviewer)
-  assert.deepEqual(ledger.waiting(), [], 'nothing waits for the owner while the author has not answered')
   await finish(reviewer, reviewed(), saying('F1 not fixed: clearer as one function'))
 
-  const [finding, suspicion] = ledger.waiting()
-
-  assert.match(finding?.id ?? '', /^\w{7}\/F1$/)
-  assert.deepEqual(
-    [finding?.rule, finding?.file, finding?.line, finding?.standing, finding?.session],
-    ['N1', A_FILE, 1, 'not fixed by the agent: clearer as one function', 's'],
-  )
-  assert.deepEqual([suspicion?.id.slice(-3), suspicion?.message], ['/S1', 'may be read before it is set'])
-
-  assert.equal(ledger.close('nowhere/F9', 'fixed', null), 'no point is named nowhere/F9')
-  assert.equal(ledger.close(finding?.id ?? '', 'wontfix', 'one function reads better'), null)
-  assert.match(ledger.close(finding?.id ?? '', 'fixed', null) ?? '', /is already closed as wontfix$/)
-  assert.deepEqual(
-    ledger.waiting().map((point) => point.id),
-    [suspicion?.id],
-  )
-
   const later = new Session(session.repo, 'another-session', 'codex')
+  const finishLater = (message?: string) => finishWith(later, stubChecks([PASSING]), reviewed(), message, reviewer)
 
   prompt(later, 'touch it again')
   agentWrites(later, { [A_FILE]: 'export const a = 3\n' })
-  await finishWith(later, stubChecks([PASSING]), reviewed(), undefined, reviewer)
-
-  const asked = reviewer.requests[1]?.prompt(null) ?? ''
+  await finishLater()
 
   assert.match(
-    asked,
-    /## What earlier reviews left about these files\n\n[^\n]*\n\n- N1 src\/a\.ts:1: two levels of abstraction in one function \(not fixed by the agent: clearer as one function; closed by the owner as wontfix\)\n- weaver:suspicion src\/a\.ts: may be read before it is set \(suspected by the reviewer, not verified\)/,
+    reviewer.requests[1]?.prompt(null) ?? '',
+    /## What is already known about these files\n\n[^\n]*Check that none of these came back\.[^\n]*\n\n- #2 open {2}src\/a\.ts {2}may be read before it is set \(suspected by the reviewer, not verified\)\n- #1 open {2}src\/a\.ts:1 {2}two levels of abstraction in one function \(rule N1; not fixed by the agent: clearer as one function\)\n/,
   )
+
+  await finishLater(saying('F1 not fixed: the owner asked for one function'))
+
+  const [finding, suspicion, ...others] = cardsOf(session.repo)
+
+  assert.deepEqual(others, [], 'the finding the second review reports again is the card the first one left')
+  assert.deepEqual(
+    finding?.record.occurrences.map(({ card, provenance, note }) => [
+      card,
+      provenance.session,
+      provenance.author,
+      note.replace(/^\w{7}/, ''),
+    ]),
+    [[null, 'another-session', 'codex', '/F1: two levels of abstraction in one function']],
+  )
+  assert.deepEqual([finding?.state, suspicion?.record.occurrences], ['open', []])
+
+  withRegistry(session.repo, (registry) => registry.closeCard(1, 'wontfix', 'one function\nreads better'))
+  prompt(later, 'and once more')
+  agentWrites(later, { [A_FILE]: 'export const a = 4\n' })
+  await finishLater()
+
+  assert.match(
+    reviewer.requests[2]?.prompt(null) ?? '',
+    /\n- #1 closed \(wontfix\) {2}src\/a\.ts:1 {2}two levels of abstraction in one function \(rule N1; not fixed by the agent: clearer as one function; the owner's reason: one function reads better\)\n/,
+  )
+})
+
+test('a reviewer is told what agents flagged in the files it reads, and nothing of the other files', async () => {
+  const reviewer = stubReviewer([clean])
+
+  refusalOf(session, bashCall(flagCommand([`${A_FILE}:1`])))
+  refusalOf(session, bashCall(flagCommand(['package.json'], FLAG_BODY.replace('refresh()', 'renew()'))))
+  await finish(reviewer)
+
+  const asked = reviewer.requests[0]?.prompt(null) ?? ''
+
+  assert.match(asked, /\n- #1 raw {2}src\/a\.ts:1 {2}no call of refresh\(\) exists under src\/\.\n/)
+  assert.doesNotMatch(asked, /#2|package\.json/)
 })
 
 test('the places a program of the project lists under a rule of the review reach its reviewer', async () => {

@@ -106,10 +106,10 @@ test('the reviewer is told the rules, the way of the project, what the owner ask
   )
 })
 
-test('the reviewer is given the places a program of the project listed, and what earlier reviews left about the files', () => {
+test('the reviewer is given the places a program of the project listed, and what the cards say of the files', () => {
   const asked = request({
     candidates: ['C1 src/a.ts:1: new comment: // casts the response'],
-    history: ['N2 src/a.ts:1: cast of external data (not fixed by the agent: the owner asked for it; closed by the owner as wontfix)'],
+    history: ['#3 closed (wontfix)  src/a.ts:1  cast of external data (rule N2; not fixed by the agent: the owner asked for it)'],
   }).prompt(null)
 
   assert.match(
@@ -118,7 +118,7 @@ test('the reviewer is given the places a program of the project listed, and what
   )
   assert.match(
     asked,
-    /## What earlier reviews left about these files\n\n[^\n]*none of these came back[^\n]*\n\n- N2 src\/a\.ts:1: cast of external data \(not fixed/,
+    /## What is already known about these files\n\n[^\n]*none of these came back[^\n]*\n\n- #3 closed \(wontfix\) {2}src\/a\.ts:1 {2}cast of external data \(rule N2; not fixed/,
   )
 })
 

@@ -1,6 +1,6 @@
 # Memory: flags and cards
 
-What Weaver keeps of what agents discover. This is what the owner and I agreed on 2026-10-11, after two independent reviews of the design, one by Codex and one by Claude Code. None of it is built yet. What is still open is listed apart, and so is what waits for later.
+What Weaver keeps of what agents discover. This is what the owner and I agreed on 2026-10-11, after two independent reviews of the design, one by Codex and one by Claude Code. The first five steps of the plan were built the same day; what real sessions showed is told below. What is still open is listed apart, and so is what waits for later.
 
 ## What it is for
 
@@ -66,7 +66,15 @@ The keywords are English, like the other words Weaver reads. The content is in t
 
 **What decides the fields.** A flag asks for what only the one who found it knows. It does not ask for a title, labels, duplicates, a severity, the git history or a proposed fix: the writer or Weaver find those, and every field more is a reason not to flag. A flag that was never made cannot be detected, so a short one with unknowns is worth more than a discovery that was dropped.
 
-**Who records it.** The hook that sees the call, not the command. The hook is given the session and the subagent with every call, so the author is never declared by the agent. The command the agent runs knows neither for sure, and under the default sandbox of Codex it cannot write under `.git/`. It only reads the record back and answers in one line, with the number of the flag.
+**Who records it.** The hook that sees the call, which also answers in place of the command. The hook is given the session and the subagent with every call, so the author is never declared by the agent. It records the flag and refuses the call, with the acknowledgement and the number of the flag as the reason of the refusal: the agent reads it and goes on. The command itself never runs for an agent, so nothing has to be on its `PATH`, and the default sandbox of Codex, which cannot write under `.git/`, is no obstacle. The owner flags with the same command from a terminal, where no hook is involved.
+
+**What was proved on real sessions**, on 2026-10-11, with Claude Code and Codex running at the same time in one folder:
+
+- The call that the hook sees carries the session, the id of the call and the whole command, heredoc included, in both runtimes; a chained command (`cd src && … weaver flag …`) arrives whole too.
+- A call made by a subagent of Claude Code carries the session of its parent and the id of the subagent.
+- An environment variable proves nothing: the session id of an outer Claude Code session leaks into the hooks of a Codex session started under it.
+- Both runtimes show the reason of a refusal to the agent, which understands that the command did not run and that this is expected.
+- Both runtimes give to the model the context a hook adds to a request: this is how an agent is told that the command exists.
 
 **What Weaver does with it.**
 
@@ -146,17 +154,32 @@ The registry lives on the owner's machine. Whether it must survive a change of m
 
 The command that opens an issue is declared with the reviewers today. It moves out of their file: a project without a reviewer must be able to open an issue from a card.
 
+## Settled while building
+
+The owner asked for the plan to be built without stopping. These were open, and were settled as follows; each can be changed.
+
+- **How an agent learns that the command exists.** Weaver adds a few lines to every request of the owner, through the hook: they survive a compacted context, which a message given once a session does not. The template of the finish skill says the same.
+- **`Did: fixed in the task` against the finish skill.** The template of the skill now says to flag what is found along the way and not to do it in the task, unless the task cannot go on without it: it is then flagged as fixed.
+- **What the writer saw** is one of three: what it read agrees with the flag, contradicts it, or does not let it tell, with a note that says what it read.
+- **Cards whose line has changed since.** `weaver cards` says so, as a hint to look again, never as a closing.
+- **A project that declares no writer** keeps its flags raw, and spends nothing.
+- **The command that files an issue** is declared in `.weaver/project/issues.json`.
+
+## What the real trials showed
+
+On 2026-10-11, with real sessions of Claude Code in the clone of Adaptive and of Codex in a small project.
+
+- **What an agent is told decides whether it flags.** With a first wording, both runtimes saw a real defect of Adaptive, wrote about it in their final message and flagged nothing. With a second one, which said in advance that the call would be refused, Claude Code believed the command did not work and did not run it. With the third, which says to flag even what the final message also tells and that the hook's message is the answer, Claude Code flagged the defect by itself twice, and Codex flagged one too.
+- **From the flag to the card.** The writer, Claude Code on Sonnet with the skill of Adaptive, wrote a card in French with its four sections in 14 seconds, for 0.11 dollar. The second flag of the same defect was merged into the first card as an occurrence.
+- **Codex loads the hooks of a project only when the project is trusted** in the owner's `~/.codex/config.toml`. The clone of Adaptive is not: Codex ran there unsupervised, was told nothing, and its `weaver flag` ran for real. Trusting a project is the owner's to do; `weaver doctor` does not see it yet.
+- **The sandbox of Codex puts the runtime at the first process.** The check of who runs a command now looks there too: before, a `weaver flag` run by an unsupervised Codex took itself for the owner's.
+- **A label came back with its family in front** (`type:bug` as the value) and was dropped. The writer is now told what a family and a value are, and both forms are taken.
+
 ## Still open
 
-To settle before the part concerned is built.
-
-- **How an agent learns that the command exists.** Telling it once a session is too weak: the message is lost when the context is compacted, and it does not reach subagents. Today Weaver can only speak to an agent by refusing something. The second review proposes three lines in the instructions file of the project, and a reminder at the end of a task when a point found along the way has no flag.
-- **`Did: fixed in the task` against the finish skill.** The template of the skill tells the agent never to do in the task what it found along the way. One of the two has to change.
-- **What the writer saw**, as one of three: what it read agrees with the flag, contradicts it, or does not let it tell.
-- **Cards whose line has changed since.** Weaver would say so, as a hint to look again, never as a closing.
-- **A project that declares no writer** keeps its flags raw, and spends nothing.
-- **`wontfix`** covers both "this is wanted" and "not now". The first should stop an agent later, the second should not.
-- **The language of a card**, when agents write in two languages.
+- **`wontfix`** covers both "this is wanted" and "not now". The first should stop an agent later, the second should not. It matters for the recall, and waits for it.
+- **The language of a card**, when agents write in two languages. Today the skill of the project says how its cards are written, language included.
+- **A reminder at the end of a task**, when the final message names something found along the way that has no flag. Not built: the agent is told about the command with every request instead.
 
 ## What the reviews found, for the build
 
@@ -180,11 +203,13 @@ Not decisions: facts to keep in mind when the code is written.
 
 ## Plan
 
-1. **Prove the attribution.** The hook records a flag. Real trials: two sessions at once in one folder, subagents, a command chained or run in the background, Claude Code and Codex, the payloads kept as fixtures. And who is allowed to close a card. The rest depends on it.
-2. **The flag and a small registry.** `weaver flag`, what it refuses, the lines it keeps; listing and closing. Cards are raw at this point.
-3. **A real trial, on raw cards**, on the clone of Adaptive. Two questions: do agents flag, and is a raw flag enough for the owner to decide?
-4. **The writer.** `writer.json`, the skill `wv-card.md`, the start at the end of a turn, the card checked against its schema. It is judged on the flags of the trial.
-5. **The complete card.** The labels, the ties and the occurrences, correcting and reopening. The ledger of the reviews moves into the registry.
+The first five steps are built. The owner asked for them in one go, so the trial of step 3 came after the writer instead of before it.
+
+1. **Prove the attribution.** Done: the hook records a flag, on real payloads of both runtimes kept as fixtures, with two sessions at once, a subagent and a chained command. The owner's commands are refused to an agent, by a guard and by the commands themselves.
+2. **The flag and a small registry.** Done: `weaver flag`, what it refuses, the lines it keeps; listing and closing.
+3. **A real trial.** Done for the first question: agents flag, once they are told well. The second, whether a raw flag is enough for the owner to decide, is the owner's to answer.
+4. **The writer.** Done: `writer.json`, the skill `wv-card.md`, the start at the end of a turn, the card checked against its schema.
+5. **The complete card.** Done: the labels, the ties and the occurrences, correcting and reopening. The ledger of the reviews is gone, and what a review leaves is a card.
 6. **Afterwards.** The recall against regressions, defined with the owner first. Then the rest of the earlier plan: guards decided by a program and the comparison with the base, both in [to do later](todo-later.md), the distribution of Weaver, and the workbench, last.
 
-Until Weaver is distributed, the agent has to be given the path of the command without writing it in a file that git follows.
+An agent needs no path to the command: the hook answers in its place.

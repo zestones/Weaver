@@ -4,6 +4,7 @@ import type { DeclaredGuard } from '../../declaration/content/declared-guard.ts'
 import type { Repository } from '../../lib/git/repository.ts'
 import { EngineGuard } from '../kinds/engine-guard.ts'
 import type { Guard } from '../kinds/guard.ts'
+import { OwnerCommandGuard } from '../kinds/owner-command-guard.ts'
 import { RunsGuard } from '../kinds/runs-guard.ts'
 import { WritesGuard } from '../kinds/writes-guard.ts'
 import type { Refusal } from '../results/refusal.ts'
@@ -12,7 +13,11 @@ export class ProjectGuards {
   private readonly guards: readonly Guard[]
 
   constructor(declaration: Declaration, repo: Repository) {
-    this.guards = [new EngineGuard(repo, declaration.skills), ...declaration.guards.flatMap((declared) => this.guardsOf(declared, repo))]
+    this.guards = [
+      new EngineGuard(repo, declaration.skills),
+      new OwnerCommandGuard(),
+      ...declaration.guards.flatMap((declared) => this.guardsOf(declared, repo)),
+    ]
   }
 
   refusal(call: ToolCall): Refusal | null {

@@ -18,7 +18,8 @@ class HookProgram {
 
     const copy = ReviewCopy.fromArguments(this.argv)
 
-    // A reviewer in its copy is held there; any other hook of a reviewer answers nothing and keeps nothing.
+    // A reviewer in its copy is held there; any other hook of a reviewer, and every hook of the writer of the cards,
+    // answers nothing and keeps nothing.
     if (copy === null && process.env[AgentReviewer.MARK] !== undefined) return
 
     try {

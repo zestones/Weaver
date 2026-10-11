@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver writer",
+  "description": "Who writes the cards. A flag is the raw report of a discovery an agent leaves aside. The writer is the agent Weaver starts at the end of a turn to turn the flags of that turn into cards, which the owner reads and decides on. It only reads: it runs no test and changes nothing. It has a limit of time and none of cost. Without this file no writer starts: flags stay raw, and nothing is spent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runtime", "timeoutSeconds"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows, for the editor."
+    },
+    "runtime": {
+      "enum": ["claude", "codex"],
+      "description": "The runtime that writes the cards."
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The model the runtime writes with. Without it, the runtime chooses."
+    },
+    "effort": {
+      "type": "string",
+      "minLength": 1,
+      "description": "How hard the model thinks, in the words of its runtime (`low`, `high`, ...). Without it, the runtime chooses."
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The time the writer is given. A flag it did not write up in time stays raw: it is listed and closed like a card."
+    },
+    "skill": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The file that tells the writer how this project wants its cards written, relative to the repository root. Its header lists the `sections` of the body of a card. Weaver guards the file. Without a skill, a card has the sections Observation, Context, Trace and Uncertainties."
+    }
+  }
+}

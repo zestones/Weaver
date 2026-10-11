@@ -73,15 +73,6 @@
       "type": "string",
       "minLength": 1,
       "description": "The file that tells the reviewer how this project wants its changes reviewed, relative to the repository root. Weaver guards it."
-    },
-    "issue": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      },
-      "minItems": 1,
-      "description": "The command that files an issue when the owner closes a point as `issue` with `weaver close`, with `{title}` and `{body}` where they go. Without it, closing as `issue` only records it."
     }
   },
   "definitions": {

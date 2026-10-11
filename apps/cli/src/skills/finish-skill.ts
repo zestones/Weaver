@@ -4,7 +4,8 @@ const EXPECTS: Readonly<Record<string, string>> = {
   Request: 'What you did for the request, and how you verified it: on the real stack, by tests only, or not at all and why.',
   'To validate':
     'What the owner must decide or check before committing: an exception to a rule, a suppression, a deleted test, a limit you could not remove.',
-  'Found along the way': 'What you noticed outside the request. List it here; never do it in the task.',
+  'Found along the way':
+    'What you noticed outside the request. Flag each thing with `weaver flag` when you find it, and name it here with the number of its flag. Do not do it in the task, unless the task cannot go on without it: flag it then as fixed in the task.',
 }
 
 export class FinishSkill extends ProjectSkill {

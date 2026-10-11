@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@weaver/agent-sdk": "workspace:*",
+    "@weaver/memory": "workspace:*",
     "ajv": "8.20.0",
     "unbash": "2.2.0"
   },

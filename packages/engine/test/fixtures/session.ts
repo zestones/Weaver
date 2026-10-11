@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import type { WriterJob, WriterLauncher } from '@weaver/memory'
 import { AgentCatalog } from '../../src/agents/runtimes/agent-catalog.ts'
 import { Payload } from '../../src/agents/events/payload.ts'
 import { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
@@ -33,6 +34,10 @@ export interface CheckStub extends CheckRunner {
 export interface ReviewerStub extends Reviewer {
   readonly requests: ReviewRequest[]
   readonly assignments: ReviewAssignment[]
+}
+
+export interface WriterStub extends WriterLauncher {
+  readonly jobs: WriterJob[]
 }
 
 export const A_FILE = 'src/a.ts'
@@ -74,6 +79,16 @@ export function startTool(session: Session, tool: Raw, project?: Declaration): (
   return () => new AfterCall().run(turnOf(session, call, project))
 }
 
+// What the hook answers before a call: the reason it refuses the call with, or null when it lets it through.
+export function refusalOf(session: Session, tool: Raw, project?: Declaration): string | null {
+  toolCalls += 1
+
+  const { body } = new BeforeCall().run(turnOf(session, { tool_use_id: `tool-${String(toolCalls)}`, ...tool }, project))
+  const output = body?.hookSpecificOutput
+
+  return output !== undefined && 'permissionDecisionReason' in output ? output.permissionDecisionReason : null
+}
+
 function useTool(session: Session, tool: Raw, effect: () => void, project?: Declaration): Answer {
   const end = startTool(session, tool, project)
 
@@ -97,8 +112,8 @@ export function eventsOf<Kind extends EventBody['kind']>(session: Session, kind:
   return new Journal(session.repo).read().filter((event): event is EventOf<Kind> => event.kind === kind)
 }
 
-export function prompt(session: Session, text: string): void {
-  new OnRequest().run(turnOf(session, { prompt: text }))
+export function prompt(session: Session, text: string, project?: Declaration, raw: Raw = {}): AnswerBody {
+  return new OnRequest().run(turnOf(session, { prompt: text, ...raw }, project)).body ?? {}
 }
 
 export function agentWrites(session: Session, files: Readonly<Record<string, string>>): void {
@@ -151,14 +166,21 @@ export function stubReviewer(outcomes: readonly ReviewOutcome[]): ReviewerStub {
   }
 }
 
+export function stubWriters(): WriterStub {
+  const jobs: WriterJob[] = []
+
+  return { jobs, start: (job) => void jobs.push(job) }
+}
+
 export async function finishWith(
   session: Session,
   checks: CheckRunner,
   project: Declaration = declaration(),
   message = FINISHED,
   reviewer: Reviewer = stubReviewer([]),
+  writers: WriterLauncher = stubWriters(),
 ): Promise<AnswerBody> {
-  return finishThrough(session, checks, new ReviewRounds(new InlineLauncher(reviewer), REVIEW_POLL_MS), project, message)
+  return finishThrough(session, checks, new ReviewRounds(new InlineLauncher(reviewer), REVIEW_POLL_MS), project, message, writers)
 }
 
 export async function finishThrough(
@@ -167,8 +189,9 @@ export async function finishThrough(
   reviews: ReviewRounds,
   project: Declaration = declaration(),
   message = FINISHED,
+  writers: WriterLauncher = stubWriters(),
 ): Promise<AnswerBody> {
-  const answer = await new EndOfTurn(checks, reviews).run(turnOf(session, { last_assistant_message: message }, project))
+  const answer = await new EndOfTurn(checks, reviews, writers).run(turnOf(session, { last_assistant_message: message }, project))
 
   return answer.body ?? {}
 }

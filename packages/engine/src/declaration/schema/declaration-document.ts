@@ -1,4 +1,4 @@
-export type PartName = 'settings' | 'guards' | 'checks' | 'scripts' | 'reviewers' | 'rules'
+export type PartName = 'settings' | 'guards' | 'checks' | 'scripts' | 'labels' | 'issues' | 'reviewers' | 'rules' | 'writer'
 
 // A rule is its sentence, or an object when it says more.
 export type DocumentCheckRule = string | { readonly statement: string; readonly level: 'gate' | 'human' }
@@ -50,6 +50,13 @@ export interface ScriptsDocument {
   readonly scope: { readonly exclude: readonly string[] }
 }
 
+// A family of labels, then each of its values with what it means.
+export type LabelsDocument = Readonly<Record<string, Readonly<Record<string, string>>>>
+
+export interface IssuesDocument {
+  readonly command: readonly string[]
+}
+
 export interface ReviewersDocument {
   readonly runtime: 'claude' | 'codex' | 'same' | 'other'
   readonly reviewers: { readonly claude?: DocumentReviewer; readonly codex?: DocumentReviewer }
@@ -59,7 +66,14 @@ export interface ReviewersDocument {
   readonly waitSeconds: number
   readonly maxRefusals: number
   readonly skill?: string
-  readonly issue?: readonly string[]
 }
 
 export type RulesDocument = Readonly<Record<string, DocumentReviewRule>>
+
+export interface WriterDocument {
+  readonly runtime: 'claude' | 'codex'
+  readonly model?: string
+  readonly effort?: string
+  readonly timeoutSeconds: number
+  readonly skill?: string
+}

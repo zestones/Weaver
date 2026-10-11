@@ -4,6 +4,7 @@ import type { DeclaredCheck } from '../content/declared-check.ts'
 import type { DeclaredGuard } from '../content/declared-guard.ts'
 import { FinishPolicy } from '../content/finish-policy.ts'
 import { ReviewPolicy, type ReviewerName, type ReviewerSettings } from '../content/review-policy.ts'
+import { WriterPolicy } from '../content/writer-policy.ts'
 import { GateRule } from '../rules/gate-rule.ts'
 import { HumanRule } from '../rules/human-rule.ts'
 import { LlmRule } from '../rules/llm-rule.ts'
@@ -13,11 +14,14 @@ import type {
   DocumentCheckRule,
   DocumentReviewRule,
   GuardsDocument,
+  IssuesDocument,
+  LabelsDocument,
   PartName,
   ReviewersDocument,
   RulesDocument,
   ScriptsDocument,
   SettingsDocument,
+  WriterDocument,
 } from '../schema/declaration-document.ts'
 import { frontMatter } from '../../lib/text/front-matter.ts'
 import { PartSchema } from '../schema/part-schema.ts'
@@ -37,8 +41,11 @@ export class DeclarationParts {
     guards: 'project/guards.json',
     checks: 'project/checks.json',
     scripts: 'project/scripts.json',
+    labels: 'project/labels.json',
+    issues: 'project/issues.json',
     reviewers: 'llm/reviewers.json',
     rules: 'llm/rules.json',
+    writer: 'llm/writer.json',
   }
 
   private readonly where: string
@@ -57,8 +64,11 @@ export class DeclarationParts {
     const guardsOf = this.part<GuardsDocument>('guards', {})
     const checksOf = this.part<ChecksDocument>('checks', {})
     const scripts = this.part<ScriptsDocument>('scripts', {})
+    const labels = this.part<LabelsDocument>('labels', {})
+    const issues = this.texts.issues === undefined ? null : this.part<IssuesDocument>('issues', {})
     const reviewers = this.texts.reviewers === undefined ? null : this.part<ReviewersDocument>('reviewers', {})
     const rulesOf = this.part<RulesDocument>('rules', {})
+    const writerOf = this.texts.writer === undefined ? null : this.part<WriterDocument>('writer', {})
 
     this.failOnProblems()
 
@@ -81,6 +91,7 @@ export class DeclarationParts {
     const guards = Object.entries(guardsOf).map(([id, guard]): DeclaredGuard => ({ ...guard, id }))
     const { finish } = settings
     const headings = this.headings(finish.skill)
+    const writer = writerOf === null ? null : this.writerPolicy(writerOf)
 
     this.problems.push(...this.bindingProblems(checks, guards, rules, reviewers !== null))
     this.failOnProblems()
@@ -94,6 +105,9 @@ export class DeclarationParts {
       checks,
       guards,
       rules,
+      labels,
+      writer,
+      issue: issues?.command ?? null,
     })
   }
 
@@ -160,22 +174,55 @@ export class DeclarationParts {
       waitSeconds: review.waitSeconds,
       maxRefusals: review.maxRefusals,
       skill: review.skill ?? null,
-      issue: review.issue ?? null,
+    })
+  }
+
+  private writerPolicy(writer: WriterDocument): WriterPolicy {
+    return new WriterPolicy({
+      runtime: writer.runtime,
+      model: writer.model ?? null,
+      effort: writer.effort ?? null,
+      timeoutSeconds: writer.timeoutSeconds,
+      skill: writer.skill ?? null,
+      sections: this.sections(writer.skill),
     })
   }
 
   // The headings of the final message are written once, in the skill that teaches them to the agent. A skill that is
   // not there yet teaches nothing: the doctor says so, and every end of turn ends the task meanwhile.
   private headings(skill: string | undefined): readonly string[] | null {
-    const text = skill === undefined ? null : this.read(skill)
-    const listed = text === null ? undefined : frontMatter(text).headings
+    const listed = this.listed(skill, 'headings')
 
-    if (skill === undefined || text === null) return null
-    if (listed !== undefined && typeof listed !== 'string' && listed.length > 0 && listed.every((heading) => heading !== '')) return listed
+    if (skill === undefined || listed === null) return null
+    if (listed.length > 0) return listed
 
     this.problems.push(`${skill}: its header lists no \`headings\`: they are what tells Weaver that a task is finished`)
 
     return null
+  }
+
+  // The sections of a card are written the same way, in the skill of the writer. Until that skill is there, a card
+  // has the sections every project starts with.
+  private sections(skill: string | undefined): readonly string[] {
+    const listed = this.listed(skill, 'sections')
+
+    if (skill === undefined || listed === null) return WriterPolicy.SECTIONS
+    if (listed.length > 0) return listed
+
+    this.problems.push(`${skill}: its header lists no \`sections\`: they are what the writer writes in the body of a card`)
+
+    return WriterPolicy.SECTIONS
+  }
+
+  // What the header of a skill lists under a name: null when the skill is not named or not written yet, nothing when
+  // it is there and lists no usable entry.
+  private listed(skill: string | undefined, name: string): readonly string[] | null {
+    const text = skill === undefined ? null : this.read(skill)
+    const listed = text === null ? undefined : frontMatter(text)[name]
+
+    if (text === null) return null
+
+    return listed !== undefined && typeof listed !== 'string' && listed.every((entry) => entry !== '') ? listed : []
   }
 
   // A schema describes the shape of each entry, not what ties one entry to another.

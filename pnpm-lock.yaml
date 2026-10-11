@@ -196,6 +196,9 @@ importers:
       '@weaver/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@weaver/memory':
+        specifier: workspace:*
+        version: link:../../packages/memory
     devDependencies:
       vitest:
         specifier: 5.0.3
@@ -212,12 +215,25 @@ importers:
       '@weaver/agent-sdk':
         specifier: workspace:*
         version: link:../agent-sdk
+      '@weaver/memory':
+        specifier: workspace:*
+        version: link:../memory
       ajv:
         specifier: 8.20.0
         version: 8.20.0
       unbash:
         specifier: 2.2.0
         version: 2.2.0
+    devDependencies:
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@types/node@24.19.2)(vite@8.3.4(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/memory:
+    dependencies:
+      '@weaver/agent-sdk':
+        specifier: workspace:*
+        version: link:../agent-sdk
     devDependencies:
       vitest:
         specifier: 5.0.3

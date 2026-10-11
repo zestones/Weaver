@@ -7,6 +7,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { afterAll, beforeEach, test } from 'vitest'
 import type { Repository } from '../../src/lib/git/repository.ts'
 import { Journal } from '../../src/unit-of-work/journal/journal.ts'
+import { cardsOf } from '../fixtures/cards.ts'
 import { declarationFiles, writeDeclaration } from '../fixtures/declaration.ts'
 import { git, locate, makeRepo, writeFiles } from '../fixtures/repo.ts'
 
@@ -56,7 +57,12 @@ interface Answer {
   readonly decision?: string
   readonly reason?: string
   readonly systemMessage?: string
-  readonly hookSpecificOutput?: { readonly permissionDecision: string; readonly permissionDecisionReason: string }
+  readonly hookSpecificOutput?: {
+    readonly hookEventName?: string
+    readonly permissionDecision?: string
+    readonly permissionDecisionReason?: string
+    readonly additionalContext?: string
+  }
 }
 
 let repo: Repository
@@ -337,7 +343,7 @@ process.stdin.on('end', () => {
 })
 
 test('a word of the owner that is almost a directive is said back at once, in a project that reviews its changes', () => {
-  assert.deepEqual(hook('UserPromptSubmit', { prompt: 'rename it #critcal' }), {}, 'this project declares no review')
+  assert.equal(hook('UserPromptSubmit', { prompt: 'rename it #critcal' }).systemMessage, undefined, 'this project declares no review')
 
   writeDeclaration(repo.top, { review: { runtime: 'codex' } })
 
@@ -345,7 +351,44 @@ test('a word of the owner that is almost a directive is said back at once, in a 
     hook('UserPromptSubmit', { prompt: 'rename it #critcal' }).systemMessage,
     '[weaver] #critcal is not a directive: did you mean #critical?',
   )
-  assert.deepEqual(hook('UserPromptSubmit', { prompt: 'rename it #critical' }), {})
+  assert.equal(hook('UserPromptSubmit', { prompt: 'rename it #critical' }).systemMessage, undefined)
+})
+
+test('an agent is told of the flag command with its request, flags through a call that never runs, and the owner reads of it', () => {
+  const flag = JSON.parse(readFileSync(join(import.meta.dirname, '../payloads/claude-flag-chained.json'), 'utf8')) as Record<
+    string,
+    unknown
+  >
+  const told = hook('UserPromptSubmit', { prompt: 'read src/a.js' }).hookSpecificOutput
+
+  assert.equal(told?.hookEventName, 'UserPromptSubmit')
+  assert.match(told?.additionalContext ?? '', /flag it with the shell command below[^]*\nweaver flag <file>\[:<line>\] \.\.\. <<'EOF'\n/)
+
+  writeFiles(repo.top, { 'src/one.js': 'export const one = 1\n' })
+
+  const refused = hook('PreToolUse', { ...flag, cwd: repo.top, session_id: 'session-1' }).hookSpecificOutput
+  const [card] = cardsOf(repo)
+
+  assert.equal(refused?.permissionDecision, 'deny')
+  assert.equal(
+    refused?.permissionDecisionReason,
+    '[weaver] Flag 1 recorded for the owner. This command is answered here and never runs: that is expected. Go on with your task.',
+  )
+  assert.deepEqual(card?.places, [
+    { file: 'src/one.js', line: 1 },
+    { file: 'tools/parse.mjs', line: null },
+  ])
+  assert.deepEqual(
+    [card?.state, card?.record.provenance.session, card?.record.provenance.requests],
+    ['raw', 'session-1', ['read src/a.js']],
+  )
+  assert.deepEqual(stop('I only read it.'), { systemMessage: '[weaver] Flagged in this turn: #1 (weaver cards).' })
+  assert.deepEqual(kinds(), ['flag'])
+  assert.match(
+    hook('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'weaver close 1 fixed' }, tool_use_id: 'close' }).hookSpecificOutput
+      ?.permissionDecisionReason ?? '',
+    /^\[weaver weaver:owner-command\] Running `weaver close` is refused\./,
+  )
 })
 
 test('a reviewer at work in a copy of the project is held there by its own hook, which keeps nothing', () => {

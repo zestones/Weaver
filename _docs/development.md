@@ -51,7 +51,7 @@ Shapes written to disk or read from another program, such as a saved state or a 
 
 A folder holds sub-folders or files, never both. `src/index.ts`, the entry of a package, is the one file allowed beside folders. As soon as files form a family, such as a base class and its subclasses, they get a sub-folder of their own.
 
-The folders of a package are layers, read from the top: a file imports from its own layer and from those below it, never from one above. In the engine these are `bin`, then `loop`, then `verdict`, then `checks`, `guards` and `review` side by side, then `unit-of-work`, `declaration` and `agents` side by side, then `lib`. Start reading at `loop/dispatch/loop.ts`.
+The folders of a package are layers, read from the top: a file imports from its own layer and from those below it, never from one above. In the engine these are `bin`, then `loop`, then `verdict`, then `checks`, `guards`, `review` and `flagging` side by side, then `unit-of-work`, `declaration` and `agents` side by side, then `lib`. Start reading at `loop/dispatch/loop.ts`. The memory package, `packages/memory`, has `bin`, `writing`, `registry`, `cards`, `flags` and `lib`, and imports nothing from the engine: start reading at `registry/card-registry.ts`.
 
 ### Comments
 
@@ -74,6 +74,8 @@ A package that uses another reads its emitted types and runs its emitted code, s
 
 ### Running the CLI on a project
 
-`weaver install`, run at the root of a project, writes the hooks of the agent runtimes and a starter `.weaver/` folder: the settings, one file for each part of what the project asks, and the skill that says how a task ends. `weaver doctor` checks that the wiring is alive, and `weaver uninstall` removes the hooks. To have the command on this machine, build the workspace, then link its entry into a folder of your `PATH`, for example `ln -s "$PWD/apps/cli/dist/bin/weaver.js" ~/.local/bin/weaver` from the root of this repository. The build makes the entry executable.
+`weaver install`, run at the root of a project, writes the hooks of the agent runtimes and a starter `.weaver/` folder: the settings, one file for each part of what the project asks, and the skill that says how a task ends. `weaver doctor` checks that the wiring is alive, and `weaver uninstall` removes the hooks. `weaver cards` lists what agents flagged and what reviews left for the owner, `weaver cards <number>` prints one card, and `weaver close` decides on it; the [memory design](memory.md) says how a flag becomes a card. To have the command on this machine, build the workspace, then link its entry into a folder of your `PATH`, for example `ln -s "$PWD/apps/cli/dist/bin/weaver.js" ~/.local/bin/weaver` from the root of this repository. The build makes the entry executable.
+
+The commands that decide or change something are the owner's: they refuse to run when a `claude` or `codex` process is among their ancestors, so run them from a terminal of your own, not from inside an agent session.
 
 This is temporary. Weaver is not distributed yet, so a project is wired to this checkout by absolute paths: the hooks and the `$schema` line stop working when the checkout moves or its `dist/` is removed, and they belong to one machine. The `TODO(distribution)` in `apps/cli/src/link/engine-link.ts` marks what to replace once Weaver is published.

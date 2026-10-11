@@ -1,0 +1,17 @@
+{
+  "session_id": "09454c87-b496-4474-9a83-c7e85763c3bb",
+  "transcript_path": "/transcripts/session.jsonl",
+  "cwd": "/repo",
+  "prompt_id": "4b1a482d-243d-4aed-9089-719e415faf94",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "weaver flag src/one.js:1 <<'EOF2'\nSeen: the constant is named one but the file exports nothing else.\nExpected: a second export, since \"tools/parse.mjs\" reads two names.\nFound: I was reading src/one.js for another task; it's short.\nChecked: grep over src/ for `two`. I did not run anything.\nDid: left as it is.\nEOF2",
+    "description": "Run weaver flag command on src/one.js"
+  },
+  "tool_use_id": "toolu_01SYxancJ78ecKM65egUnMmT"
+}

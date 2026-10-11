@@ -2,12 +2,15 @@ import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv'
 import checks from './checks.schema.json' with { type: 'json' }
 import type { PartName } from './declaration-document.ts'
 import guards from './guards.schema.json' with { type: 'json' }
+import issues from './issues.schema.json' with { type: 'json' }
+import labels from './labels.schema.json' with { type: 'json' }
 import reviewers from './reviewers.schema.json' with { type: 'json' }
 import rules from './rules.schema.json' with { type: 'json' }
 import scripts from './scripts.schema.json' with { type: 'json' }
 import settings from './settings.schema.json' with { type: 'json' }
+import writer from './writer.schema.json' with { type: 'json' }
 
-const SCHEMAS: Readonly<Record<PartName, object>> = { settings, guards, checks, scripts, reviewers, rules }
+const SCHEMAS: Readonly<Record<PartName, object>> = { settings, guards, checks, scripts, labels, issues, reviewers, rules, writer }
 const TYPES: Readonly<Record<string, string>> = { object: 'an object', array: 'a list', string: 'a text', integer: 'a whole number' }
 
 // The shape of one file of `.weaver/`: its schema is the single definition of what the file may hold.

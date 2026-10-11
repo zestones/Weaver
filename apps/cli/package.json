@@ -1,7 +1,7 @@
 {
   "name": "@weaver/cli",
   "version": "0.0.0",
-  "description": "The owner's commands: plug Weaver into a project, unplug it, and check that it is alive there",
+  "description": "The owner's commands: plug Weaver into a project, check that it is alive there, and decide on the cards agents left",
   "private": true,
   "type": "module",
   "bin": {
@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@weaver/agent-sdk": "workspace:*",
-    "@weaver/engine": "workspace:*"
+    "@weaver/engine": "workspace:*",
+    "@weaver/memory": "workspace:*"
   },
   "devDependencies": {
     "vitest": "5.0.3"

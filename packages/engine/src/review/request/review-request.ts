@@ -20,7 +20,7 @@ export interface ReviewRequestFields {
   readonly earlier: readonly string[]
   // The places a program of the project listed under a rule, one a line.
   readonly candidates: readonly string[]
-  // What earlier reviews left for the owner about these files, one point a line.
+  // What the cards of the repository say of these files, one card a line.
   readonly history: readonly string[]
 }
 
@@ -79,8 +79,8 @@ export class ReviewRequest {
         earlier,
       ),
       ...this.listed(
-        'What earlier reviews left about these files',
-        'Check that none of these came back. A point the author left with a reason, or that the owner closed, was decided: raise it again only if this change removes the reason.',
+        'What is already known about these files',
+        'Each line is a card kept for the owner: something an agent flagged or a review left there, with where it stands. Check that none of these came back. A point the author left with a reason, or that the owner closed, was decided: raise it again only if this change removes the reason.',
         history,
       ),
       ...this.section('Your answer', [

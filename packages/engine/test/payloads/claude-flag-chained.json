@@ -1,0 +1,17 @@
+{
+  "session_id": "6abe6b05-14c7-4c56-be93-9184a8402531",
+  "transcript_path": "/transcripts/session.jsonl",
+  "cwd": "/repo",
+  "prompt_id": "06c318e2-98bb-4cc5-9d17-49e292f564ed",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "cd src && echo before && /opt/weaver/bin/weaver flag one.js:1 ../tools/parse.mjs <<'EOF2'\nSeen: chained call.\nExpected: unknown\nFound: a test of a chained command.\nChecked: nothing.\nDid: left as it is.\nEOF2",
+    "description": "Run the weaver flag command verbatim once"
+  },
+  "tool_use_id": "toolu_01Bjjr9bZhowYMD15oviimgg"
+}

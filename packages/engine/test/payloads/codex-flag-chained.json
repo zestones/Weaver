@@ -1,0 +1,14 @@
+{
+  "session_id": "01a12c01-9d68-72c2-8bc1-57ff66b0476d",
+  "turn_id": "01a12c01-9d94-77c2-9d9f-6fc6ff9f79aa",
+  "transcript_path": "/transcripts/session.jsonl",
+  "cwd": "/repo",
+  "hook_event_name": "PreToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "cd src && echo before && /opt/weaver/bin/weaver flag one.js:1 ../tools/parse.mjs <<'EOF2'\nSeen: chained call.\nExpected: unknown\nFound: a test of a chained command.\nChecked: nothing.\nDid: left as it is.\nEOF2"
+  },
+  "tool_use_id": "exec-3754b1dd-4a6f-4b6d-9e04-fd4fdde25b25"
+}

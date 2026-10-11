@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver issues",
+  "description": "Where the issues of this project are filed. Without this file, closing as `issue` with `weaver close` only records it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["command"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows, for the editor."
+    },
+    "command": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "description": "The command that files an issue for what the owner closes as `issue` with `weaver close`, as its words, with `{title}`, `{body}` and `{labels}` where they go."
+    }
+  }
+}

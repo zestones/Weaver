@@ -1,36 +1,36 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import {
-  DeclarationError,
-  DeclarationFolder,
-  DeclarationParts,
-  Repository,
-  ReviewLedger,
-  type Declaration,
-  type PartName,
-} from '@weaver/engine'
+import { DeclarationError, DeclarationFolder, DeclarationParts, Repository, type Declaration, type PartName } from '@weaver/engine'
+import { CardRegistry } from '@weaver/memory'
 import type { EngineLink } from '../link/engine-link.ts'
+import { CardSkill } from '../skills/card-skill.ts'
 import { FinishSkill } from '../skills/finish-skill.ts'
 import type { ProjectSkill } from '../skills/project-skill.ts'
 import { ReviewSkill } from '../skills/review-skill.ts'
 
 // What a new project starts with: every limit Weaver applies is written in its settings, where the owner changes it.
 const STARTING_LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 }
+// The database the registry keeps in the state folder.
+const REGISTRY_FILE = 'registry.sqlite'
 
 export class Project {
-  readonly top: string
+  readonly repository: Repository
 
-  constructor(top: string) {
-    this.top = top
+  constructor(repository: Repository) {
+    this.repository = repository
   }
 
   static locate(cwd: string): Project {
-    const repo = Repository.locate(cwd)
+    const repository = Repository.locate(cwd)
 
-    if (repo === null) throw new Error(`${cwd} is not inside a git repository`)
+    if (repository === null) throw new Error(`${cwd} is not inside a git repository`)
 
-    return new Project(repo.top)
+    return new Project(repository)
+  }
+
+  get top(): string {
+    return this.repository.top
   }
 
   get configName(): string {
@@ -42,7 +42,7 @@ export class Project {
   }
 
   // The settings, and one empty file for each part of what the project asks, each naming the schema an editor checks
-  // it against. Who reviews is the owner's to add: a review costs money.
+  // it against. Who reviews and who writes the cards are the owner's to add: both cost money.
   createConfig(link: EngineLink): boolean {
     const folder = DeclarationFolder.in(this.top)
     const starter: Readonly<Partial<Record<PartName, object>>> = {
@@ -50,6 +50,7 @@ export class Project {
       guards: {},
       checks: {},
       scripts: {},
+      labels: {},
     }
 
     if (existsSync(folder.settings)) return false
@@ -87,16 +88,33 @@ export class Project {
     return skill === null ? null : new ReviewSkill(this.top, skill)
   }
 
-  skills(): ProjectSkill[] {
-    return [this.finishSkill(), this.reviewSkill()].flatMap((skill) => skill ?? [])
+  cardSkill(): CardSkill | null {
+    const writer = this.readableDeclaration()?.writer
+
+    return writer?.skill == null ? null : new CardSkill(this.top, writer.skill, writer.sections)
   }
 
-  reviewLedger(): ReviewLedger {
-    const repo = Repository.locate(this.top)
+  skills(): ProjectSkill[] {
+    return [this.finishSkill(), this.reviewSkill(), this.cardSkill()].flatMap((skill) => skill ?? [])
+  }
 
-    if (repo === null) throw new Error(`${this.top} is not inside a git repository`)
+  // Creates the registry when nothing was recorded yet. Whoever opens it closes it.
+  registry(): CardRegistry {
+    return new CardRegistry(this.repository.stateDir)
+  }
 
-    return new ReviewLedger(repo)
+  // null while nothing was recorded: a command that only reads creates nothing.
+  recordedRegistry(): CardRegistry | null {
+    return existsSync(join(this.repository.stateDir, REGISTRY_FILE)) ? this.registry() : null
+  }
+
+  // The text of a file by its path from the top; null when it is not there.
+  read(path: string): string | null {
+    try {
+      return readFileSync(join(this.top, path), 'utf8')
+    } catch {
+      return null
+    }
   }
 
   ignores(path: string): boolean {

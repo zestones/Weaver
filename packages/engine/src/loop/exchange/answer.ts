@@ -4,11 +4,17 @@ interface ToolDenial {
   readonly permissionDecisionReason: string
 }
 
+// Both runtimes give this text to their model with the request.
+interface RequestContext {
+  readonly hookEventName: 'UserPromptSubmit'
+  readonly additionalContext: string
+}
+
 export interface AnswerBody {
   readonly decision?: 'block'
   readonly reason?: string
   readonly systemMessage?: string
-  readonly hookSpecificOutput?: ToolDenial
+  readonly hookSpecificOutput?: ToolDenial | RequestContext
 }
 
 export class Answer {
@@ -37,6 +43,10 @@ export class Answer {
 
   static refusing(reason: string): Answer {
     return new Answer({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } })
+  }
+
+  static adding(additionalContext: string): Answer {
+    return new Answer({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext } })
   }
 
   after(alert: string | null): Answer {

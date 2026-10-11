@@ -130,6 +130,52 @@ test('Weaver’s configuration, its state and the agent’s hook settings are gu
   assert.equal(refusal('Bash', { command: 'git status' }), null)
 })
 
+test('the commands of Weaver that decide or change are the owner’s, however an agent runs them; the ones that read are let through', () => {
+  const bare = new ProjectGuards(declarationOf({}), repo)
+  const refusal = (command: string): string | null => {
+    const { call } = catalog.fromArguments([]).read(new Payload({ cwd: repo.top, tool_name: 'Bash', tool_input: { command } }))
+
+    return call === null ? null : (bare.refusal(call)?.reason ?? null)
+  }
+  const owned = [
+    ['close 12 wontfix "not now"', 'close'],
+    ['install', 'install'],
+    ['uninstall', 'uninstall'],
+    ['cards reopen 12', 'cards reopen'],
+    ['cards retitle 12 "A better title"', 'cards retitle'],
+    ['cards label 12 type:bug', 'cards label'],
+    ['cards rewrite 12', 'cards rewrite'],
+    ['cards tie 12 13', 'cards tie'],
+    ['cards untie 12 13', 'cards untie'],
+    ['cards separate 12', 'cards separate'],
+  ] as const
+
+  for (const [words, named] of owned) {
+    for (const program of ['weaver', '/opt/weaver/bin/weaver', 'node /opt/weaver/dist/bin/weaver.js', 'cd src && timeout 30 weaver']) {
+      assert.equal(
+        refusal(`${program} ${words}`),
+        `[weaver weaver:owner-command] Running \`weaver ${named}\` is refused. Deciding on a card and plugging Weaver in or out are the owner's, from a terminal of their own.`,
+        `${program} ${words}`,
+      )
+    }
+  }
+
+  assert.match(refusal('weaver cards --all && weaver close 3 fixed') ?? '', /Running `weaver close`/)
+  assert.match(refusal('echo fixed | weaver cards rewrite 3') ?? '', /Running `weaver cards rewrite`/)
+
+  for (const command of [
+    'weaver cards',
+    'weaver cards 12',
+    'weaver cards --all --file src/a.ts --label type:bug',
+    'weaver doctor',
+    'node /opt/weaver/dist/bin/weaver.js cards 12',
+    'echo weaver close 12 fixed',
+    'git close 12',
+  ]) {
+    assert.equal(refusal(command), null, command)
+  }
+})
+
 test('the skill that says how a task ends is guarded as soon as the configuration names it', () => {
   const declared = declarationOf({ finish: { headings: ['Done'], skill: '.agents/skills/wv-finish.md' } })
   const { call } = catalog

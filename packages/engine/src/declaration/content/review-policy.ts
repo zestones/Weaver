@@ -15,7 +15,6 @@ export interface ReviewFields {
   readonly waitSeconds: number
   readonly maxRefusals: number
   readonly skill: string | null
-  readonly issue: readonly string[] | null
 }
 
 export class ReviewPolicy {
@@ -32,8 +31,6 @@ export class ReviewPolicy {
   readonly waitSeconds: number
   readonly maxRefusals: number
   readonly skill: string | null
-  // The command that files an issue for a point the owner closes as one.
-  readonly issue: readonly string[] | null
 
   constructor(fields: ReviewFields) {
     this.runtime = fields.runtime
@@ -45,6 +42,5 @@ export class ReviewPolicy {
     this.waitSeconds = fields.waitSeconds
     this.maxRefusals = fields.maxRefusals
     this.skill = fields.skill
-    this.issue = fields.issue
   }
 }

@@ -1,8 +1,7 @@
 import type { EventBody } from '../../unit-of-work/journal/journal-event.ts'
 import type { FindingAnswer } from '../answers/finding-answer.ts'
-import type { OwnerPoint } from '../ledger/owner-point.ts'
-import { ReviewLedger } from '../ledger/review-ledger.ts'
 import type { ReviewOutcome } from '../results/review-outcome.ts'
+import type { ReviewPoint } from './review-point.ts'
 
 // running: the review goes on after this end of turn. sent-back: the author has findings to answer. answers-wanted:
 // its answers are missing or cannot be taken. answered: each finding has its answer, or the author was asked enough.
@@ -68,34 +67,47 @@ export class UnitReview {
     if (standing === 'failed')
       return [`${REVIEW_RULE} the review by ${outcome.runtime} did not give its findings: ${outcome.failure ?? ''}`]
 
-    return this.points('').map((point) => `${point.id} ${ReviewLedger.describe(point)} (${point.standing})`)
+    return this.points().map(({ place, content }) => {
+      const where = place === null ? 'the change' : `${place.file}${place.line === null ? '' : `:${String(place.line)}`}`
+
+      return `${content.review} ${content.rule ?? SUSPICION_RULE} ${where}: ${content.message} (${content.standing})`
+    })
   }
 
-  // What the review leaves for the owner once the unit ends, each under a name the owner closes it by.
-  points(session: string): OwnerPoint[] {
+  // What the review leaves for the owner once the unit ends, each under its name in this review.
+  points(): ReviewPoint[] {
     const { outcome } = this
-    const at = new Date().toISOString()
     const key = this.content.slice(0, KEY_LENGTH)
 
     if (!ENDING.has(this.standing)) return []
 
-    const findings = outcome.findings.flatMap((finding, index): OwnerPoint[] => {
+    const findings = outcome.findings.flatMap((finding, index): ReviewPoint[] => {
       const standing = this.left(index)
-      const { rule, file, message } = finding
+      const { rule, file, message, quote, suggestion, evidence } = finding
+      const review = `${key}/F${String(index + 1)}`
 
       return standing === null
         ? []
-        : [{ id: `${key}/F${String(index + 1)}`, rule, file, line: finding.line ?? null, message, standing, session, at }]
+        : [
+            {
+              origin: 'finding',
+              place: { file, line: finding.line ?? null },
+              content: { review, rule, message, quote, suggestion, evidence, standing },
+            },
+          ]
     })
-    const suspicions = outcome.suspicions.map(({ file, note }, index): OwnerPoint => ({
-      id: `${key}/S${String(index + 1)}`,
-      rule: SUSPICION_RULE,
-      file,
-      line: null,
-      message: note,
-      standing: 'suspected by the reviewer, not verified',
-      session,
-      at,
+    const suspicions = outcome.suspicions.map(({ file, note }, index): ReviewPoint => ({
+      origin: 'suspicion',
+      place: file === null ? null : { file, line: null },
+      content: {
+        review: `${key}/S${String(index + 1)}`,
+        rule: null,
+        message: note,
+        quote: null,
+        suggestion: null,
+        evidence: null,
+        standing: 'suspected by the reviewer, not verified',
+      },
     }))
 
     return [...findings, ...suspicions]

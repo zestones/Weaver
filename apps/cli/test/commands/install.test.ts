@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DeclarationFolder } from '@weaver/engine'
@@ -54,7 +54,7 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   assert.match(claude.hooks.Stop?.[0]?.hooks[0]?.command ?? '', /hook\.js" Stop --agent=claude --weaver$/)
   assert.match(codex.hooks.PreToolUse?.[0]?.hooks[0]?.command ?? '', /hook\.js" PreToolUse --agent=codex --weaver$/)
 
-  for (const part of ['settings', 'guards', 'checks', 'scripts'] as const) {
+  for (const part of ['settings', 'guards', 'checks', 'scripts', 'labels'] as const) {
     const file = part === 'settings' ? CONFIG : `.weaver/project/${part}.json`
 
     assert.equal(readJson<{ $schema: string }>(top, file).$schema, link.schemaOf(part), 'each file names the schema it follows')
@@ -66,13 +66,16 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
     LIMITS,
     'every limit Weaver applies is written in the settings, where the owner changes it',
   )
-  assert.equal(existsSync(join(top, '.weaver/llm')), false, 'who reviews is the owner’s to add')
+  assert.equal(existsSync(join(top, '.weaver/llm')), false, 'who reviews and who writes the cards are the owner’s to add')
+  assert.deepEqual(readJson(top, '.weaver/project/labels.json'), { $schema: link.schemaOf('labels') })
+  assert.deepEqual(DeclarationFolder.in(top).load()?.labels, {})
+  assert.equal(existsSync(join(top, '.weaver/skills/wv-card.md')), false, 'a project that names no writer gets no skill for one')
   assert.deepEqual(DeclarationFolder.in(top).load()?.rules, [])
   assert.deepEqual(DeclarationFolder.in(top).load()?.finish.headings, ['Request', 'To validate', 'Found along the way'])
   assert.ok(lines.includes('.weaver/ created: declare your guards and your checks in .weaver/project/.'))
   assert.match(
     readFileSync(join(top, SKILL), 'utf8'),
-    /## Request\n\nWhat you did for the request[^]*## To validate\n\n[^]*## Found along the way\n\n/,
+    /## Request\n\nWhat you did for the request[^]*## To validate\n\n[^]*## Found along the way\n\nWhat you noticed outside the request\. Flag each thing with `weaver flag` when you find it, and name it here with the number of its flag\. Do not do it in the task, unless the task cannot go on without it: flag it then as fixed in the task\.\n```\n/,
   )
   assert.ok(lines.includes(`${SKILL} created: it tells the agent how to end a task. Adapt it to your project.`))
   assert.ok(lines.some((line) => line.includes(`${CLAUDE} is not ignored by git`)))
@@ -141,6 +144,33 @@ test('the skill of the reviewer is written the same way, where the configuration
   assert.ok(!weaver(top, ['install', 'claude']).lines.some((line) => line.includes('docs/review.md created')))
 })
 
+test('the skill of the writer is written when the configuration names it, with the sections of a card in its header, and never written over', () => {
+  const mine = '---\nsections:\n  - What\n  - Why\n---\n\nWrite short cards.\n'
+
+  writeConfig(top, { settings: SETTINGS, writer: { runtime: 'codex', timeoutSeconds: 600, skill: 'docs/card.md' } })
+
+  const { lines } = weaver(top, ['install', 'claude'])
+  const written = readFileSync(join(top, 'docs/card.md'), 'utf8')
+
+  assert.ok(lines.includes('docs/card.md created: it tells the writer how this project wants its cards written. Adapt it to your project.'))
+  assert.match(written, /^---\ndescription: [^\n]*\nsections:\n {2}- Observation\n {2}- Context\n {2}- Trace\n {2}- Uncertainties\n---\n/)
+  assert.deepEqual(DeclarationFolder.in(top).load()?.writer?.sections, ['Observation', 'Context', 'Trace', 'Uncertainties'])
+  assert.match(written, /understood alone, months later/)
+  assert.match(written, /neither an investigation nor a certainty/)
+  assert.match(written, /Keep what was seen apart from what is concluded/)
+  assert.match(
+    written,
+    /- \*\*Observation\*\*: What was seen, and where[^\n]*\n- \*\*Context\*\*: [^\n]*\n- \*\*Trace\*\*: [^\n]*\n- \*\*Uncertainties\*\*: /,
+  )
+  assert.match(written, /GitHub callout[^\n]*mermaid diagram/)
+  assert.match(written, /\n- No emoji\.\n/)
+
+  writeFileSync(join(top, 'docs/card.md'), mine)
+  assert.ok(!weaver(top, ['install', 'claude']).lines.some((line) => line.includes('docs/card.md created')))
+  assert.equal(readFileSync(join(top, 'docs/card.md'), 'utf8'), mine)
+  assert.deepEqual(DeclarationFolder.in(top).load()?.writer?.sections, ['What', 'Why'])
+})
+
 test('install may name the runtimes to wire, and refuses a name it does not know', () => {
   assert.equal(weaver(top, ['install', 'codex']).status, 0)
   assert.equal(existsSync(join(top, CODEX)), true)
@@ -153,7 +183,7 @@ test('install may name the runtimes to wire, and refuses a name it does not know
 })
 
 test('nothing is written when the hook cannot start, or outside a git repository', () => {
-  const dead = weaver(top, ['install'], new EngineLink(join(scratch, 'nowhere/hook.js'), link.schemas))
+  const dead = weaver(top, ['install'], { link: new EngineLink(join(scratch, 'nowhere/hook.js'), link.schemas) })
   const outside = weaver(scratch, ['install'])
 
   assert.equal(dead.status, 1)
@@ -179,8 +209,24 @@ test('without a command, or with one it does not know, weaver lists what it can 
   assert.equal(usage.status, 0)
   assert.equal(usage.lines[0], 'weaver <command>')
   assert.deepEqual(
-    usage.lines.slice(2).map((line) => line.trim().split(' ')[0]),
-    ['install', 'uninstall', 'doctor', 'status', 'close'],
+    usage.lines.slice(2).map((line) => line.trim().split(/ {2,}/)[0]),
+    [
+      'install [claude] [codex]',
+      'uninstall [claude] [codex]',
+      'doctor',
+      'flag <place>...',
+      'cards [<number>] [--all] [--file <path>] [--label <family:value>]',
+      'cards reopen <number> [note]',
+      'cards retitle <number> <title>',
+      'cards label <number> <family:value>...',
+      'cards rewrite <number>',
+      'cards tie <a> <b> [note]',
+      'cards untie <a> <b>',
+      'cards separate <number>',
+      'close <number> fixed|wontfix|issue [reason]',
+    ],
   )
+  assert.deepEqual(weaver(top, ['help']), usage)
+  assert.deepEqual(weaver(top, ['status']).status, 2, 'status went away with the ledger')
   assert.equal(weaver(top, ['frobnicate']).status, 2)
 })

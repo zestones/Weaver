@@ -3,7 +3,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { ClaudeCodeExecution, ExecutionCatalog, ScriptedExecution } from '@weaver/agent-sdk'
 import { DeclarationFolder, DeclarationParts, type PartName } from '@weaver/engine'
-import { CommandLine } from '../../src/commands/command-line.ts'
+import type { Caller } from '../../src/caller/caller.ts'
+import { CommandLine } from '../../src/commands/line/command-line.ts'
+import type { Input } from '../../src/input/input.ts'
 import type { EngineLink } from '../../src/link/engine-link.ts'
 import type { Output } from '../../src/output/output.ts'
 
@@ -12,11 +14,43 @@ interface Run {
   readonly lines: readonly string[]
 }
 
+// What surrounds a command when it runs. Left out: the real engine, a terminal of the owner's, nothing to read.
+interface Around {
+  readonly link?: EngineLink
+  // The agent runtime the command is started under.
+  readonly under?: string
+  readonly input?: string
+}
+
 class RecordingOutput implements Output {
   readonly lines: string[] = []
 
   say(line: string): void {
     this.lines.push(line)
+  }
+}
+
+class GivenCaller implements Caller {
+  private readonly name: string | null
+
+  constructor(name: string | null) {
+    this.name = name
+  }
+
+  agent(): string | null {
+    return this.name
+  }
+}
+
+class GivenInput implements Input {
+  private readonly text: string
+
+  constructor(text: string) {
+    this.text = text
+  }
+
+  read(): string {
+    return this.text
   }
 }
 
@@ -30,9 +64,11 @@ export function makeProject(top: string): string {
 // On the machine of these tests, Codex starts and Claude Code does not.
 const EXECUTIONS = new ExecutionCatalog([new ScriptedExecution('codex', []), new ClaudeCodeExecution('/nowhere/claude')])
 
-export function weaver(cwd: string, args: readonly string[], link: EngineLink | null = null): Run {
+// These tests may themselves run under an agent: who runs a command is always given, never read from the processes.
+export function weaver(cwd: string, args: readonly string[], around: Around = {}): Run {
   const output = new RecordingOutput()
-  const status = new CommandLine(cwd, output, link, EXECUTIONS).run(args)
+  const caller = new GivenCaller(around.under ?? null)
+  const status = new CommandLine(cwd, output, around.link ?? null, EXECUTIONS, caller, new GivenInput(around.input ?? '')).run(args)
 
   return { status, lines: output.lines }
 }

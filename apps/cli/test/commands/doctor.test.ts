@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
 import { RuntimeCatalog } from '../../src/runtimes/runtime-catalog.ts'
+import { finding, flag, write } from '../fixtures/cards.ts'
 import { makeProject, REVIEW, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-doctor-'))
@@ -57,7 +58,7 @@ test('hooks that point to a Weaver that is no longer there are a problem, and so
   for (const runtime of new RuntimeCatalog().settings(top, moved, ['codex'])) runtime.install()
 
   const stale = weaver(top, ['doctor'])
-  const dead = weaver(top, ['doctor'], moved)
+  const dead = weaver(top, ['doctor'], { link: moved })
 
   assert.equal(stale.status, 1)
   assert.ok(stale.lines.includes('PROBLEM Codex: the hooks in .codex/hooks.json point somewhere else. Run weaver install.'))
@@ -150,4 +151,78 @@ test('a configuration that cannot be read is a problem, with what is wrong in it
 
   assert.equal(status, 1)
   assert.match(lines[0] ?? '', /^PROBLEM \.weaver is not a valid project declaration: settings\.json: chekcs is not a known field$/)
+})
+
+const WRITER = { runtime: 'codex', model: 'gpt-5.5', timeoutSeconds: 600, skill: '.weaver/skills/wv-card.md' }
+
+test('a writer that starts, with its skill, is alive, and the cards that wait are counted', () => {
+  writeConfig(top, { settings: SETTINGS, writer: WRITER })
+  weaver(top, ['install', 'claude'])
+  flag(top)
+  finding(top)
+
+  const { status, lines } = weaver(top, ['doctor'])
+
+  assert.equal(status, 0, lines.join('\n'))
+  assert.deepEqual(lines, [
+    'ok      .weaver: 0 rule(s), 0 check(s), 0 guard(s)',
+    'ok      the writer codex on gpt-5.5 starts',
+    'ok      the card skill: .weaver/skills/wv-card.md',
+    'ok      the registry: 2 card(s) wait for you',
+    `ok      the hook starts: ${link.hook}`,
+    'ok      Claude Code: wired in .claude/settings.local.json',
+    '-       Codex: not wired',
+    '-       an agent started outside these runtimes is not supervised',
+  ])
+})
+
+test('a writer whose command does not start, or whose skill is missing, is a problem', () => {
+  writeConfig(top, { settings: SETTINGS, writer: { runtime: 'claude', timeoutSeconds: 600, skill: 'docs/card.md' } })
+
+  const { status, lines } = weaver(top, ['doctor'])
+
+  assert.equal(status, 1)
+  assert.deepEqual(lines.slice(1, 3), [
+    'PROBLEM claude writes the cards here, and the claude command does not start: flags stay raw.',
+    'PROBLEM docs/card.md is missing, and the writer is pointed to it. Run weaver install to write a template.',
+  ])
+
+  writeConfig(top, { settings: SETTINGS, writer: { runtime: 'codex', timeoutSeconds: 600 } })
+  assert.deepEqual(weaver(top, ['doctor']).lines.slice(1, 3), ['ok      the writer codex starts', `ok      the hook starts: ${link.hook}`])
+})
+
+test('without a writer, the flags that wait are noted: they stay raw until one is declared', () => {
+  const note = '-       1 flag(s) wait and no writer is declared: they stay raw. .weaver/llm/writer.json says who writes the cards.'
+
+  weaver(top, ['install', 'claude'])
+  assert.ok(!weaver(top, ['doctor']).lines.some((line) => line.includes('registry')), 'nothing is said of a registry that is not there')
+
+  flag(top)
+  finding(top)
+
+  const { status, lines } = weaver(top, ['doctor'])
+
+  assert.equal(status, 0, lines.join('\n'))
+  assert.deepEqual(lines.slice(2, 4), ['ok      the registry: 2 card(s) wait for you', note])
+
+  write(top, 1)
+  assert.ok(!weaver(top, ['doctor']).lines.includes(note), 'a flag closed or written up no longer waits for a writer')
+
+  flag(top, {
+    provenance: { author: 'owner', role: 'owner', session: null, subagent: null, unit: null, requests: [], commit: null, at: '' },
+  })
+  writeConfig(top, { settings: SETTINGS, writer: WRITER })
+  assert.ok(!weaver(top, ['doctor']).lines.some((line) => line.includes('no writer is declared')))
+})
+
+test('a registry that cannot be read is a problem, in the words of the registry', () => {
+  mkdirSync(join(top, '.git/weaver'), { recursive: true })
+  writeFileSync(join(top, '.git/weaver/registry.sqlite'), 'not a database')
+
+  const { status, lines } = weaver(top, ['doctor'])
+  const problem = lines.find((line) => line.includes('registry.sqlite')) ?? ''
+
+  assert.equal(status, 1)
+  assert.match(problem, /^PROBLEM the registry at .*\/\.git\/weaver\/registry\.sqlite could not be used: /)
+  assert.deepEqual(weaver(top, ['cards']), { status: 1, lines: [problem.replace('PROBLEM ', 'weaver: ')] })
 })

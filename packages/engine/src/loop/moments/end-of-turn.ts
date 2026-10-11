@@ -1,13 +1,18 @@
+import type { WriterLauncher } from '@weaver/memory'
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
-import { ReviewLedger } from '../../review/ledger/review-ledger.ts'
+import { WriterStart } from '../../flagging/writing/writer-start.ts'
+import type { Repository } from '../../lib/git/repository.ts'
+import { ReviewCards } from '../../review/cards/review-cards.ts'
 import type { ReviewRounds } from '../../review/rounds/review-rounds.ts'
+import { AgentReviewer } from '../../review/running/agent-reviewer.ts'
 import { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
 import { Report } from '../../verdict/report.ts'
 import { UnitVerdict } from '../../verdict/unit-verdict.ts'
 import { Answer } from '../exchange/answer.ts'
+import { FlaggedNotice } from '../exchange/flagged-notice.ts'
 import { HeadAlert } from '../exchange/head-alert.ts'
 import type { Turn } from '../exchange/turn.ts'
 import type { Moment } from './moment.ts'
@@ -18,10 +23,12 @@ export class EndOfTurn implements Moment {
   readonly speaksToOwner = true
   private readonly checks: CheckRunner
   private readonly reviews: ReviewRounds
+  private readonly writers: WriterLauncher
 
-  constructor(checks: CheckRunner, reviews: ReviewRounds) {
+  constructor(checks: CheckRunner, reviews: ReviewRounds, writers: WriterLauncher) {
     this.checks = checks
     this.reviews = reviews
+    this.writers = writers
   }
 
   async run(turn: Turn): Promise<Answer> {
@@ -31,9 +38,27 @@ export class EndOfTurn implements Moment {
     if (session === null) return Answer.empty()
 
     const alert = new HeadAlert(session.closeOpenCalls())
+    // Whatever the turn ends with, its flags are written up and the owner is told of them. The writer starts before
+    // the checks and the review, which a runtime may cut short: it has all the flags of the turn by now.
+    const unwritten = this.startWriter(turn.repo, turn.declaration)
     const answer = await this.finish(session, turn.declaration, turn.event.lastMessage)
+    const flagged = new FlaggedNotice(session.takeFlags())
 
-    return answer.after(alert.text)
+    return answer.after(unwritten).after(flagged.text).after(alert.text)
+  }
+
+  // A writer runs with the hooks of a reviewer, which stay silent: it never flags and is never supervised. What
+  // keeps it from starting is said to the owner, and takes nothing from the answer of the turn.
+  private startWriter(repo: Repository, declaration: Declaration): string | null {
+    try {
+      new WriterStart(this.writers, { [AgentReviewer.MARK]: '1' }).run(repo, declaration)
+
+      return null
+    } catch (error) {
+      const reason = (error instanceof Error ? error.message : String(error)).replace(/\.$/, '')
+
+      return `[weaver] The flags that wait were not written up: ${reason}.`
+    }
   }
 
   private async finish(session: Session, declaration: Declaration, lastMessage: string | null): Promise<Answer> {
@@ -98,7 +123,7 @@ export class EndOfTurn implements Moment {
 
     if (verdict.passed) {
       session.settle(unit.files)
-      new ReviewLedger(session.repo).open(review?.points(session.id) ?? [])
+      if (review !== null) new ReviewCards(session.repo).open(review, session, unit, declaration)
 
       return Answer.saying(report.summary(reportPath))
     }

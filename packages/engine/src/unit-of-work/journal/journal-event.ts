@@ -72,6 +72,14 @@ interface AnswerEvent {
   readonly status: 'fixed' | 'not-fixed' | 'missing'
 }
 
-export type EventBody = TouchEvent | CheckEvent | SettleEvent | HeadMovedEvent | RefuseEvent | ReviewEvent | AnswerEvent
+interface FlagEvent {
+  readonly kind: 'flag'
+  readonly unit: number
+  readonly card: number
+  // The registry already held this flag: the same call seen again, or the same words in the same unit of work.
+  readonly known: boolean
+}
+
+export type EventBody = TouchEvent | CheckEvent | SettleEvent | HeadMovedEvent | RefuseEvent | ReviewEvent | AnswerEvent | FlagEvent
 export type JournalEvent = EventBase & EventBody
 export type EventOf<Kind extends EventBody['kind']> = Extract<JournalEvent, { kind: Kind }>

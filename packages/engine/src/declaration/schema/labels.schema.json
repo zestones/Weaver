@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver labels",
+  "description": "The labels a card may carry, with the same words as the labels of the project where its issues live. Each key is the name of a family of labels, such as `type` or `area`. The writer labels a card with these values only.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "The schema this file follows, for the editor."
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      {
+        "const": "$schema"
+      },
+      {
+        "$ref": "#/definitions/name"
+      }
+    ]
+  },
+  "additionalProperties": {
+    "$ref": "#/definitions/family"
+  },
+  "definitions": {
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "family": {
+      "type": "object",
+      "description": "The values of the family. Each key is a value, such as `bug`.",
+      "propertyNames": {
+        "$ref": "#/definitions/name"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "description": "What the value means, as it is told to the writer that chooses among them."
+      }
+    }
+  }
+}

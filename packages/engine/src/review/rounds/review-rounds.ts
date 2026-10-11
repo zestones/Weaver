@@ -6,8 +6,8 @@ import type { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
 import { AuthorAnswers } from '../answers/author-answers.ts'
+import { ReviewCards } from '../cards/review-cards.ts'
 import type { ReviewLauncher } from '../launching/review-launcher.ts'
-import { ReviewLedger } from '../ledger/review-ledger.ts'
 import { ReviewOutcome } from '../results/review-outcome.ts'
 import type { ReviewRecord } from '../results/review-record.ts'
 import { ReviewStore } from '../results/review-store.ts'
@@ -99,7 +99,7 @@ export class ReviewRounds {
         candidates: candidates.map(
           ({ rule, file, line, message }) => `${rule} ${line === undefined ? file : `${file}:${String(line)}`}: ${message}`,
         ),
-        history: new ReviewLedger(session.repo).about(diff.paths),
+        history: new ReviewCards(session.repo).about(diff.paths),
       },
       assignment: new ReviewRouting(policy, new OwnerDirectives(unit.requests)).assign(session.agent, diff),
       startedAt: new Date().toISOString(),

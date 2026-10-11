@@ -1,0 +1,24 @@
+{
+  "name": "@weaver/memory",
+  "version": "0.0.0",
+  "description": "What agents discover and what the owner decides about it: flags, cards and the registry that keeps them",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@weaver/agent-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "5.0.3"
+  }
+}

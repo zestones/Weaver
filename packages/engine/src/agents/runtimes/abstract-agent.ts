@@ -29,7 +29,7 @@ export abstract class AbstractAgent implements Agent {
       cwd,
       prompt: payload.text('prompt'),
       call: tool === null ? null : this.call(tool, payload.record('tool_input'), cwd),
-      subagent: payload.text('agent_id') !== null,
+      agentId: payload.text('agent_id'),
       lastMessage: payload.text('last_assistant_message'),
     })
   }

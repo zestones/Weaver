@@ -113,6 +113,17 @@ export class Session {
     this.store.update((latest) => ({ ...latest, failedReview: content, unit: new UnitOfWork(latest.unit).withReviewRunning(null).record }))
   }
 
+  // A flag is journaled each time it is made; one that is new is named to the owner when the turn ends.
+  flagged(card: number, known: boolean): void {
+    const { unit } = this.store.update((latest) => (known ? latest : { ...latest, flagged: [...latest.flagged, card] }))
+
+    this.log({ kind: 'flag', unit: unit.number, card, known })
+  }
+
+  takeFlags(): readonly number[] {
+    return this.store.transact((latest) => ({ record: { ...latest, flagged: [] }, value: latest.flagged })).value
+  }
+
   failRound(): number {
     return this.store.update((latest) => ({ ...latest, unit: new UnitOfWork(latest.unit).withFailedRound().record })).unit.check.rounds
   }

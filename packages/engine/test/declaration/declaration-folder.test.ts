@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, test } from 'vitest'
+import { WriterPolicy } from '../../src/declaration/content/writer-policy.ts'
 import { DeclarationError } from '../../src/declaration/reading/declaration-error.ts'
 import { DeclarationFolder } from '../../src/declaration/reading/declaration-folder.ts'
 import { DeclarationParts, type PartTexts } from '../../src/declaration/reading/declaration-parts.ts'
@@ -284,7 +285,6 @@ test('a project says who reviews its changes, where a mistake costs the most, an
     review: {
       runtime: 'other',
       reviewers: { claude: { model: 'opus', effort: 'max' } },
-      issue: ['gh', 'issue', 'create', '--title', '{title}', '--body', '{body}'],
       critical: { paths: ['src/auth/**'], lines: 200 },
       experiments: true,
       skill: 'docs/review.md',
@@ -308,8 +308,122 @@ test('a project says who reviews its changes, where a mistake costs the most, an
     ['other', { model: 'opus', effort: 'max' }, ['src/auth/**'], 200, true],
   )
   assert.deepEqual(full.skills, ['docs/review.md'], 'the skill of the reviewer is guarded as the others are')
-  assert.deepEqual([full.review?.issue?.[0], plain?.issue, plain?.waitSeconds], ['gh', null, 1500])
+  assert.equal(plain?.waitSeconds, 1500)
   assert.equal(parse({}).review, null)
+  assert.deepEqual(
+    problems({ review: { runtime: 'codex', issue: ['gh', 'issue', 'create'] } }),
+    ['llm/reviewers.json: issue is not a known field'],
+    'a project without a reviewer files issues too: the command has a file of its own',
+  )
+})
+
+const CARD_SECTIONS = ['Observation', 'Context', 'Trace', 'Uncertainties']
+
+test('the labels of a card, the command that files an issue and the writer are each read from their own file, which may name its schema', () => {
+  const top = join(scratch, 'cards')
+  const labels = { type: { bug: 'Something does not work.', 'tech-debt': 'Code to clean up.' }, area_2: { auth: 'Signing in.' } }
+  const command = ['gh', 'issue', 'create', '--title', '{title}', '--body', '{body}', '--label', '{labels}']
+  const writer = { runtime: 'claude', model: 'sonnet', effort: 'low', timeoutSeconds: 300, skill: '.weaver/skills/wv-card.md' }
+
+  writeFiles(top, {
+    '.weaver/settings.json': SETTINGS,
+    '.weaver/project/labels.json': JSON.stringify({ $schema: './labels.schema.json', ...labels }),
+    '.weaver/project/issues.json': JSON.stringify({ $schema: './issues.schema.json', command }),
+    '.weaver/llm/writer.json': JSON.stringify({ $schema: './writer.schema.json', ...writer }),
+    '.weaver/skills/wv-card.md': '---\ndescription: How a card is written.\nsections: [What, "Why it matters"]\n---\n\n## What\n',
+  })
+
+  const config = DeclarationFolder.in(top).load()
+
+  assert.deepEqual(config?.labels, labels)
+  assert.deepEqual(config?.issue, command)
+  assert.deepEqual({ ...config?.writer }, { ...writer, sections: ['What', 'Why it matters'] })
+  assert.deepEqual(config?.skills, ['.weaver/skills/wv-card.md'], 'the skill of the writer is guarded as the others are')
+})
+
+test('a project that declares none of them has no label, no writer and no command; a writer may say only who writes and for how long', () => {
+  const bare = parse({})
+  const plain = parse({ writer: { runtime: 'codex' } }).writer
+
+  assert.deepEqual([bare.labels, bare.writer, bare.issue, bare.skills], [{}, null, null, []])
+  assert.deepEqual({ ...plain }, { runtime: 'codex', model: null, effort: null, timeoutSeconds: 600, skill: null, sections: CARD_SECTIONS })
+})
+
+test('the sections of a card are listed in the header of the skill of the writer; the four agreed ones stand until it is written', () => {
+  const card = 'docs/card.md'
+  const skilled = (skill: string) =>
+    new DeclarationParts(
+      '.weaver',
+      { settings: SETTINGS, writer: JSON.stringify({ runtime: 'codex', timeoutSeconds: 300, skill: card }) },
+      () => skill,
+    )
+  const unwritten = parse({ writer: { runtime: 'codex', skill: card } })
+
+  assert.deepEqual(WriterPolicy.SECTIONS, CARD_SECTIONS)
+  assert.deepEqual(
+    skilled('---\ndescription: How a card is written.\nsections:\n  - Facts\n  - "Open doubts"\n---\n').declaration().writer?.sections,
+    ['Facts', 'Open doubts'],
+  )
+  assert.deepEqual(parse({ writer: { runtime: 'codex', sections: ['Facts'] } }).writer?.sections, ['Facts'])
+  assert.deepEqual(
+    [unwritten.writer?.skill, unwritten.writer?.sections],
+    [card, CARD_SECTIONS],
+    'a skill that is not written yet lists nothing',
+  )
+  assert.deepEqual(
+    problemsOf(() => skilled('---\ndescription: How a card is written.\n---\n\n## Facts\n').declaration()),
+    ['docs/card.md: its header lists no `sections`: they are what the writer writes in the body of a card'],
+  )
+  assert.deepEqual(
+    parse({
+      finish: { skill: 'docs/finish.md' },
+      review: { runtime: 'codex', skill: 'docs/review.md' },
+      writer: { runtime: 'codex', skill: card },
+    }).skills,
+    ['docs/finish.md', 'docs/review.md', card],
+  )
+})
+
+test('what is wrong with the labels, the issues and the writer is reported with the file and the field', () => {
+  assert.deepEqual(
+    problemsIn({
+      settings: SETTINGS,
+      labels: JSON.stringify({ 'kind!': {}, type: { 'to do': 'x', bug: '', debt: 3 }, area: 'auth' }),
+      issues: JSON.stringify({ command: ['gh', ''], labels: ['bug'] }),
+      writer: JSON.stringify({ runtime: 'gemini', model: '', effort: 3, timeoutSeconds: 0, skill: '', maxCostUsd: 1 }),
+    }),
+    [
+      'project/labels.json: kind! is not a valid name',
+      'project/labels.json: type.to do is not a valid name',
+      'project/labels.json: type.bug must not be empty',
+      'project/labels.json: type.debt must be a text',
+      'project/labels.json: area must be an object',
+      'project/issues.json: labels is not a known field',
+      'project/issues.json: command.1 must not be empty',
+      'llm/writer.json: maxCostUsd is not a known field',
+      'llm/writer.json: runtime must be one of claude, codex',
+      'llm/writer.json: model must not be empty',
+      'llm/writer.json: effort must be a text',
+      'llm/writer.json: timeoutSeconds must be at least 1',
+      'llm/writer.json: skill must not be empty',
+    ],
+  )
+  assert.deepEqual(problemsIn({ settings: SETTINGS, issues: '{}', writer: '{}' }), [
+    'project/issues.json: command is missing',
+    'llm/writer.json: runtime is missing',
+    'llm/writer.json: timeoutSeconds is missing',
+  ])
+  assert.deepEqual(
+    problemsIn({ settings: SETTINGS, labels: '[]', issues: '{"command":[]}', writer: '{"runtime":"codex","timeoutSeconds":1.5}' }),
+    [
+      'project/labels.json: the file must be an object',
+      'project/issues.json: command must not be empty',
+      'llm/writer.json: timeoutSeconds must be a whole number',
+    ],
+  )
+  assert.deepEqual(problemsIn({ settings: SETTINGS, issues: '{"command":"gh issue create"}' }), [
+    'project/issues.json: command must be a list',
+  ])
 })
 
 test('a rule of the review may name the check that lists its places, and may ask for the experiment behind each finding', () => {
