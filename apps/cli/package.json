@@ -1,12 +1,15 @@
 {
   "name": "@weaver/cli",
-  "version": "0.0.0",
+  "version": "0.0.0-dev",
   "description": "The owner's commands: plug Weaver into a project, check that it is alive there, and decide on the cards agents left",
   "private": true,
   "type": "module",
   "bin": {
     "weaver": "./dist/bin/weaver.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json && chmod +x dist/bin/weaver.js",
     "typecheck": "tsc -p tsconfig.json",

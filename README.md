@@ -162,6 +162,7 @@ The hooks point at this checkout, for as long as Weaver is not distributed. Code
 | `weaver install [claude] [codex]`              | Plugs Weaver into the project: the hooks, and a starter configuration.  |
 | `weaver uninstall [claude] [codex]`            | Removes the hooks, and leaves everything else as it is.                 |
 | `weaver doctor`                                | Checks the configuration, the hook, and each agent runtime.             |
+| `weaver version`                               | Says which version of Weaver this is.                                   |
 | `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.   |
 | `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`. |
 | `weaver cards reopen\|retitle\|label\|rewrite` | Corrects a card, or opens it again.                                     |

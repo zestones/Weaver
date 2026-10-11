@@ -1,0 +1,84 @@
+# =============================================================
+# Release: a version tag becomes a GitHub Release
+# =============================================================
+# Trigger: push a version tag  →  git tag v1.2.3 && git push origin v1.2.3
+# Manual:  workflow_dispatch with a version. It is a rehearsal: the archive
+#          and the notes are built and kept with the run, nothing is published.
+#
+# One job, in this order:
+#   1. pnpm check                 → nothing is published from a tree that fails
+#   2. tools/release/package.sh   → weaver-<version>.tar.gz and SHA256SUMS
+#   3. tools/release/notes.sh     → the notes, from the commits since the release before
+#   4. gh release create          → the release, with the archive, its digest and install.sh
+#
+# The tag decides the version: package.sh stamps it in the copy that ships.
+# =============================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to rehearse (e.g., v1.2.3)'
+        required: true
+
+permissions:
+  contents: read
+
+# bash with pipefail: a step whose script fails before a pipe fails too.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: 'check, package, publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # creates the release
+    env:
+      VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The notes read the history and the tags.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+
+      - name: Package
+        run: bash tools/release/package.sh "$VERSION" dist
+
+      - name: Write the notes
+        run: bash tools/release/notes.sh "$VERSION" | tee dist/notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep what a rehearsal built
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: weaver-rehearsal
+          path: |
+            dist/weaver-*.tar.gz
+            dist/SHA256SUMS
+            dist/notes.md
+          retention-days: 7
+
+      - name: Publish
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$VERSION" \
+            "dist/weaver-$VERSION.tar.gz" dist/SHA256SUMS tools/release/install.sh \
+            --title "$VERSION" --notes-file dist/notes.md --verify-tag

@@ -214,6 +214,7 @@ test('without a command, or with one it does not know, weaver lists what it can 
       'install [claude] [codex]',
       'uninstall [claude] [codex]',
       'doctor',
+      'version',
       'flag <place>...',
       'cards [<number>] [--all] [--file <path>] [--label <family:value>]',
       'cards reopen <number> [note]',

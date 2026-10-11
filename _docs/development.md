@@ -6,20 +6,68 @@ Use the Node.js version in `.node-version` and the pnpm version recorded in `pac
 
 ## Commands
 
-| Command             | Purpose                                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------------------------ |
-| `pnpm build`        | Run package build scripts in dependency order, one package at a time. No application build exists yet. |
-| `pnpm typecheck`    | Run package type checks sequentially.                                                                  |
-| `pnpm lint`         | Check JavaScript and TypeScript with zero warnings allowed.                                            |
-| `pnpm knip`         | Detect unused files, exports and dependencies across the workspace.                                    |
-| `pnpm test`         | Run package test scripts sequentially.                                                                 |
-| `pnpm format`       | Format repository files.                                                                               |
-| `pnpm format:check` | Check formatting without writing.                                                                      |
-| `pnpm check`        | Run formatting, builds, types, lint, unused-code analysis and tests sequentially.                      |
+| Command             | Purpose                                                                           |
+| ------------------- | --------------------------------------------------------------------------------- |
+| `pnpm build`        | Run package build scripts in dependency order, one package at a time.             |
+| `pnpm typecheck`    | Run package type checks sequentially.                                             |
+| `pnpm lint`         | Check JavaScript and TypeScript with zero warnings allowed.                       |
+| `pnpm knip`         | Detect unused files, exports and dependencies across the workspace.               |
+| `pnpm test`         | Run package test scripts sequentially.                                            |
+| `pnpm format`       | Format repository files.                                                          |
+| `pnpm format:check` | Check formatting without writing.                                                 |
+| `pnpm check`        | Run formatting, builds, types, lint, unused-code analysis and tests sequentially. |
 
-Checks run locally through `pnpm check`; no GitHub Actions workflow is configured. Recursive package commands use one workspace slot. Each package must configure its own test runner with one worker and no parallel test files. These limits reduce concurrent work; they are not a hard memory quota.
+`pnpm check` is the one command that judges the repository, on a workstation and in the [CI](#continuous-integration-and-releases). Recursive package commands use one workspace slot. Each package must configure its own test runner with one worker and no parallel test files. These limits reduce concurrent work; they are not a hard memory quota.
 
 Knip discovers workspace packages from `pnpm-workspace.yaml` and tooling entry points through its plugins. `knip.json` declares the root project files without treating every file as an entry point. Add actual executable entry points when applications are implemented; do not hide unused code or dependencies with blanket exclusions.
+
+## Continuous integration and releases
+
+Two workflows live in `.github/workflows/`.
+
+| Workflow      | Trigger                                 | What it does                                                                                    |
+| ------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `ci.yml`      | A push to `main`, every pull request    | Runs `pnpm check`.                                                                              |
+| `release.yml` | A version tag, or a run started by hand | Runs `pnpm check`, builds the archive, writes the notes and publishes them as a GitHub Release. |
+
+### Cutting a release
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The tag decides the version. Nothing in the sources is edited for a release: the copy that ships is stamped with the tag, and a checkout keeps saying `weaver 0.0.0-dev`. Choose the number from what the notes will say: a breaking change, a feature, or fixes only.
+
+A run of `release.yml` started by hand, with a version, is a rehearsal. It builds the archive and the notes, keeps them with the run for a week, and publishes nothing. To publish a version again, delete its release first.
+
+The notes are written from the commits since the release before. Commits follow Conventional Commits, so a subject says where it goes: a `feat` under Features, a `fix` under Fixes, and whatever carries a `!` under Breaking changes.
+
+### What a release holds
+
+| File                      | What it is                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------------------- |
+| `weaver-<version>.tar.gz` | The command, the engine and what they depend on, built. It needs only Node.js 24.13 or later. |
+| `SHA256SUMS`              | The digest of the archive.                                                                    |
+| `install.sh`              | The script that installs the archive for the current user.                                    |
+
+The scripts of `tools/release/` do the work, and run on a workstation as they do in the workflow:
+
+| Script                                | What it does                                                                                        |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `package.sh <version> [<out folder>]` | Builds the archive and its digest, into `dist/` by default, and tries the copy before it packs it.  |
+| `notes.sh <version>`                  | Prints the notes of the release.                                                                    |
+| `install.sh <archive>`                | Installs an archive. `WEAVER_HOME` and `WEAVER_BIN` move where it goes, to try one without a trace. |
+
+### Installing a release
+
+```sh
+gh release download v0.1.0 --repo zestones/Weaver --dir weaver-v0.1.0 && cd weaver-v0.1.0
+sha256sum --check --ignore-missing SHA256SUMS
+bash install.sh weaver-v0.1.0.tar.gz
+```
+
+The release goes to `~/.local/share/weaver/v0.1.0/`, and `~/.local/bin/weaver` points at it. Versions stay side by side: a supervised project runs the one it was wired with, until `weaver install` is run in it again. After an upgrade, `weaver doctor` says in each project that its hooks point somewhere else. An older version is removed by hand, once no project points at it.
 
 ## TypeScript and packages
 

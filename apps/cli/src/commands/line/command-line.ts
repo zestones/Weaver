@@ -18,9 +18,11 @@ import { FlagCommand } from '../memory/flag-command.ts'
 import { DoctorCommand } from '../wiring/doctor-command.ts'
 import { InstallCommand } from '../wiring/install-command.ts'
 import { UninstallCommand } from '../wiring/uninstall-command.ts'
+import { VersionCommand } from '../wiring/version-command.ts'
 import type { Command } from './command.ts'
 
 const HELP = new Set(['help', '--help', '-h'])
+const ALIASES: Readonly<Record<string, string>> = { '--version': 'version', '-v': 'version' }
 
 export class CommandLine {
   private readonly cwd: string
@@ -82,6 +84,7 @@ export class CommandLine {
       new InstallCommand(this.cwd, this.output, link),
       new UninstallCommand(this.cwd, this.output, link),
       new DoctorCommand(this.cwd, this.output, link, this.executions),
+      new VersionCommand(this.output),
       new FlagCommand(this.cwd, this.output, this.input, this.caller),
       new CardsCommand(this.cwd, this.output),
       new ReopenCommand(this.cwd, this.output),
@@ -97,9 +100,10 @@ export class CommandLine {
 
   // A name of two words wins over its first word: `cards reopen` is not `cards` given the word `reopen`.
   private called(commands: readonly Command[], argv: readonly string[]): Command | undefined {
+    const [first = ''] = argv
     const words = argv.slice(0, 2).join(' ')
 
-    return commands.find((command) => command.name === words) ?? commands.find((command) => command.name === argv[0])
+    return commands.find((command) => command.name === words) ?? commands.find((command) => command.name === (ALIASES[first] ?? first))
   }
 
   private usage(commands: readonly Command[]): void {

@@ -1,0 +1,40 @@
+# =============================================================
+# CI: the checks of the repository, on every change
+# =============================================================
+# Trigger: a push to main, and every pull request.
+#
+# One job runs `pnpm check`, the same command as on a workstation:
+# formatting, builds, types, lint, unused code, tests.
+# =============================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: 'pnpm check'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # pnpm comes first: setup-node asks it where its store is, to cache it.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
