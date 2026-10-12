@@ -20,15 +20,17 @@ const TAG = 'v9.9.9'
 const ARCHIVE = `weaver-${TAG}.tar.gz`
 const CLAUDE = '.claude/settings.local.json'
 // A later release reduced to what an update asks of it: it says its version, and it records how it was asked to
-// finish the update.
+// finish the update, or to say what it would change.
 const LATER = `#!/usr/bin/env node
 const [command, ...args] = process.argv.slice(2)
 if (command === 'version') console.log('weaver 9.9.9')
 if (command === 'update') {
   require('node:fs').writeFileSync('handed-over.txt', args.join(' '))
-  console.log('This project is up to date with Weaver v9.9.9.')
+  console.log(args.includes('--dry-run') ? '- .weaver/ would be brought up to date:' : 'This project is up to date with Weaver v9.9.9.')
 }
 `
+// What the publisher of a release writes of it: how it is installed, then what changed.
+const NOTES = '## Install\n\nWeaver needs Node.js.\n\n## What changed since v0.1.0\n\n### Features\n\n- add a thing (abc1234)\n'
 // A project as the first format wrote it, wired by the release of that time.
 const FIRST_SETTINGS = { version: 1, checks: { maxRefusals: 5, totalTimeoutSeconds: 600, parallel: 2 } }
 const FIRST_CHECKS = {
@@ -57,18 +59,20 @@ class LocalReleases implements ReleaseSource {
   private readonly folder: string
   private readonly names: readonly string[]
   private readonly reachable: boolean
+  private readonly notes: string
 
-  constructor(folder: string, names: readonly string[], reachable: boolean) {
+  constructor(folder: string, names: readonly string[], reachable: boolean, notes: string) {
     this.folder = folder
     this.names = names
     this.reachable = reachable
+    this.notes = notes
   }
 
   latest(): Promise<PublishedRelease> {
     this.asked += 1
 
     return this.reachable
-      ? Promise.resolve({ tag: TAG, assets: new Map(this.names.map((name) => [name, join(this.folder, name)])) })
+      ? Promise.resolve({ tag: TAG, notes: this.notes, assets: new Map(this.names.map((name) => [name, join(this.folder, name)])) })
       : Promise.reject(new Error('the releases of zestones/Weaver could not be read: no network'))
   }
 
@@ -87,6 +91,7 @@ class LocalReleases implements ReleaseSource {
 interface Machine {
   readonly names?: readonly string[]
   readonly reachable?: boolean
+  readonly notes?: string
 }
 
 afterAll(() => {
@@ -120,7 +125,8 @@ beforeEach(() => {
 
 // The machine as an update sees it: the release that runs, the releases published in a folder, a home of these tests.
 function channel(version: string, machine: Machine = {}): ReleaseChannel {
-  const source = new LocalReleases(published, machine.names ?? [ARCHIVE, 'SHA256SUMS', 'install.sh'], machine.reachable ?? true)
+  const files = machine.names ?? [ARCHIVE, 'SHA256SUMS', 'install.sh']
+  const source = new LocalReleases(published, files, machine.reachable ?? true, machine.notes ?? '')
 
   return new ReleaseChannel(source, new ReleaseInstaller({ ...process.env, WEAVER_HOME: home, WEAVER_BIN: bin }), new OwnRelease(version))
 }
@@ -206,15 +212,60 @@ test('a dry run says what an update would do and writes nothing, in the project 
   assert.equal(here.lines.at(-1), 'Dry run: nothing was written.')
   assert.deepEqual(readJson(top, '.weaver/settings.json'), FIRST_SETTINGS)
   assert.equal(readFileSync(join(top, CLAUDE), 'utf8'), hooks)
+})
 
-  const later = channel('0.1.0')
+test('a dry run from an earlier release shows what the later one says changed, and asks it what it would change here', async () => {
+  firstFormatProject()
 
-  assert.deepEqual((await weaver(top, ['update', '--dry-run'], { channel: later })).lines, [
+  const later = channel('0.1.0', { notes: NOTES })
+  const dry = await weaver(top, ['update', '--dry-run'], { channel: later })
+
+  assert.deepEqual(dry, {
+    status: 0,
+    lines: [
+      '- Weaver v9.9.9 is published, and this is v0.1.0: it would be installed.',
+      '',
+      'What changed since v0.1.0',
+      '',
+      'Features',
+      '  - add a thing (abc1234)',
+      '',
+      'What Weaver v9.9.9 would change in this project',
+      '  - .weaver/ would be brought up to date:',
+    ],
+  })
+  assert.equal(handedOver(), '--dry-run --offline', 'the later release is asked for its own dry run')
+  assert.equal(sourceOf(later).fetched, 2, 'its archive and its sums: the script that installs is not fetched')
+  assert.equal(existsSync(home), false, 'nothing is installed')
+  assert.deepEqual(readJson(top, '.weaver/settings.json'), FIRST_SETTINGS)
+
+  const silent = await weaver(top, ['update', '--dry-run'], { channel: channel('0.1.0') })
+
+  assert.deepEqual(silent.lines.slice(0, 3), [
     '- Weaver v9.9.9 is published, and this is v0.1.0: it would be installed.',
-    '  What it changes in this project is its own to say: once it is installed, weaver update --dry-run shows it.',
+    '',
+    'What Weaver v9.9.9 would change in this project',
   ])
-  assert.equal(sourceOf(later).fetched, 0)
-  assert.equal(existsSync(home), false)
+})
+
+test('a dry run runs nothing of an archive that is not the one its release published', async () => {
+  writeConfig(top, { settings: SETTINGS })
+  writeFileSync(join(published, 'SHA256SUMS'), `${'0'.repeat(64)}  ${ARCHIVE}\n`)
+
+  assert.deepEqual(await weaver(top, ['update', '--dry-run'], { channel: channel('0.1.0') }), {
+    status: 1,
+    lines: [
+      '- Weaver v9.9.9 is published, and this is v0.1.0: it would be installed.',
+      'X Weaver v9.9.9 could not be asked what it would change.',
+      `  ${ARCHIVE} does not match the SHA256SUMS of its release: nothing of it is run.`,
+    ],
+  })
+  assert.equal(handedOver(), null)
+
+  const lacking = await weaver(top, ['update', '--dry-run'], { channel: channel('0.1.0', { names: [ARCHIVE] }) })
+
+  assert.deepEqual(lacking.lines.at(-1), 'X The release v9.9.9 has no SHA256SUMS')
+  assert.equal(lacking.status, 1)
 })
 
 test('update looks for no release when it is told so, when GitHub does not answer, or from a checkout, and still brings the project up to date', async () => {

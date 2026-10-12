@@ -1,5 +1,7 @@
 export interface PublishedRelease {
   readonly tag: string
+  // What its publisher wrote of it, as Markdown; empty when nothing was written.
+  readonly notes: string
   // Each file the release carries, by its name, with where it is fetched from.
   readonly assets: ReadonlyMap<string, string>
 }

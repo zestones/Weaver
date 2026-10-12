@@ -184,7 +184,7 @@ weaver doctor      # is everything alive?
 
 Codex loads the hooks of a project only once it trusts the project, and runs each one only once you have approved it with `/hooks`: `weaver doctor` says where that stands. Who reviews and who writes the cards are yours to add in `.weaver/llm/`, since both cost money.
 
-To stay up to date there is one command, `weaver update`, which you run in a supervised project whenever you like. It does three things in order: it installs the latest release of Weaver when you do not have it, it applies to `.weaver/` the migrations the project lacks, naming each and what it changed, and it wires the hooks to that release. `weaver update --dry-run` shows what it would do and writes nothing.
+To stay up to date there is one command, `weaver update`, which you run in a supervised project whenever you like. It does three things in order: it installs the latest release of Weaver when you do not have it, it applies to `.weaver/` the migrations the project lacks, naming each and what it changed, and it wires the hooks to that release. `weaver update --dry-run` shows what it would do and writes nothing: when a later release is published, what that release says changed, and what it would change in this project, asked of a copy of it that is unpacked and never installed.
 
 Releases stay side by side, and a project runs the one that wired it until `weaver update` is run there: `weaver doctor` says when a project is behind. A release that changes the format of `.weaver/` comes with the migration from the format before; `version`, in `settings.json`, is the number of that format.
 

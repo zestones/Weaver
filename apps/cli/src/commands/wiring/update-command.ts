@@ -85,13 +85,49 @@ export class UpdateCommand implements Command {
     return null
   }
 
-  private announce(later: PublishedRelease): number {
-    const { own } = this.channel
+  // What a later release would change here is its own to say: this one does not hold its migrations. So the release
+  // is unpacked in a temporary folder, where nothing is installed, and asked for its own dry run on this project.
+  private async announce(later: PublishedRelease): Promise<number> {
+    const { own, source, installer } = this.channel
+    const folder = mkdtempSync(join(tmpdir(), 'weaver-update-'))
+    const archive = `weaver-${later.tag}.tar.gz`
 
     this.screen.note(`Weaver ${later.tag} is published, and this is ${own.tag}: it would be installed.`)
-    this.screen.hint('What it changes in this project is its own to say: once it is installed, weaver update --dry-run shows it.', 1)
+    this.notes(later)
 
-    return 0
+    try {
+      for (const name of [archive, SUMS]) await source.fetch(later, name, join(folder, name))
+
+      const unpacked = installer.unpack(folder, archive)
+
+      if (unpacked.command === null) {
+        this.screen.error(`Weaver ${later.tag} could not be asked what it would change.`, ...unpacked.said)
+
+        return 1
+      }
+
+      const asked = installer.start(unpacked.command, [this.name, DRY_RUN, OFFLINE], this.cwd)
+
+      this.screen.heading(`What Weaver ${later.tag} would change in this project`)
+      for (const line of asked.said) this.screen.line(`  ${line}`)
+
+      return asked.status
+    } finally {
+      rmSync(folder, { recursive: true, force: true })
+    }
+  }
+
+  // What the release says changed, as its publisher wrote it: how it is installed is not what a dry run is asked.
+  private notes(later: PublishedRelease): void {
+    const from = later.notes.search(/^## What changed/m)
+    const changed = (from === -1 ? later.notes : later.notes.slice(from)).trim()
+
+    for (const line of changed === '' ? [] : changed.split('\n')) {
+      const heading = /^#+ +(.*)$/.exec(line)
+
+      if (heading !== null) this.screen.heading(heading[1] ?? '')
+      else if (line.trim() !== '') this.screen.line(`  ${line}`)
+    }
   }
 
   // A later release is installed with the script it carries, then finishes the update itself: this one may not know

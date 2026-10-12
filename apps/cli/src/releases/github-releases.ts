@@ -3,6 +3,7 @@ import type { PublishedRelease, ReleaseSource } from './release-source.ts'
 
 interface GithubRelease {
   readonly tag_name: string
+  readonly body: string | null
   readonly assets: readonly { readonly name: string; readonly url: string }[]
 }
 
@@ -23,7 +24,7 @@ export class GithubReleases implements ReleaseSource {
     const response = await this.ask(`${API}/repos/${this.repository}/releases/latest`, 'application/vnd.github+json')
     const release = (await response.json()) as GithubRelease
 
-    return { tag: release.tag_name, assets: new Map(release.assets.map((asset) => [asset.name, asset.url])) }
+    return { tag: release.tag_name, notes: release.body ?? '', assets: new Map(release.assets.map((asset) => [asset.name, asset.url])) }
   }
 
   async fetch(release: PublishedRelease, name: string, to: string): Promise<void> {

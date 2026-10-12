@@ -77,7 +77,7 @@ After that, `weaver update` is the one command that keeps things up to date. It 
 2. **The configuration.** It applies the migrations the project lacks, and names each with what it changed.
 3. **The hooks.** It wires again the runtimes that were wired, and plugs in no other.
 
-`--dry-run` says what it would do and writes nothing. `--offline` looks for no release; a checkout looks for none either, since git updates it. The command is the owner's. `weaver install` only puts Weaver on a project: it leaves a project in another format to `weaver update`.
+`--dry-run` says what it would do and writes nothing. When a later release is published, it shows what that release says changed, then unpacks it in a temporary folder, once its archive matches its sums, and asks it for its own dry run on the project: an earlier Weaver does not hold the migrations of a later one. Nothing is installed. `--offline` looks for no release; a checkout looks for none either, since git updates it. The command is the owner's. `weaver install` only puts Weaver on a project: it leaves a project in another format to `weaver update`.
 
 ### Migrations
 

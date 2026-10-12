@@ -33,7 +33,7 @@ The release goes to \`~/.local/share/weaver/$version/\`, and \`~/.local/bin/weav
 
 From a release that has it, \`weaver update\` does the three commands above. In a supervised project it then applies the migrations the configuration lacks, naming each, and wires the hooks to this release.
 
-A supervised project runs the release that wired it until \`weaver update\` is run in it, and \`weaver doctor\` says when one is behind. \`weaver update --dry-run\` shows what would change and writes nothing.
+A supervised project runs the release that wired it until \`weaver update\` is run in it, and \`weaver doctor\` says when one is behind. \`weaver update --dry-run\` shows what would change and writes nothing: what a later release says changed, and what it would change in the project.
 
 ## $heading
 
