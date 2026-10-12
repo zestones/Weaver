@@ -30,7 +30,7 @@ const problems = (project: Record<string, unknown>) => problemsOf(() => parse(pr
 const problemsIn = (texts: PartTexts) => problemsOf(() => new DeclarationParts('.weaver', texts).declaration())
 
 // The settings every project writes: its limits, with the values a new project starts with.
-const SETTINGS = '{"version":1,"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3}}'
+const SETTINGS = '{"version":1,"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
 
 const VALID = {
   scope: { exclude: ['design/lab'] },
@@ -39,14 +39,14 @@ const VALID = {
   scripts: { writers: ['npm run api:types'], readers: ['make verify'] },
   checks: {
     types: {
-      verify: ['npx', 'tsc', '--noEmit'],
+      judge: ['npx', 'tsc', '--noEmit'],
       when: ['src/**/*.ts'],
       cwd: 'client',
       timeoutSeconds: 120,
       rules: { 'types-compile': 'The code type-checks.' },
     },
     markers: {
-      verify: ['node', 'tools/markers.mjs'],
+      judge: ['node', 'tools/markers.mjs'],
       reads: 'findings',
       after: 'types',
       rules: {
@@ -88,11 +88,12 @@ test('a declaration is read from the files of .weaver, each part in its own', ()
   assert.deepEqual(config?.exclude, ['design/lab'])
   assert.deepEqual(config?.scripts, { writers: ['npm run api:types'], readers: ['make verify'] })
   assert.deepEqual({ ...config?.finish }, { headings: ['Request', 'To validate'], skill: '.weaver/skills/wv-finish.md' })
-  assert.deepEqual({ ...config?.checkLimits }, { maxRefusals: 2, totalTimeoutSeconds: 1200, parallel: 3 })
+  assert.deepEqual({ ...config?.checkLimits }, { maxRefusals: 2, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 })
   assert.deepEqual(config?.checks[1], {
     id: 'markers',
-    verify: ['node', 'tools/markers.mjs'],
-    fix: null,
+    warn: null,
+    repair: null,
+    judge: ['node', 'tools/markers.mjs'],
     cwd: '.',
     when: null,
     reads: 'findings',
@@ -131,16 +132,16 @@ test('a rule is its sentence, or an object when it says more; under a check it i
   const rules = { plain: 'A sentence.', owner: { statement: 'For the owner.', level: 'human' } }
 
   assert.deepEqual(
-    parse({ checks: { c: { verify: ['true'], rules } } }).rules.map((rule) => [rule.id, rule.level, rule.statement]),
+    parse({ checks: { c: { judge: ['true'], rules } } }).rules.map((rule) => [rule.id, rule.level, rule.statement]),
     [
       ['plain', 'gate', 'A sentence.'],
       ['owner', 'human', 'For the owner.'],
     ],
   )
-  assert.deepEqual(problems({ checks: { c: { verify: ['true'], rules: { r: { statement: 'x', level: 'llm' } } } } }), [
+  assert.deepEqual(problems({ checks: { c: { judge: ['true'], rules: { r: { statement: 'x', level: 'llm' } } } } }), [
     'project/checks.json: c.rules.r.level must be one of gate, human',
   ])
-  assert.deepEqual(problems({ checks: { c: { verify: ['true'], rules: { r: 3, s: '', t: {} } } } }), [
+  assert.deepEqual(problems({ checks: { c: { judge: ['true'], rules: { r: 3, s: '', t: {} } } } }), [
     'project/checks.json: c.rules.r must be a text or an object',
     'project/checks.json: c.rules.s must not be empty',
     'project/checks.json: c.rules.t.statement is missing',
@@ -149,9 +150,9 @@ test('a rule is its sentence, or an object when it says more; under a check it i
 })
 
 test('what ties entries together is checked: a check stands behind a rule, a name stands for one rule, rules for a reviewer need one', () => {
-  const lint = { verify: ['true'], rules: { clean: 'x' } }
+  const lint = { judge: ['true'], rules: { clean: 'x' } }
 
-  assert.deepEqual(problems({ checks: { lint: { verify: ['true'] } } }), [
+  assert.deepEqual(problems({ checks: { lint: { judge: ['true'] } } }), [
     'project/checks.json: lint stands behind no rule: give it rules, or name it as the candidates of a rule of llm/rules.json',
   ])
   assert.deepEqual(problems({ checks: { c: { ...lint, after: 'd' } } }), ['project/checks.json: c.after names d, which is not a check'])
@@ -166,9 +167,13 @@ test('what ties entries together is checked: a check stands behind a rule, a nam
 test('everything wrong with the shape of the files is reported at once, each with the file and the field', () => {
   assert.deepEqual(
     problemsIn({
-      settings: JSON.stringify({ version: 2, checks: { maxRefusals: 0, totalTimeoutSeconds: 1200, parallel: 3 }, chekcs: {} }),
+      settings: JSON.stringify({
+        version: 2,
+        checks: { maxRefusals: 0, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 },
+        chekcs: {},
+      }),
       guards: JSON.stringify({ '9x': {}, g: { statement: '' } }),
-      checks: JSON.stringify({ c: { verify: [], cwd: '.', reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } }),
+      checks: JSON.stringify({ c: { judge: [], cwd: '.', reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } }),
       reviewers: JSON.stringify({
         runtime: 'gemini',
         experiments: false,
@@ -185,7 +190,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
       'project/guards.json: 9x is not a valid name',
       'project/guards.json: 9x.statement is missing',
       'project/guards.json: g.statement must not be empty',
-      'project/checks.json: c.verify must not be empty',
+      'project/checks.json: c.judge must not be empty',
       'project/checks.json: c.reads must be one of exit, findings',
       'project/checks.json: c.timeoutSeconds must be a whole number',
       'llm/reviewers.json: rules is not a known field',
@@ -205,7 +210,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
 test('a file writes every limit Weaver applies: one left out is a problem, never a value the file does not show', () => {
   const written = {
     settings: '{"version":1,"checks":{}}',
-    checks: JSON.stringify({ c: { verify: ['true'], rules: { plain: 'x', owner: { statement: 'y' } } } }),
+    checks: JSON.stringify({ c: { judge: ['true'], rules: { plain: 'x', owner: { statement: 'y' } } } }),
     reviewers: '{"runtime":"codex"}',
   }
 
@@ -213,6 +218,7 @@ test('a file writes every limit Weaver applies: one left out is a problem, never
     'settings.json: checks.maxRefusals is missing',
     'settings.json: checks.totalTimeoutSeconds is missing',
     'settings.json: checks.parallel is missing',
+    'settings.json: checks.warnTimeoutSeconds is missing',
     'project/checks.json: c.cwd is missing',
     'project/checks.json: c.reads is missing',
     'project/checks.json: c.timeoutSeconds is missing',
@@ -427,7 +433,7 @@ test('what is wrong with the labels, the issues and the writer is reported with 
 })
 
 test('a rule of the review may name the check that lists its places, and may ask for the experiment behind each finding', () => {
-  const comments = { verify: ['node', 'tools/new-comments.mjs'], reads: 'findings' }
+  const comments = { judge: ['node', 'tools/new-comments.mjs'], reads: 'findings' }
   const review = (rules: unknown) => ({ runtime: 'codex', rules })
   const listed = parse({
     checks: { comments },
@@ -451,10 +457,10 @@ test('a rule of the review may name the check that lists its places, and may ask
   assert.deepEqual(problems({ review: review({ r: { statement: 'x', candidates: 'nowhere' } }) }), [
     'llm/rules.json: r.candidates names nowhere, which is not a check',
   ])
-  assert.deepEqual(problems({ checks: { c: { verify: ['true'] } }, review: review({ r: { statement: 'x', candidates: 'c' } }) }), [
+  assert.deepEqual(problems({ checks: { c: { judge: ['true'] } }, review: review({ r: { statement: 'x', candidates: 'c' } }) }), [
     'llm/rules.json: r.candidates names c, which reads exit: a check that lists places for the reviewer reads findings',
   ])
-  assert.deepEqual(problems({ checks: { c: { verify: ['true'], rules: { r: { statement: 'x', level: 'gate', evidence: true } } } } }), [
+  assert.deepEqual(problems({ checks: { c: { judge: ['true'], rules: { r: { statement: 'x', level: 'gate', evidence: true } } } } }), [
     'project/checks.json: c.rules.r.evidence is not a known field',
   ])
 })
@@ -463,13 +469,28 @@ test('a check may carry the command that repairs before it judges', () => {
   const [check] = parse({
     checks: {
       format: {
-        fix: ['npx', 'prettier', '--write', '{files}'],
-        verify: ['npx', 'prettier', '--check', '{files}'],
+        repair: ['npx', 'prettier', '--write', '{files}'],
+        judge: ['npx', 'prettier', '--check', '{files}'],
         rules: { formatted: 'Prettier decides formatting.' },
       },
     },
   }).checks
 
-  assert.deepEqual(check?.fix, ['npx', 'prettier', '--write', '{files}'])
-  assert.deepEqual(problems({ checks: { c: { verify: ['true'], fix: [] } } }), ['project/checks.json: c.fix must not be empty'])
+  assert.deepEqual(check?.repair, ['npx', 'prettier', '--write', '{files}'])
+  assert.equal(check?.warn, null)
+  assert.deepEqual(problems({ checks: { c: { judge: ['true'], repair: [] } } }), ['project/checks.json: c.repair must not be empty'])
+})
+
+test('a check may carry the command that warns right after a call, whose time is one of the limits of the settings', () => {
+  const lint = { warn: ['npx', 'eslint', '{files}'], judge: ['npx', 'eslint', '.'], rules: { clean: 'The code passes the linter.' } }
+  const config = parse({ checks: { lint }, limits: { warnTimeoutSeconds: 20 } })
+
+  assert.deepEqual(config.checks[0]?.warn, ['npx', 'eslint', '{files}'])
+  assert.equal(config.checkLimits.warnTimeoutSeconds, 20)
+  assert.deepEqual(problems({ checks: { c: { judge: ['true'], warn: [] } } }), ['project/checks.json: c.warn must not be empty'])
+  assert.deepEqual(problems({ checks: { c: { verify: ['true'], fix: ['true'] } } }), [
+    'project/checks.json: c.judge is missing',
+    'project/checks.json: c.verify is not a known field',
+    'project/checks.json: c.fix is not a known field',
+  ])
 })

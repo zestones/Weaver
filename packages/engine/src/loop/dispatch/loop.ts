@@ -27,14 +27,12 @@ export class Loop {
     launcher: ReviewLauncher = new DetachedLauncher(),
     writers: WriterLauncher = new DetachedWriterLauncher(),
   ) {
-    const afterCall = new AfterCall()
-
     this.moments = new Map<string, Moment>([
       ['UserPromptSubmit', new OnRequest()],
       ['PreToolUse', new BeforeCall()],
-      ['PostToolUse', afterCall],
+      ['PostToolUse', new AfterCall('PostToolUse', checks)],
       // A command that fails may have written files before it did.
-      ['PostToolUseFailure', afterCall],
+      ['PostToolUseFailure', new AfterCall('PostToolUseFailure', checks)],
       ['Stop', new EndOfTurn(checks, new ReviewRounds(launcher), writers)],
     ])
   }

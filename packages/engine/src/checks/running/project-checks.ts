@@ -1,5 +1,6 @@
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import type { DeclaredCheck } from '../../declaration/content/declared-check.ts'
+import type { CallDiff } from '../../unit-of-work/diff/call-diff.ts'
 import type { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { Check } from '../kinds/check.ts'
 import { ExitCheck } from '../kinds/exit-check.ts'
@@ -10,8 +11,34 @@ import type { CheckRunner } from './check-runner.ts'
 const MIN_TIMEOUT_MS = 1000
 
 export class ProjectChecks implements CheckRunner {
+  warns(declaration: Declaration): boolean {
+    return declaration.checks.some((declared) => declared.warn !== null)
+  }
+
+  async warn(declaration: Declaration, call: CallDiff, deadline: number): Promise<CheckOutcome[]> {
+    const env = call.environment()
+    const waiting = declaration.checks.map((declared) => this.checkOf(declaration, declared)).filter((check) => check.warns)
+    const outcomes: CheckOutcome[] = []
+    const next = async (): Promise<void> => {
+      for (let check = waiting.shift(); check !== undefined; check = waiting.shift()) {
+        const left = deadline - Date.now()
+        const outcome = left <= 0 ? null : await this.warning(check, call, env, left)
+
+        if (outcome !== null) outcomes.push(outcome)
+      }
+    }
+
+    try {
+      await Promise.all(Array.from({ length: declaration.checkLimits.parallel }, next))
+    } finally {
+      call.forget()
+    }
+
+    return outcomes
+  }
+
   repairs(declaration: Declaration): boolean {
-    return declaration.checks.some((declared) => declared.fix !== null)
+    return declaration.checks.some((declared) => declared.repair !== null)
   }
 
   // One after the other: two repairs at once could rewrite the same file.
@@ -28,7 +55,7 @@ export class ProjectChecks implements CheckRunner {
     }
   }
 
-  async verify(declaration: Declaration, unit: UnitDiff, deadline: number): Promise<CheckOutcome[]> {
+  async judge(declaration: Declaration, unit: UnitDiff, deadline: number): Promise<CheckOutcome[]> {
     const { parallel } = declaration.checkLimits
     const env = unit.environment()
     const checks = declaration.checks.map((declared) => this.checkOf(declaration, declared))
@@ -60,6 +87,12 @@ export class ProjectChecks implements CheckRunner {
     return checks.map((check) => done.get(check.id) ?? check.broken('the check never started: its `after` chain loops'))
   }
 
+  private warning(check: Check, call: CallDiff, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<CheckOutcome | null> {
+    return check
+      .warn(call, env, timeoutMs)
+      .catch((error: unknown) => check.broken(`the warning crashed: ${error instanceof Error ? error.message : String(error)}`))
+  }
+
   private checkOf(declaration: Declaration, declared: DeclaredCheck): Check {
     const rules = declaration.rulesOf(declared.id)
 
@@ -84,7 +117,7 @@ export class ProjectChecks implements CheckRunner {
     if (prerequisite?.status === 'timeout') return Promise.resolve(check.skipped(`${prerequisite.id} did not finish`))
 
     return check
-      .verify(unit, env, timeoutMs)
+      .judge(unit, env, timeoutMs)
       .catch((error: unknown) => check.broken(`the check crashed: ${error instanceof Error ? error.message : String(error)}`))
   }
 }

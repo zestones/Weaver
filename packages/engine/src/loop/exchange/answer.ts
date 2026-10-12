@@ -10,11 +10,17 @@ interface RequestContext {
   readonly additionalContext: string
 }
 
+// Both runtimes give this text to their model with the result of the call.
+interface CallContext {
+  readonly hookEventName: 'PostToolUse' | 'PostToolUseFailure'
+  readonly additionalContext: string
+}
+
 export interface AnswerBody {
   readonly decision?: 'block'
   readonly reason?: string
   readonly systemMessage?: string
-  readonly hookSpecificOutput?: ToolDenial | RequestContext
+  readonly hookSpecificOutput?: ToolDenial | RequestContext | CallContext
 }
 
 export class Answer {
@@ -47,6 +53,10 @@ export class Answer {
 
   static adding(additionalContext: string): Answer {
     return new Answer({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext } })
+  }
+
+  static telling(hookEventName: CallContext['hookEventName'], additionalContext: string): Answer {
+    return new Answer({ hookSpecificOutput: { hookEventName, additionalContext } })
   }
 
   after(alert: string | null): Answer {

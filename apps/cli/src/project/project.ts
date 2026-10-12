@@ -10,7 +10,7 @@ import type { ProjectSkill } from '../skills/project-skill.ts'
 import { ReviewSkill } from '../skills/review-skill.ts'
 
 // What a new project starts with: every limit Weaver applies is written in its settings, where the owner changes it.
-const STARTING_LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 }
+const STARTING_LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 }
 // The database the registry keeps in the state folder.
 const REGISTRY_FILE = 'registry.sqlite'
 

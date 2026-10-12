@@ -2,10 +2,13 @@ import type { Repository } from './repository.ts'
 
 type LineRange = [number, number]
 
-export interface ChangedFile {
+export interface ChangedPath {
   readonly status: 'A' | 'M' | 'D' | 'R' | 'C' | 'T'
   readonly path: string
   readonly oldPath: string
+}
+
+export interface ChangedFile extends ChangedPath {
   // New-side line ranges that were added or modified, 1-based and inclusive.
   readonly added: readonly (readonly [number, number])[]
 }

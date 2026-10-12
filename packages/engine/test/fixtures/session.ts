@@ -4,6 +4,7 @@ import { AgentCatalog } from '../../src/agents/runtimes/agent-catalog.ts'
 import { Payload } from '../../src/agents/events/payload.ts'
 import { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
 import type { CheckRunner } from '../../src/checks/running/check-runner.ts'
+import { ProjectChecks } from '../../src/checks/running/project-checks.ts'
 import type { ReviewRequest } from '../../src/review/request/review-request.ts'
 import { ReviewOutcome } from '../../src/review/results/review-outcome.ts'
 import { InlineLauncher } from '../../src/review/launching/inline-launcher.ts'
@@ -45,7 +46,7 @@ export const B_FILE = 'src/b.ts'
 const FINISHED = '## Request\n\nDone.\n\n## To validate\n\nNothing.\n'
 const AGENTS = new AgentCatalog()
 // The one check of the project these tests declare, with the rule it stands behind.
-export const LINT = { verify: ['true'], rules: { L1: 'The code passes the linter.' } }
+export const LINT = { judge: ['true'], rules: { L1: 'The code passes the linter.' } }
 const REVIEW_POLL_MS = 2
 
 export const declaration = (extra: Raw = {}): Declaration => declarationOf({ checks: { lint: LINT }, ...extra })
@@ -69,6 +70,13 @@ function turnOf(session: Session, raw: Raw, project: Declaration = declaration()
   return new Turn(agent, event, session.repo, project)
 }
 
+// These tests declare no check that warns, so the hook answers a call at once.
+function settled(answer: Answer | Promise<Answer>): Answer {
+  if (answer instanceof Promise) throw new Error('a check of this project warns: its answer comes later')
+
+  return answer
+}
+
 export function startTool(session: Session, tool: Raw, project?: Declaration): () => Answer {
   toolCalls += 1
 
@@ -76,7 +84,7 @@ export function startTool(session: Session, tool: Raw, project?: Declaration): (
 
   new BeforeCall().run(turnOf(session, call, project))
 
-  return () => new AfterCall().run(turnOf(session, call, project))
+  return () => settled(new AfterCall('PostToolUse', new ProjectChecks()).run(turnOf(session, call, project)))
 }
 
 // What the hook answers before a call: the reason it refuses the call with, or null when it lets it through.
@@ -135,9 +143,11 @@ export function stubChecks(outcomes: readonly CheckOutcome[], during: () => Prom
   return {
     calls,
     seen,
+    warns: () => false,
+    warn: () => Promise.resolve([]),
     repairs: () => false,
     repair: () => Promise.resolve(),
-    verify: async (_declaration, unit) => {
+    judge: async (_declaration, unit) => {
       calls.count += 1
       seen.push(unit.paths)
       await during()

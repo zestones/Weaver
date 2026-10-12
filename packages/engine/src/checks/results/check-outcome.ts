@@ -16,6 +16,8 @@ export interface OutcomeFields {
 }
 
 const EXCERPT_LINES = 30
+// A warning comes after every call that changes a file: it stays short.
+const WARNING_LINES = 12
 
 export class CheckOutcome {
   readonly id: string
@@ -53,6 +55,12 @@ export class CheckOutcome {
 
   failureLines(): string[] {
     return this.failures.length > 0 ? this.failures.map((finding) => this.line(finding)) : this.excerpt()
+  }
+
+  warningLines(): string[] {
+    const lines = this.failures.length > 0 ? this.failures.map((finding) => this.line(finding)) : this.output.trim().split('\n')
+
+    return lines.length > WARNING_LINES ? [...lines.slice(0, WARNING_LINES), `… ${String(lines.length - WARNING_LINES)} more`] : lines
   }
 
   validationLines(): string[] {

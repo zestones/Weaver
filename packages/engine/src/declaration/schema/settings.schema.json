@@ -30,7 +30,7 @@
     "checks": {
       "type": "object",
       "additionalProperties": false,
-      "description": "How the checks of `project/checks.json` are run. Each time the agent says it has finished, Weaver runs them all; when one fails, the end of the turn is refused and the agent goes back to work.",
+      "description": "How the checks of `project/checks.json` are run. Each time the agent says it has finished, Weaver runs them all; when one fails, the end of the turn is refused and the agent goes back to work. A check that warns also runs right after a tool call.",
       "properties": {
         "maxRefusals": {
           "type": "integer",
@@ -46,9 +46,14 @@
           "type": "integer",
           "minimum": 1,
           "description": "How many checks run at the same time."
+        },
+        "warnTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The time the warnings of the checks are given all together after one tool call. A warning still running then is stopped and says nothing. The agent waits for them after every call that changes a file: keep it short."
         }
       },
-      "required": ["maxRefusals", "totalTimeoutSeconds", "parallel"]
+      "required": ["maxRefusals", "totalTimeoutSeconds", "parallel", "warnTimeoutSeconds"]
     }
   }
 }

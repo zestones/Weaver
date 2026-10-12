@@ -44,7 +44,7 @@ function unitDiff(): UnitDiff {
 
 async function run(declaration: Record<string, unknown>): Promise<Record<string, CheckOutcome>> {
   const project = declarationOf(declaration)
-  const outcomes = await new ProjectChecks().verify(project, unitDiff(), project.checkLimits.deadlineFrom(Date.now()))
+  const outcomes = await new ProjectChecks().judge(project, unitDiff(), project.checkLimits.deadlineFrom(Date.now()))
 
   return Object.fromEntries(outcomes.map((outcome) => [outcome.id, outcome]))
 }
@@ -57,9 +57,9 @@ test('the exit status of a check is its verdict, and its rules say whether a fai
 
   const outcomes = await run({
     checks: {
-      ok: { verify: ['true'], rules: gate('G1') },
-      broken: { verify: ['sh', '-c', 'echo boom >&2; exit 3'], rules: gate('G2') },
-      advisory: { verify: ['false'], rules: human('H1') },
+      ok: { judge: ['true'], rules: gate('G1') },
+      broken: { judge: ['sh', '-c', 'echo boom >&2; exit 3'], rules: gate('G2') },
+      advisory: { judge: ['false'], rules: human('H1') },
     },
   })
 
@@ -74,9 +74,9 @@ test('a check runs only when the unit changed a file it is about, and is handed 
 
   const outcomes = await run({
     checks: {
-      names: { verify: ['sh', '-c', 'echo "$@"; exit 1', 'sh', '{files}'], when: ['src/**/*.js'], cwd: 'src', rules: gate('G1') },
-      sql: { verify: ['false'], when: ['**/*.sql'], rules: gate('G2') },
-      docs: { verify: ['false', '{files}'], when: ['docs/**'], rules: gate('G3') },
+      names: { judge: ['sh', '-c', 'echo "$@"; exit 1', 'sh', '{files}'], when: ['src/**/*.js'], cwd: 'src', rules: gate('G1') },
+      sql: { judge: ['false'], when: ['**/*.sql'], rules: gate('G2') },
+      docs: { judge: ['false', '{files}'], when: ['docs/**'], rules: gate('G3') },
     },
   })
 
@@ -96,8 +96,8 @@ test('each finding goes where the level of its rule sends it', async () => {
   }
   const outcomes = await run({
     checks: {
-      mixed: { verify: reporter(findings), reads: 'findings', rules: { ...gate('M1'), ...human('M2') } },
-      advisory: { verify: reporter({ findings: [findings.findings[1]] }), reads: 'findings', rules: human('M3') },
+      mixed: { judge: reporter(findings), reads: 'findings', rules: { ...gate('M1'), ...human('M2') } },
+      advisory: { judge: reporter({ findings: [findings.findings[1]] }), reads: 'findings', rules: human('M3') },
     },
   })
 
@@ -111,7 +111,7 @@ test('findings only the owner settles pass the check and wait for them', async (
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
 
   const finding = { rule: 'M2', file: 'src/a.js', message: 'eslint-disable added' }
-  const outcomes = await run({ checks: { c: { verify: reporter({ findings: [finding] }), reads: 'findings', rules: human('M2') } } })
+  const outcomes = await run({ checks: { c: { judge: reporter({ findings: [finding] }), reads: 'findings', rules: human('M2') } } })
 
   assert.deepEqual([outcomes.c?.status, outcomes.c?.blocking, outcomes.c?.toValidate], ['pass', false, [finding]])
 })
@@ -121,10 +121,10 @@ test('a check that cannot give its verdict fails: no output, no JSON, a crash or
 
   const outcomes = await run({
     checks: {
-      silent: { verify: ['true'], reads: 'findings', rules: gate('G1') },
-      shapeless: { verify: reporter({ findings: [{ rule: 'G2' }] }), reads: 'findings', rules: gate('G2') },
-      crashed: { verify: reporter({ findings: [] }, 2), reads: 'findings', rules: gate('G3') },
-      missing: { verify: ['weaver-no-such-command'], rules: gate('G4') },
+      silent: { judge: ['true'], reads: 'findings', rules: gate('G1') },
+      shapeless: { judge: reporter({ findings: [{ rule: 'G2' }] }), reads: 'findings', rules: gate('G2') },
+      crashed: { judge: reporter({ findings: [] }, 2), reads: 'findings', rules: gate('G3') },
+      missing: { judge: ['weaver-no-such-command'], rules: gate('G4') },
     },
   })
 
@@ -141,8 +141,8 @@ test('a check that outlives its own timeout times out, and the check that reads 
 
   const outcomes = await run({
     checks: {
-      reader: { verify: ['true'], after: 'slow', rules: gate('G1') },
-      slow: { verify: ['sleep', '30'], timeoutSeconds: 1, rules: gate('G2') },
+      reader: { judge: ['true'], after: 'slow', rules: gate('G1') },
+      slow: { judge: ['sleep', '30'], timeoutSeconds: 1, rules: gate('G2') },
     },
   })
 
@@ -155,7 +155,7 @@ test('the checks share one time: a check still running when it ends times out, w
 
   const outcomes = await run({
     limits: { totalTimeoutSeconds: 1 },
-    checks: { slow: { verify: ['sleep', '30'], rules: gate('G1') }, quick: { verify: ['true'], rules: gate('G2') } },
+    checks: { slow: { judge: ['sleep', '30'], rules: gate('G1') }, quick: { judge: ['true'], rules: gate('G2') } },
   })
 
   assert.deepEqual([outcomes.slow?.status, outcomes.quick?.status], ['timeout', 'pass'])
@@ -167,8 +167,8 @@ test('the repairs take their time from the one the checks share: out of time, a 
   const project = declarationOf({
     limits: { totalTimeoutSeconds: 1 },
     checks: {
-      slow: { fix: ['sleep', '30'], verify: ['true'], rules: gate('G1') },
-      late: { fix: ['sh', '-c', 'echo repaired > late.txt'], verify: ['true'], rules: gate('G2') },
+      slow: { repair: ['sleep', '30'], judge: ['true'], rules: gate('G1') },
+      late: { repair: ['sh', '-c', 'echo repaired > late.txt'], judge: ['true'], rules: gate('G2') },
     },
   })
   const deadline = project.checkLimits.deadlineFrom(Date.now())
@@ -179,7 +179,7 @@ test('the repairs take their time from the one the checks share: out of time, a 
   assert.ok(Date.now() >= deadline, 'the repair that sleeps held the whole time, and no longer')
   assert.equal(existsSync(join(repo.top, 'late.txt')), false)
   assert.deepEqual(
-    (await checks.verify(project, unitDiff(), deadline)).map((outcome) => outcome.status),
+    (await checks.judge(project, unitDiff(), deadline)).map((outcome) => outcome.status),
     ['pass', 'pass'],
     'the checks still give their verdict',
   )
@@ -190,7 +190,7 @@ test('a check is told the two trees and reads the diff of the unit as a file, ad
 
   const script =
     "const diff = JSON.parse(require('fs').readFileSync(process.env.WEAVER_UNIT_DIFF)); console.log(JSON.stringify([diff, process.env.WEAVER_BASE_TREE, process.env.WEAVER_HEAD_TREE]))"
-  const outcomes = await run({ checks: { c: { verify: ['node', '-e', script], rules: gate('G1') } } })
+  const outcomes = await run({ checks: { c: { judge: ['node', '-e', script], rules: gate('G1') } } })
   const [diff, base, head] = JSON.parse(outcomes.c?.output ?? '') as [unknown, string, string]
 
   assert.deepEqual(diff, [{ status: 'M', path: 'src/a.js', oldPath: 'src/a.js', added: [[2, 2]] }])
@@ -202,7 +202,7 @@ test('checks that wait for each other in a loop are reported, never waited for',
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
 
   const outcomes = await run({
-    checks: { one: { verify: ['true'], after: 'two', rules: gate('G1') }, two: { verify: ['true'], after: 'one', rules: gate('G2') } },
+    checks: { one: { judge: ['true'], after: 'two', rules: gate('G1') }, two: { judge: ['true'], after: 'one', rules: gate('G2') } },
   })
 
   assert.equal(outcomes.one?.reason, 'the check never started: its `after` chain loops')

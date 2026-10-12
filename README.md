@@ -13,6 +13,7 @@ Weaver knows no rule by itself. Everything it enforces is declared by the superv
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Knows who changed what          | Each request you send opens a unit of work. The files an agent changes join it, tool call by tool call: the diff Weaver checks and reviews is that agent's own.                       |
 | Refuses before a tool runs      | The project declares guards: paths an agent may not write, commands it may not run. A refusal carries the sentence of the project that says why.                                      |
+| Warns right after a call        | A check may run a fast command on the files a call just changed. What it finds is told to the agent at once and holds nothing: the verdict comes when the task ends.                  |
 | Checks when a task ends         | The project's programs judge the change: the compiler, the linter, scripts of its own. A check may repair first, then judge. A failure sends the agent back to work.                  |
 | Has another agent review        | The rules no program can judge go to a reviewer, Claude Code or Codex, that only reads or that experiments in a throwaway copy of the project. The agent answers each finding.        |
 | Keeps what agents discover      | An agent flags what it comes across and its task does not settle. A writer turns the flag into a card. You read the cards and decide: fixed, left as it is, or an issue.              |
@@ -36,7 +37,7 @@ The agent calls Weaver at each of its hooks, in a process that lasts a little ov
 
 ![One turn, hook by hook: a request, before a tool call, after a tool call, the end of the turn.](_docs/assets/weaver-turn.svg)
 
-A turn starts with your request and ends when the agent stops. In between, Weaver is called before and after every tool call. The end of the turn is where most of the work happens.
+A turn starts with your request and ends when the agent stops. In between, Weaver is called before and after every tool call. After a call that changed files, the checks that warn run on those files, and the agent reads what they found with the result of its call. The end of the turn is where most of the work happens.
 
 ### When the agent stops
 
@@ -58,7 +59,7 @@ A few things the diagram leaves out:
 - **A finding needs an answer, not obedience.** The agent writes `F1 fixed: …` or `F1 not fixed: …` in its final message. An answer `fixed` is refused while the file has not changed. What it does not fix waits for you, with its reason.
 - **A suspicion is for you alone.** For a rule about what the code does, a finding must carry the experiment that shows it. Without one it is a suspicion: you read it, the agent never does.
 - **A review never holds a turn hostage.** One that outlasts its wait goes on by itself, and its findings come at the next end of turn. One that breaks is listed for you.
-- **Every limit is written in the project**: how many times the checks may refuse, how long they may run, how long a review may take.
+- **Every limit is written in the project**: how many times the checks may refuse, how long they may run, how long the warnings of a call may take, how long a review may take.
 
 ## What agents discover: flags and cards
 
@@ -122,20 +123,34 @@ A guard, in `project/guards.json`: the sentence is what the agent reads when it 
 }
 ```
 
-A check, in `project/checks.json`: it repairs with `fix`, judges with `verify`, and names the rules it stands behind.
+A check, in `project/checks.json`, has up to three commands and names the rules it stands behind. It warns with `warn`, right after a call that changed its files; when the task ends it repairs with `repair`, then judges with `judge`. Only `judge` is required.
 
 ```json
 {
-  "format": {
-    "fix": ["npx", "prettier", "--write", "{files}"],
-    "verify": ["npx", "prettier", "--check", "{files}"],
+  "lint": {
+    "warn": ["npx", "eslint", "{files}"],
+    "repair": ["npx", "eslint", "--fix", "{files}"],
+    "judge": ["npx", "eslint", "."],
+    "cwd": ".",
     "when": ["src/**/*.ts"],
     "reads": "exit",
-    "timeoutSeconds": 120,
-    "rules": { "prettier-formats": "Prettier decides formatting." }
+    "timeoutSeconds": 300,
+    "rules": { "no-unused-variable": "A variable that is declared is used." }
   }
 }
 ```
+
+A warning is the same check run early on a few files: it stands behind the same rules, is read the same way, and never holds the agent. The warnings of one call share the time `checks.warnTimeoutSeconds` gives them in `settings.json`.
+
+A command that needs more than the names of the files reads what Weaver sets in its environment:
+
+| Variable             | Given to          | What it holds                                                                                                                   |
+| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `WEAVER_UNIT_DIFF`   | `repair`, `judge` | A JSON file: the files the unit of work changed, each with its status and the line ranges it added.                             |
+| `WEAVER_BASE_TREE`   | `repair`, `judge` | The git tree the unit of work started from.                                                                                     |
+| `WEAVER_HEAD_TREE`   | `repair`, `judge` | The git tree of the working tree now.                                                                                           |
+| `WEAVER_CALL_DIFF`   | `warn`            | A JSON file: the files the call changed, each with its status and the blobs it held `before` and holds `after`.                 |
+| `WEAVER_GIT_OBJECTS` | all three         | The object store that holds those trees and blobs: git reads them with it as `GIT_OBJECT_DIRECTORY`, over the repository's own. |
 
 ## Try it
 
@@ -173,7 +188,7 @@ The hooks point at this checkout, for as long as Weaver is not distributed. Code
 
 ![What supervision costs, in seconds: a hook 0.13 s, a hook that records a flag 0.15 s, the end of a task 11 to 13 s, the writer 14 s for one card, a review 30 to 50 s.](_docs/assets/weaver-timings.svg)
 
-Orders of magnitude, not a benchmark: seen on one machine on 2026-10-11, a few runs each. The hook was timed in a small project. The rest comes from a clone of a real project with its own checks (`tsc`, `eslint`, `prettier`), a Codex reviewer working in a copy of the project, and a Claude writer.
+Orders of magnitude, not a benchmark: seen on one machine on 2026-10-11, a few runs each. The hook was timed in a small project. The rest comes from a clone of a real project with its own checks (`tsc`, `eslint`, `prettier`), a Codex reviewer working in a copy of the project, and a Claude writer. A check that warns adds the time of its command to each call that changes its files.
 
 ## What is not there yet
 

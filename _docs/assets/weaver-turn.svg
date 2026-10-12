@@ -104,9 +104,9 @@
   <g class="w">
     <rect x="460" y="142" width="188" height="124" rx="6"/>
     <text x="474" y="168" class="sub" text-anchor="start">The files that changed</text>
-    <text x="474" y="184" class="sub" text-anchor="start">join the unit of work:</text>
-    <text x="474" y="200" class="sub" text-anchor="start">Weaver knows who</text>
-    <text x="474" y="216" class="sub" text-anchor="start">changed what.</text>
+    <text x="474" y="184" class="sub" text-anchor="start">join the unit of work.</text>
+    <text x="474" y="200" class="sub" text-anchor="start">The checks that warn</text>
+    <text x="474" y="216" class="sub" text-anchor="start">say what they found.</text>
   </g>
   <path d="M 782 112 L 782 142" class="wire" marker-end="url(#tip)"/>
   <g class="w">

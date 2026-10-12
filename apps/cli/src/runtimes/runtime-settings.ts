@@ -26,17 +26,20 @@ export type Wiring = 'absent' | 'stale' | 'installed'
 const TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure'])
 // The end of a turn waits for the project's checks, then for its reviewer.
 const END_OF_TURN_SECONDS = 3600
+// The end of a call waits for the checks that warn.
+const AFTER_CALL_SECONDS = 120
 const TIMEOUT_SECONDS: Readonly<Record<string, number>> = {
   UserPromptSubmit: 30,
   PreToolUse: 10,
-  PostToolUse: 120,
-  PostToolUseFailure: 120,
+  PostToolUse: AFTER_CALL_SECONDS,
+  PostToolUseFailure: AFTER_CALL_SECONDS,
   Stop: END_OF_TURN_SECONDS,
 }
 const DEFAULT_TIMEOUT_SECONDS = 60
 
 export abstract class RuntimeSettings {
   static readonly END_OF_TURN_SECONDS = END_OF_TURN_SECONDS
+  static readonly AFTER_CALL_SECONDS = AFTER_CALL_SECONDS
 
   abstract readonly label: string
   abstract readonly file: string

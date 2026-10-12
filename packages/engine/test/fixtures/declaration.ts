@@ -18,7 +18,7 @@ interface Split {
 const FINISH_SKILL = '.weaver/skills/wv-finish.md'
 const CARD_SKILL = '.weaver/skills/wv-card.md'
 // A file writes every limit Weaver applies. A test gives the ones it is about, and these stand for the others.
-const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 }
+const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 }
 const CHECK = { cwd: '.', reads: 'exit', timeoutSeconds: 600 }
 const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
 const WRITER = { timeoutSeconds: 600 }

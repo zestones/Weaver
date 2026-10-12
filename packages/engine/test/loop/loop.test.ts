@@ -19,9 +19,9 @@ const DECLARATION = {
   finish: { headings: ['Request', 'To validate'] },
   limits: { maxRefusals: 2 },
   checks: {
-    syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } },
+    syntax: { judge: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } },
     markers: {
-      verify: ['node', 'tools/markers.mjs'],
+      judge: ['node', 'tools/markers.mjs'],
       when: ['src/**'],
       reads: 'findings',
       rules: {
@@ -176,7 +176,7 @@ test('what the owner saves while the agent runs its tests is never charged to th
   assert.deepEqual(kinds(), ['settle'])
 })
 
-test('a call a guard refuses does not verify: the runtime is told to deny it, with the rule, and the journal keeps the attempt', () => {
+test('a call a guard refuses does not judge: the runtime is told to deny it, with the rule, and the journal keeps the attempt', () => {
   hook('UserPromptSubmit', { prompt: 'loosen the check and commit' })
 
   const edit = hook('PreToolUse', { tool_name: 'Write', tool_input: { file_path: join(repo.top, 'tools/markers.mjs') }, tool_use_id: 'e' })
@@ -226,12 +226,12 @@ process.exitCode = judging && untidy ? 1 : 0
     version: 1,
     checks: {
       tidy: {
-        fix: ['node', 'tools/tidy.mjs', '{files}'],
-        verify: ['node', 'tools/tidy.mjs', '--check', '{files}'],
+        repair: ['node', 'tools/tidy.mjs', '{files}'],
+        judge: ['node', 'tools/tidy.mjs', '--check', '{files}'],
         when: ['src/**/*.js'],
         rules: { F1: 'No space at the end of a line.' },
       },
-      syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } },
+      syntax: { judge: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } },
     },
   }
 
@@ -269,7 +269,7 @@ process.stdin.on('end', () => {
   const declared = {
     version: 1,
     review: { runtime: 'codex', rules: { N1: { statement: 'A name says what it holds.', scope: ['src/**'] } } },
-    checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
+    checks: { syntax: { judge: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
   }
 
   writeDeclaration(repo.top, declared)
@@ -313,7 +313,7 @@ process.stdin.on('end', () => {
   const declared = {
     version: 1,
     review: { runtime: 'codex', rules: { N1: { statement: 'A name says what it holds.', scope: ['src/**'] } } },
-    checks: { syntax: { verify: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
+    checks: { syntax: { judge: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
   }
 
   writeDeclaration(repo.top, declared)
@@ -472,7 +472,7 @@ test('a repository that declares nothing is left alone, and a declaration that c
   assert.deepEqual(stop(), {})
   assert.equal(existsSync(repo.stateDir), false)
 
-  writeDeclaration(repo.top, { checks: { lint: { verify: ['true'] } } })
+  writeDeclaration(repo.top, { checks: { lint: { judge: ['true'] } } })
 
   assert.match(
     stop().systemMessage ?? '',

@@ -43,6 +43,7 @@ export class DoctorCommand implements Command {
     const held = await Promise.all(runtimes.map((runtime) => this.held(runtime, project.top)))
     const findings = [
       this.configuration(project),
+      ...this.warnings(project),
       ...this.finishSkill(project),
       ...this.review(project),
       ...this.writer(project),
@@ -77,6 +78,26 @@ export class DoctorCommand implements Command {
     } catch (error) {
       return { state: 'problem', text: error instanceof Error ? error.message : String(error) }
     }
+  }
+
+  // A hook the runtime stops before its end says nothing: the warnings must end before the call is given up on.
+  private warnings(project: Project): Finding[] {
+    const declaration = project.readableDeclaration()
+    const warning = declaration?.checks.filter((check) => check.warn !== null).length ?? 0
+
+    if (declaration === null || warning === 0) return []
+
+    const time = declaration.checkLimits.warnTimeoutSeconds
+    const given = RuntimeSettings.AFTER_CALL_SECONDS
+
+    return time < given
+      ? [{ state: 'ok', text: `${String(warning)} check(s) warn right after a call, in ${String(time)} s at most` }]
+      : [
+          {
+            state: 'problem',
+            text: `the warnings after a call (${String(time)} s) may last longer than the ${String(given)} s the end of a call is given: lower checks.warnTimeoutSeconds in ${DeclarationParts.FILES.settings}.`,
+          },
+        ]
   }
 
   // The agent is pointed to the skill, and the configuration waits for the headings the skill shows.

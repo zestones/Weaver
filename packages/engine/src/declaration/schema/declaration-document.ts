@@ -7,8 +7,9 @@ export type DocumentReviewRule =
   string | { readonly statement: string; readonly scope?: readonly string[]; readonly evidence: boolean; readonly candidates?: string }
 
 interface DocumentCheck {
-  readonly verify: readonly string[]
-  readonly fix?: readonly string[]
+  readonly warn?: readonly string[]
+  readonly repair?: readonly string[]
+  readonly judge: readonly string[]
   readonly cwd: string
   readonly when?: readonly string[]
   readonly reads: 'exit' | 'findings'
@@ -37,6 +38,7 @@ export interface SettingsDocument {
     readonly maxRefusals: number
     readonly totalTimeoutSeconds: number
     readonly parallel: number
+    readonly warnTimeoutSeconds: number
   }
 }
 

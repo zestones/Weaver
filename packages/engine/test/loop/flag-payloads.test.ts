@@ -32,7 +32,7 @@ afterAll(() => {
 beforeEach(() => {
   counter += 1
   repo = makeRepo(join(scratch, `repo-${String(counter)}`), {
-    ...declarationFiles({ checks: { lint: { verify: ['true'], rules: { L1: 'The code passes the linter.' } } } }),
+    ...declarationFiles({ checks: { lint: { judge: ['true'], rules: { L1: 'The code passes the linter.' } } } }),
     'src/one.js': 'export const one = 1\n',
     'tools/parse.mjs': 'export {}\n',
   })

@@ -184,7 +184,7 @@ export class Session {
         head: closed.headMoved === null ? latest.head : closed.headMoved.to,
         unit: unit.record,
       },
-      value: new Touch({ tool: window.tool, paths: [...closed.charged.keys()], shown: closed.shown, foreign, headMoved: closed.headMoved }),
+      value: new Touch({ tool: window.tool, changes: closed.charged, shown: closed.shown, foreign, headMoved: closed.headMoved }),
     }
   }
 }

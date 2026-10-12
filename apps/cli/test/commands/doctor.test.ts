@@ -7,7 +7,7 @@ import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
 import { RuntimeCatalog } from '../../src/runtimes/runtime-catalog.ts'
 import { finding, flag, write } from '../fixtures/cards.ts'
-import { makeProject, REVIEW, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
+import { LIMITS, makeProject, REVIEW, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-doctor-'))
 const link = new EngineLink()
@@ -176,6 +176,31 @@ test('a Codex that could not say is only noted, and nothing is asked of a runtim
   assert.equal(unsaid.status, 0, unsaid.lines.join('\n'))
   assert.deepEqual(said(unsaid.lines), ['-       Codex did not say whether it runs these hooks: its app server gave no answer'])
   assert.deepEqual(said((await weaver(top, ['doctor'], { executions: new ExecutionCatalog([absent]) })).lines), [])
+})
+
+test('the checks that warn right after a call are counted, and a time the end of a call cannot wait for is a problem', async () => {
+  const lint = {
+    warn: ['true'],
+    judge: ['true'],
+    cwd: '.',
+    reads: 'exit',
+    timeoutSeconds: 60,
+    rules: { clean: 'The code passes the linter.' },
+  }
+
+  writeConfig(top, { settings: SETTINGS, checks: { lint, tests: { ...lint, warn: undefined, rules: { green: 'The tests pass.' } } } })
+
+  assert.equal((await weaver(top, ['doctor'])).lines[1], 'ok      1 check(s) warn right after a call, in 30 s at most')
+
+  writeConfig(top, { settings: { version: 1, checks: { ...LIMITS, warnTimeoutSeconds: 120 } } })
+
+  const { status, lines } = await weaver(top, ['doctor'])
+
+  assert.equal(status, 1)
+  assert.equal(
+    lines[1],
+    'PROBLEM the warnings after a call (120 s) may last longer than the 120 s the end of a call is given: lower checks.warnTimeoutSeconds in settings.json.',
+  )
 })
 
 const RULES = { N1: 'A name says what it holds.' }

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Weaver checks",
-  "description": "What a program judges at the end of a task: the project's own programs, run on the diff of a unit of work, each with the rules it stands behind. Each key is the name of a check.",
+  "description": "What the project's own programs check, each with the rules it stands behind. A check judges the diff of a unit of work at the end of a task; it may repair before it judges, and warn right after a tool call. Each key is the name of a check.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -30,25 +30,34 @@
     "check": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["verify", "cwd", "reads", "timeoutSeconds"],
+      "required": ["judge", "cwd", "reads", "timeoutSeconds"],
       "properties": {
-        "verify": {
+        "warn": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "string",
             "minLength": 1
           },
-          "description": "The command that judges, with its arguments. An argument `{files}` becomes the changed files the check is about."
+          "description": "A command that warns the agent early, right after one of its tool calls changed files the check is about: a fast run on those files alone, where an argument `{files}` becomes them. What it finds is told to the agent with the result of the call and holds nothing: `judge` gives the verdict. Its result is read as `reads` says, and its time is `checks.warnTimeoutSeconds` in `settings.json`."
         },
-        "fix": {
+        "repair": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "string",
             "minLength": 1
           },
-          "description": "A command that repairs what it can before `verify` judges what is left: a formatter, a linter's autofix. It runs on the unit's own files, and what it rewrites stays the agent's work."
+          "description": "A command that repairs what it can before `judge` judges what is left: a formatter, a linter's autofix, a generator. It runs on the unit's own files, and what it rewrites stays the agent's work."
+        },
+        "judge": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "The command that judges, with its arguments, when the agent says it has finished. An argument `{files}` becomes the changed files the check is about."
         },
         "cwd": {
           "type": "string",
@@ -65,12 +74,12 @@
         },
         "reads": {
           "enum": ["exit", "findings"],
-          "description": "How the verdict is read. `exit`: from the exit status. `findings`: from the last line printed, `{\"findings\": [...]}`, where each finding gives the name of a `rule`, a `file`, a `message` and optionally a `line`."
+          "description": "How the verdict of `judge`, and what `warn` found, is read. `exit`: from the exit status. `findings`: from the last line printed, `{\"findings\": [...]}`, where each finding gives the name of a `rule`, a `file`, a `message` and optionally a `line`."
         },
         "timeoutSeconds": {
           "type": "integer",
           "minimum": 1,
-          "description": "How long one run of the check may take."
+          "description": "How long one run of `judge` or of `repair` may take."
         },
         "after": {
           "type": "string",

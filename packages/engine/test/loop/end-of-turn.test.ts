@@ -131,7 +131,7 @@ test('what waits for the owner is counted, listed in the report and never blocks
   const project = declaration({
     checks: {
       lint: LINT,
-      markers: { verify: ['true'], reads: 'findings', rules: { S1: { statement: 'A suppression needs approval.', level: 'human' } } },
+      markers: { judge: ['true'], reads: 'findings', rules: { S1: { statement: 'A suppression needs approval.', level: 'human' } } },
     },
   })
 

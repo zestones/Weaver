@@ -77,7 +77,7 @@ export async function weaver(cwd: string, args: readonly string[], around: Aroun
 }
 
 // The limits every project writes, with the values a new project starts with.
-export const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 }
+export const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 }
 export const SETTINGS = { version: 1, checks: LIMITS }
 export const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
 

@@ -96,7 +96,7 @@ export class EndOfTurn implements Moment {
     const repaired = finished.isEmpty ? [] : await this.repair(session, declaration, finished, deadline)
     const unit = repaired.length === 0 ? finished : session.unit()
     const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
-    const outcomes = unit.isEmpty ? [] : await this.checks.verify(declaration, diff, deadline)
+    const outcomes = unit.isEmpty ? [] : await this.checks.judge(declaration, diff, deadline)
     // The reviewer judges what the checks let through: a change they refuse will be rewritten anyway.
     const blocked = outcomes.some((outcome) => outcome.blocking)
     const candidates = outcomes.flatMap((outcome) => outcome.candidates)

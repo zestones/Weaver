@@ -1,7 +1,8 @@
 export interface DeclaredCheck {
   readonly id: string
-  readonly verify: readonly string[]
-  readonly fix: readonly string[] | null
+  readonly warn: readonly string[] | null
+  readonly repair: readonly string[] | null
+  readonly judge: readonly string[]
   readonly cwd: string
   readonly when: readonly string[] | null
   readonly reads: 'exit' | 'findings'

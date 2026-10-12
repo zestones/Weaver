@@ -74,8 +74,9 @@ export class DeclarationParts {
 
     const checks = Object.entries(checksOf).map(([id, check]): DeclaredCheck => ({
       id,
-      verify: check.verify,
-      fix: check.fix ?? null,
+      warn: check.warn ?? null,
+      repair: check.repair ?? null,
+      judge: check.judge,
       cwd: check.cwd,
       when: check.when ?? null,
       reads: check.reads,
