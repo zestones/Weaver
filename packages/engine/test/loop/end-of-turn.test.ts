@@ -53,6 +53,64 @@ test('a failing gate keeps the unit open and tells the agent what to fix, with t
   assert.match(reportOf(output.reason ?? ''), /# Unit 1, round 1: checks failed/)
 })
 
+test('a refusal quotes the rules a failure is about, and never every rule of a check that does not say which one broke', async () => {
+  const project = declaration({
+    checks: {
+      lint: { judge: ['true'], rules: { L1: 'No unused variable.', L2: 'No console call.', L3: 'Functions stay short.' } },
+      markers: {
+        judge: ['true'],
+        reads: 'findings',
+        rules: { M1: 'No FIXME is left.', M2: 'No TODO is left.', M3: 'No debugger is left.' },
+      },
+      format: { judge: ['true'], rules: { F1: 'Prettier decides formatting.' } },
+    },
+  })
+  const failing = (
+    id: string,
+    rules: readonly string[],
+    extra: Partial<ConstructorParameters<typeof CheckOutcome>[0]> = {},
+  ): CheckOutcome => new CheckOutcome({ id, rules, status: 'fail', blocking: true, ms: 1, output: `${id} printed this`, ...extra })
+  const todo = { rule: 'M2', file: A_FILE, line: 1, message: 'TODO left in' }
+
+  prompt(session, 'change it', project)
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+
+  const { reason = '' } = await finishWith(
+    session,
+    stubChecks([
+      failing('lint', ['L1', 'L2', 'L3']),
+      failing('markers', ['M1', 'M2', 'M3'], { failures: [todo, { ...todo, line: 2 }, { ...todo, rule: 'M1', message: 'FIXME left in' }] }),
+      failing('format', ['F1'], { status: 'timeout' }),
+      // A check that only lists places for the reviewer stands behind no rule of its own.
+      failing('bare', []),
+    ]),
+    project,
+  )
+
+  assert.match(
+    reason,
+    /\nFAIL lint \(one of its 3 rules, written in \.weaver\/project\/checks\.json: what it printed says which\)\n {2}lint printed this\n/,
+  )
+  assert.match(reason, /\nFAIL markers \(M2: No TODO is left\. \| M1: No FIXME is left\.\)\n {2}M2 src\/a\.ts:1: TODO left in\n/)
+  assert.match(reason, /\nTIMEOUT format \(F1: Prettier decides formatting\.\)\n/)
+  assert.match(reason, /\nFAIL bare\n {2}bare printed this\n/)
+  assert.doesNotMatch(reason, /No unused variable|No debugger/)
+})
+
+test('a check that fails without holding the task is listed for the owner under the rules it is known to be about', async () => {
+  const several = new CheckOutcome({ ...FAILING, rules: ['L1', 'L2'], blocking: false })
+  const one = new CheckOutcome({ ...FAILING, id: 'format', rules: ['F1'], blocking: false, output: 'src/a.ts is not formatted' })
+
+  prompt(session, 'change it')
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+
+  const { systemMessage = '' } = await finishWith(session, stubChecks([several, one]))
+
+  assert.match(systemMessage, /2 item\(s\) to validate\./)
+  assert.match(reportOf(systemMessage), /\n- the check lint, behind 2 rule\(s\), reports: src\/a\.ts:1:1 error max-lines-per-function\n/)
+  assert.match(reportOf(systemMessage), /\n- F1 the check format reports: src\/a\.ts is not formatted\n/)
+})
+
 test('after the refusals the project allows the agent may stop, with its unit still open; a new request starts them again', async () => {
   const project = declaration({ limits: { maxRefusals: 2 } })
   const checks = stubChecks([FAILING])

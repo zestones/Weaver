@@ -171,7 +171,12 @@ export class Project {
     }
   }
 
+  // Whether git is told to ignore the path. A file committed before it was ignored is still followed: see `tracks`.
   ignores(path: string): boolean {
-    return spawnSync('git', ['-C', this.top, 'check-ignore', '-q', path]).status === 0
+    return spawnSync('git', ['-C', this.top, 'check-ignore', '-q', '--no-index', path]).status === 0
+  }
+
+  tracks(path: string): boolean {
+    return spawnSync('git', ['-C', this.top, 'ls-files', '--error-unmatch', '--', path]).status === 0
   }
 }

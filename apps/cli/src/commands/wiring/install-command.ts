@@ -45,9 +45,9 @@ export class InstallCommand implements Command {
       runtime.install()
       this.output.say(`${runtime.label}: hooks written to ${runtime.file}`)
 
-      if (!project.ignores(runtime.file)) {
-        this.output.say(`  ${runtime.file} is not ignored by git and names paths of this machine: add it to .gitignore.`)
-      }
+      const shared = this.shared(project, runtime.file)
+
+      if (shared !== null) this.output.say(`  ${shared}`)
     }
 
     this.output.say(
@@ -63,6 +63,20 @@ export class InstallCommand implements Command {
     this.output.say(this.wired())
 
     return 0
+  }
+
+  // The hooks name paths of this machine: the file that holds them is not to be shared. null when git neither
+  // follows it nor would. A file committed before it was ignored is still followed, whatever the ignore files say.
+  private shared(project: Project, file: string): string | null {
+    const ignored = project.ignores(file)
+    const kept = `\`git rm --cached ${file}\`, which keeps the file`
+
+    if (!project.tracks(file))
+      return ignored ? null : `${file} is not ignored by git and names paths of this machine: add it to .gitignore.`
+
+    return ignored
+      ? `${file} is ignored by git, which still follows it because it was committed before: it names paths of this machine. Stop that with ${kept}.`
+      : `${file} is followed by git and names paths of this machine: add it to .gitignore, then run ${kept}.`
   }
 
   // A release keeps its folder; a checkout may move, and its build may go.

@@ -1,6 +1,8 @@
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Declaration } from '../declaration/content/declaration.ts'
+import { DeclarationFolder } from '../declaration/reading/declaration-folder.ts'
+import { DeclarationParts } from '../declaration/reading/declaration-parts.ts'
 import type { CheckOutcome } from '../checks/results/check-outcome.ts'
 import type { UnitReview } from '../review/rounds/unit-review.ts'
 import type { UnitVerdict } from './unit-verdict.ts'
@@ -257,9 +259,20 @@ export class Report {
   }
 
   private failureBlock(outcome: CheckOutcome): string[] {
-    const statements = outcome.rules.map((rule) => `${rule}: ${this.declaration.statementOf(rule)}`).join(' | ')
-    const head = `${outcome.status === 'timeout' ? 'TIMEOUT' : 'FAIL'} ${outcome.id} (${statements})`
+    const behind = this.behind(outcome)
+    const head = `${outcome.status === 'timeout' ? 'TIMEOUT' : 'FAIL'} ${outcome.id}${behind === null ? '' : ` (${behind})`}`
 
     return [head, ...(outcome.reason === null ? [] : [`  ${outcome.reason}`]), ...outcome.failureLines().map((line) => `  ${line}`), '']
+  }
+
+  // The sentences of the rules the failure is about. When the check does not say which of its rules broke, quoting
+  // them all would bury what it printed: the agent is told how many there are and where they are written.
+  private behind(outcome: CheckOutcome): string | null {
+    const { concerned, rules } = outcome
+
+    if (concerned.length > 0) return concerned.map((rule) => `${rule}: ${this.declaration.statementOf(rule)}`).join(' | ')
+    if (rules.length === 0) return null
+
+    return `one of its ${String(rules.length)} rules, written in ${DeclarationFolder.NAME}/${DeclarationParts.FILES.checks}: what it printed says which`
   }
 }

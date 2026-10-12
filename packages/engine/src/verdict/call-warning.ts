@@ -18,13 +18,11 @@ export class CallWarning {
   }
 
   private block(outcome: CheckOutcome): string {
-    const rules = [...new Set(outcome.failures.map((finding) => finding.rule))]
-
     return [
       `[weaver] \`${outcome.id}\` warns, right after this call. It would hold the end of the task: fix it now.`,
       ...(outcome.reason === null ? [] : [`  ${outcome.reason}`]),
       ...outcome.warningLines().map((line) => `  ${line}`),
-      ...rules.map((rule) => `  ${rule}: ${this.declaration.statementOf(rule)}`),
+      ...outcome.concerned.map((rule) => `  ${rule}: ${this.declaration.statementOf(rule)}`),
     ].join('\n')
   }
 }

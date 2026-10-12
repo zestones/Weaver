@@ -82,6 +82,30 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   assert.ok(lines.some((line) => line.startsWith('Wired to the Weaver checkout that holds ')))
 })
 
+test('install says what to do of a hooks file git would share: ignore it, stop following it, or both', async () => {
+  const git = (...args: string[]): void => void spawnSync('git', ['-C', top, ...args])
+  const advice = async (): Promise<string[]> => (await weaver(top, ['install'])).lines.filter((line) => line.startsWith('  '))
+
+  assert.deepEqual(await advice(), [
+    `  ${CLAUDE} is not ignored by git and names paths of this machine: add it to .gitignore.`,
+    `  ${CODEX} is not ignored by git and names paths of this machine: add it to .gitignore.`,
+  ])
+
+  git('add', '-f', CLAUDE, CODEX)
+  writeFileSync(join(top, '.gitignore'), '.codex/\n')
+
+  assert.deepEqual(await advice(), [
+    `  ${CLAUDE} is followed by git and names paths of this machine: add it to .gitignore, then run \`git rm --cached ${CLAUDE}\`, which keeps the file.`,
+    `  ${CODEX} is ignored by git, which still follows it because it was committed before: it names paths of this machine. Stop that with \`git rm --cached ${CODEX}\`, which keeps the file.`,
+  ])
+
+  git('rm', '--cached', '-q', CLAUDE, CODEX)
+  writeFileSync(join(top, '.gitignore'), '.codex/\n.claude/settings.local.json\n')
+
+  assert.deepEqual(await advice(), [], 'ignored and no longer followed: nothing is left to say')
+  assert.equal(existsSync(join(top, CODEX)), true)
+})
+
 test('the command install writes is one the runtime can run as it is', async () => {
   await weaver(top, ['install'])
 

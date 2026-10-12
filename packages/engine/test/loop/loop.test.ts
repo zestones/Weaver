@@ -135,7 +135,8 @@ test('a unit is refused until its own diff passes the declared gates, then settl
   assert.equal(again.decision, 'block')
   assert.match(
     again.reason ?? '',
-    /FAIL markers \(M1: No FIXME in the lines a unit adds\. \| M2: [^)]*\)\n {2}M1 src\/b\.js:1: FIXME left in/,
+    /FAIL markers \(M1: No FIXME in the lines a unit adds\.\)\n {2}M1 src\/b\.js:1: FIXME left in/,
+    'only the rule its finding names is quoted',
   )
 
   write('src/b.js', 'export const b = 2\n')

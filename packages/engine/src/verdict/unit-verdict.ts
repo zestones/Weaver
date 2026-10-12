@@ -61,7 +61,7 @@ export class UnitVerdict {
     const findings = this.outcomes.flatMap((outcome) => outcome.validationLines())
     const advisory = this.outcomes
       .filter((outcome) => outcome.failedWithoutBlocking)
-      .map((outcome) => `${outcome.rules.join(' ')} the check ${outcome.id} reports: ${outcome.excerpt().slice(0, 3).join(' / ')}`)
+      .map((outcome) => `${this.behind(outcome)} reports: ${outcome.excerpt().slice(0, 3).join(' / ')}`)
     const declaration = this.diff.changesUnder(DeclarationFolder.NAME)
       ? [`${DECLARATION_RULE} ${DeclarationFolder.NAME}: the unit changed the project's declaration`]
       : []
@@ -71,6 +71,12 @@ export class UnitVerdict {
     )
 
     return [...findings, ...advisory, ...lifted, ...declaration, ...(this.review?.toValidate() ?? [])]
+  }
+
+  private behind(outcome: CheckOutcome): string {
+    const { concerned, rules, id } = outcome
+
+    return concerned.length > 0 ? `${concerned.join(' ')} the check ${id}` : `the check ${id}, behind ${String(rules.length)} rule(s),`
   }
 
   event(): EventBody {

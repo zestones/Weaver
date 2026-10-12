@@ -112,6 +112,7 @@ test('a check that warns tells the agent right after a call what it found on the
   assert.equal(answer.hookSpecificOutput?.hookEventName, 'PostToolUse')
   assert.match(told(answer), /^\[weaver\] `syntax` warns, right after this call\. It would hold the end of the task: fix it now\./)
   assert.match(told(answer), /SyntaxError/)
+  assert.match(told(answer), /\n {2}S1: Source files parse\.$/, 'the only rule of the check is the one it warns about')
   assert.equal(answer.decision, undefined, 'the call is made: nothing is refused')
 
   const refused = hook('Stop', { last_assistant_message: FINISHED })

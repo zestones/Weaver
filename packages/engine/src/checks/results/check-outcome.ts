@@ -53,6 +53,16 @@ export class CheckOutcome {
     return this.status === 'fail' && !this.blocking
   }
 
+  // The rules a failure is known to be about: the ones its findings name, or the only rule the check stands behind.
+  // A check read by its exit status does not say which of several rules it found broken: none is named then.
+  get concerned(): readonly string[] {
+    const named = [...new Set(this.failures.map((finding) => finding.rule))]
+
+    if (named.length > 0) return named
+
+    return this.rules.length === 1 ? this.rules : []
+  }
+
   failureLines(): string[] {
     return this.failures.length > 0 ? this.failures.map((finding) => this.line(finding)) : this.excerpt()
   }
