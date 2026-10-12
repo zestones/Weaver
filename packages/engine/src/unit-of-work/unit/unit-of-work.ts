@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { AttributionWindow, Change, ClosedWindow } from '../attribution/attribution-window.ts'
-import type { Intent, UnitFile, UnitRecord } from './unit-record.ts'
+import type { Intent, LiftedCall, UnitFile, UnitRecord } from './unit-record.ts'
 
 type Files = Readonly<Record<string, UnitFile>>
 
@@ -19,6 +19,7 @@ export class UnitOfWork {
       intents: [],
       check: { rounds: 0, result: null, reminded: false, reviewed: [], reviewing: null },
       unattributed: [],
+      lifted: [],
     })
   }
 
@@ -67,6 +68,10 @@ export class UnitOfWork {
     return this.record.unattributed
   }
 
+  get lifted(): readonly LiftedCall[] {
+    return this.record.lifted
+  }
+
   get isEmpty(): boolean {
     return Object.keys(this.record.files).length === 0
   }
@@ -84,6 +89,13 @@ export class UnitOfWork {
       intents: known ? intents : [...intents, intent],
       check: { ...check, rounds: 0, reminded: false, reviewed: [] },
     })
+  }
+
+  // The same call made again is one thing for the owner to look at.
+  withLifted(call: LiftedCall): UnitOfWork {
+    const known = this.lifted.some((earlier) => earlier.guard === call.guard && earlier.what === call.what)
+
+    return known ? this : new UnitOfWork({ ...this.record, lifted: [...this.lifted, call] })
   }
 
   withFailedRound(): UnitOfWork {

@@ -9,16 +9,17 @@ Weaver knows no rule by itself. Everything it enforces is declared by the superv
 
 ## What it does
 
-| What                            | How                                                                                                                                                                                   |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Knows who changed what          | Each request you send opens a unit of work. The files an agent changes join it, tool call by tool call: the diff Weaver checks and reviews is that agent's own.                       |
-| Refuses before a tool runs      | The project declares guards: paths an agent may not write, commands it may not run. A refusal carries the sentence of the project that says why.                                      |
-| Warns right after a call        | A check may run a fast command on the files a call just changed. What it finds is told to the agent at once and holds nothing: the verdict comes when the task ends.                  |
-| Checks when a task ends         | The project's programs judge the change: the compiler, the linter, scripts of its own. A check may repair first, then judge. A failure sends the agent back to work.                  |
-| Has another agent review        | The rules no program can judge go to a reviewer, Claude Code or Codex, that only reads or that experiments in a throwaway copy of the project. The agent answers each finding.        |
-| Keeps what agents discover      | An agent flags what it comes across and its task does not settle. A writer turns the flag into a card. You read the cards and decide: fixed, left as it is, or an issue.              |
-| Leaves the deciding to you      | An agent cannot close a card, change one, or unplug Weaver: the commands that decide refuse to run under an agent. Weaver also guards its own configuration, its state and the hooks. |
-| Says whether it is really alive | `weaver doctor` checks the configuration, the hook, and each runtime. It asks Codex whether it runs the hooks, since Codex may hold them and work without Weaver, without a word.     |
+| What                            | How                                                                                                                                                                                            |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Knows who changed what          | Each request you send opens a unit of work. The files an agent changes join it, tool call by tool call: the diff Weaver checks and reviews is that agent's own.                                |
+| Refuses before a tool runs      | The project declares guards: paths an agent may not write, commands it may not run. A refusal carries the sentence of the project that says why.                                               |
+| Warns right after a call        | A check may run a fast command on the files a call just changed. What it finds is told to the agent at once and holds nothing: the verdict comes when the task ends.                           |
+| Checks when a task ends         | The project's programs judge the change: the compiler, the linter, scripts of its own. A check may repair first, then judge. A failure sends the agent back to work.                           |
+| Has another agent review        | The rules no program can judge go to a reviewer, Claude Code or Codex, that only reads or that experiments in a throwaway copy of the project. The agent answers each finding.                 |
+| Keeps what agents discover      | An agent flags what it comes across and its task does not settle. A writer turns the flag into a card. You read the cards and decide: fixed, left as it is, or an issue.                       |
+| Leaves the deciding to you      | An agent cannot close a card, change one, or unplug Weaver: the commands that decide refuse to run under an agent. Weaver also guards its own configuration, its state and the hooks.          |
+| Steps aside when you say so     | `weaver maintenance on` lifts the guards for one session, when you want its agent to do what they forbid. Its work is still checked, and what the guards would have refused is listed for you. |
+| Says whether it is really alive | `weaver doctor` checks the configuration, the hook, and each runtime. It asks Codex whether it runs the hooks, since Codex may hold them and work without Weaver, without a word.              |
 
 ## How it plugs in
 
@@ -123,6 +124,17 @@ A guard, in `project/guards.json`: the sentence is what the agent reads when it 
 }
 ```
 
+When you want an agent to do what a guard forbids, you put its session in maintenance, from a terminal of your own:
+
+```sh
+weaver maintenance on        # the one session at work; `on 3f2a` names one by the start of its id
+weaver maintenance off
+```
+
+In maintenance, the guards of the project let the calls of that session through, and so does the guard Weaver keeps on `.weaver/` and on the skills. Nothing else changes: the work is checked and reviewed as before, the other sessions keep their guards, and each call a guard would have refused is listed under "To validate" in the report of the task. The hook settings of the agents, Weaver's own state and the commands that are yours stay refused: an agent that could change these could unplug Weaver, or put itself in maintenance.
+
+Maintenance lasts until you turn it off. Weaver reminds you when a task ends, and `weaver doctor` names the sessions left in it. A refusal gives the agent the command to pass on to you, with the session it is for.
+
 A check, in `project/checks.json`, has up to three commands and names the rules it stands behind. It warns with `warn`, right after a call that changed its files; when the task ends it repairs with `repair`, then judges with `judge`. Only `judge` is required.
 
 ```json
@@ -181,6 +193,7 @@ Releases stay side by side, and a project runs the one that wired it until `weav
 | `weaver uninstall [claude] [codex]`            | Removes the hooks, and leaves everything else as it is.                                                |
 | `weaver update [--dry-run] [--offline]`        | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks. |
 | `weaver doctor`                                | Checks the configuration, the hook, and each agent runtime.                                            |
+| `weaver maintenance on\|off [<session>]`       | Lifts the guards of the project for one session of an agent, or puts them back.                        |
 | `weaver version`                               | Says which version of Weaver this is.                                                                  |
 | `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.                                  |
 | `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`.                                |

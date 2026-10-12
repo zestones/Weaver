@@ -102,30 +102,30 @@ test('Weaver’s configuration, its state and the agent’s hook settings are gu
     return call === null ? null : (bare.refusal(call)?.reason ?? null)
   }
 
-  for (const path of [
-    '.weaver/settings.json',
-    '.weaver/project/checks.json',
-    '.weaver/skills/wv-finish.md',
-    '.claude/settings.json',
-    '.claude/settings.local.json',
-    '.codex/hooks.json',
-    '.git/weaver/sessions/s/state.json',
-  ]) {
+  for (const path of ['.weaver/settings.json', '.weaver/project/checks.json', '.weaver/skills/wv-finish.md']) {
     assert.match(
       refusal('Write', { file_path: join(repo.top, path) }) ?? '',
-      /^\[weaver weaver:protected\] Writing .* is refused\. Weaver's configuration/,
+      /^\[weaver weaver:declaration\] Writing .* is refused\. Weaver's configuration/,
+      path,
+    )
+  }
+
+  for (const path of ['.claude/settings.json', '.claude/settings.local.json', '.codex/hooks.json', '.git/weaver/sessions/s/state.json']) {
+    assert.match(
+      refusal('Write', { file_path: join(repo.top, path) }) ?? '',
+      /^\[weaver weaver:protected\] Writing .* is refused\. Weaver's state and the agent's hook settings/,
       path,
     )
   }
 
   assert.match(
     refusal('Edit', { file_path: join(repo.top, '.weaver/llm/rules.json') }) ?? '',
-    /^\[weaver weaver:protected\] Writing \.weaver\/llm\/rules\.json is refused/,
+    /^\[weaver weaver:declaration\] Writing \.weaver\/llm\/rules\.json is refused/,
   )
   assert.match(refusal('Bash', { command: 'rm -rf .git/weaver' }) ?? '', /weaver:protected/)
   assert.match(refusal('Bash', { command: 'rm -rf .git' }) ?? '', /weaver:protected/, 'a removed folder takes Weaver’s state with it')
-  assert.match(refusal('Bash', { command: 'echo {} > .weaver/settings.json' }) ?? '', /weaver:protected/)
-  assert.match(refusal('Bash', { command: 'rm -rf .weaver' }) ?? '', /weaver:protected/)
+  assert.match(refusal('Bash', { command: 'echo {} > .weaver/settings.json' }) ?? '', /weaver:declaration/)
+  assert.match(refusal('Bash', { command: 'rm -rf .weaver' }) ?? '', /weaver:declaration/)
   assert.equal(refusal('Write', { file_path: join(repo.top, '.claude/notes.md') }), null)
   assert.equal(refusal('Bash', { command: 'git status' }), null)
 })
@@ -141,6 +141,8 @@ test('the commands of Weaver that decide or change are the owner’s, however an
     ['close 12 wontfix "not now"', 'close'],
     ['install', 'install'],
     ['uninstall', 'uninstall'],
+    ['update --dry-run', 'update'],
+    ['maintenance on 3f2a91c0', 'maintenance'],
     ['cards reopen 12', 'cards reopen'],
     ['cards retitle 12 "A better title"', 'cards retitle'],
     ['cards label 12 type:bug', 'cards label'],
@@ -154,7 +156,7 @@ test('the commands of Weaver that decide or change are the owner’s, however an
     for (const program of ['weaver', '/opt/weaver/bin/weaver', 'node /opt/weaver/dist/bin/weaver.js', 'cd src && timeout 30 weaver']) {
       assert.equal(
         refusal(`${program} ${words}`),
-        `[weaver weaver:owner-command] Running \`weaver ${named}\` is refused. Deciding on a card and plugging Weaver in or out are the owner's, from a terminal of their own.`,
+        `[weaver weaver:owner-command] Running \`weaver ${named}\` is refused. Deciding on a card, plugging Weaver in or out and lifting its guards are the owner's, from a terminal of their own.`,
         `${program} ${words}`,
       )
     }
@@ -184,9 +186,32 @@ test('the skill that says how a task ends is guarded as soon as the configuratio
 
   assert.match(
     (call === null ? null : new ProjectGuards(declared, repo).refusal(call)?.reason) ?? '',
-    /^\[weaver weaver:protected\] Writing \.agents\/skills\/wv-finish\.md is refused/,
+    /^\[weaver weaver:declaration\] Writing \.agents\/skills\/wv-finish\.md is refused/,
   )
   assert.equal(call === null ? null : guards.refusal(call), null, 'not guarded when no configuration names it')
+})
+
+test('the owner’s maintenance lifts the guards of the project and the one on its declaration, and never what could unplug Weaver', () => {
+  const liftable = (tool: string, input: Record<string, unknown>): boolean | null => {
+    const { call } = catalog.fromArguments([]).read(new Payload({ cwd: repo.top, tool_name: tool, tool_input: input }))
+
+    return call === null ? null : (guards.refusal(call)?.liftable ?? null)
+  }
+  const writing = (path: string): boolean | null => liftable('Write', { file_path: join(repo.top, path) })
+
+  assert.equal(writing('client/eslint.config.js'), true)
+  assert.equal(liftable('Bash', { command: 'git commit -m x' }), true)
+  assert.equal(writing('.weaver/project/guards.json'), true)
+  assert.equal(writing('.claude/settings.json'), false)
+  assert.equal(writing('.codex/hooks.json'), false)
+  assert.equal(writing('.git/weaver/sessions/s/state.json'), false)
+  assert.equal(liftable('Bash', { command: 'weaver maintenance on s' }), false)
+  assert.equal(liftable('Bash', { command: 'weaver uninstall' }), false)
+  assert.equal(
+    liftable('Bash', { command: 'echo {} > .weaver/settings.json && echo {} > .claude/settings.json' }),
+    false,
+    'a call that also touches what is never lifted stays refused',
+  )
 })
 
 test('the state of a linked worktree is guarded where it lives, outside the working tree', () => {

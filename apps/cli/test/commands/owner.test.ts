@@ -11,6 +11,8 @@ const top = makeProject(join(scratch, 'project'))
 const OWNERS: readonly (readonly string[])[] = [
   ['install'],
   ['uninstall'],
+  ['update', '--offline'],
+  ['maintenance', 'on'],
   ['close', '1', 'fixed'],
   ['cards', 'reopen', '2'],
   ['cards', 'retitle', '1', 'Another', 'title'],

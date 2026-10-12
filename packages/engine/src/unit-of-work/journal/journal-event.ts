@@ -49,6 +49,19 @@ interface RefuseEvent {
   readonly what: string
 }
 
+// A call a guard would have refused, let through by the owner's maintenance.
+interface LiftEvent {
+  readonly kind: 'lift'
+  readonly tool: string
+  readonly guard: string
+  readonly what: string
+}
+
+interface MaintenanceEvent {
+  readonly kind: 'maintenance'
+  readonly on: boolean
+}
+
 interface ReviewEvent {
   readonly kind: 'review'
   readonly unit: number
@@ -80,6 +93,16 @@ interface FlagEvent {
   readonly known: boolean
 }
 
-export type EventBody = TouchEvent | CheckEvent | SettleEvent | HeadMovedEvent | RefuseEvent | ReviewEvent | AnswerEvent | FlagEvent
+export type EventBody =
+  | TouchEvent
+  | CheckEvent
+  | SettleEvent
+  | HeadMovedEvent
+  | RefuseEvent
+  | LiftEvent
+  | MaintenanceEvent
+  | ReviewEvent
+  | AnswerEvent
+  | FlagEvent
 export type JournalEvent = EventBase & EventBody
 export type EventOf<Kind extends EventBody['kind']> = Extract<JournalEvent, { kind: Kind }>

@@ -15,6 +15,12 @@ export interface UnitFile {
   readonly touchedAt: string
 }
 
+// A call a guard would have refused, which the owner's maintenance let through.
+export interface LiftedCall {
+  readonly guard: string
+  readonly what: string
+}
+
 interface CheckProgress {
   readonly rounds: number
   readonly result: 'pass' | 'fail' | null
@@ -33,4 +39,5 @@ export interface UnitRecord {
   readonly intents: readonly Intent[]
   readonly check: CheckProgress
   readonly unattributed: readonly string[]
+  readonly lifted: readonly LiftedCall[]
 }

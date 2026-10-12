@@ -110,7 +110,10 @@ test('a flag never reaches the guards, which judge every other command of Weaver
   const project = declaration({ guards: { own: { statement: 'Weaver is not run here.', runs: ['weaver'] } } })
 
   assert.equal(refusalOf(session, flag(['.weaver/settings.json']), project), RECORDED(1))
-  assert.equal(refusalOf(session, bashCall('weaver cards'), project), '[weaver own] Running `weaver` is refused. Weaver is not run here.')
+  assert.equal(
+    refusalOf(session, bashCall('weaver cards'), project),
+    '[weaver own] Running `weaver` is refused. Weaver is not run here. Only the owner lifts the guards, for this session: `weaver maintenance on s`.',
+  )
   assert.deepEqual(
     eventsOf(session, 'refuse').map(({ guard, what }) => [guard, what]),
     [['own', 'Running `weaver`']],

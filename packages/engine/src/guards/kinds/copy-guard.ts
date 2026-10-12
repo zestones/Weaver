@@ -14,6 +14,7 @@ export class CopyGuard extends Guard {
     super({
       id: 'weaver:review-copy',
       statement: `A reviewer writes only inside its copy of the project (${copy}) and the temporary folder of the machine.`,
+      liftable: false,
     })
     this.roots = [copy, tmpdir()].map(realPath)
   }

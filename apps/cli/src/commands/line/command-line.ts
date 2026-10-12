@@ -16,6 +16,7 @@ import { TieCommand } from '../changes/tie-command.ts'
 import { UntieCommand } from '../changes/untie-command.ts'
 import { CardsCommand } from '../memory/cards-command.ts'
 import { FlagCommand } from '../memory/flag-command.ts'
+import { MaintenanceCommand } from '../sessions/maintenance-command.ts'
 import { DoctorCommand } from '../wiring/doctor-command.ts'
 import { InstallCommand } from '../wiring/install-command.ts'
 import { UninstallCommand } from '../wiring/uninstall-command.ts'
@@ -90,6 +91,7 @@ export class CommandLine {
       new UninstallCommand(this.cwd, this.output, link),
       new UpdateCommand(this.cwd, this.output, link, this.channel ?? new ReleaseChannel()),
       new DoctorCommand(this.cwd, this.output, link, this.executions),
+      new MaintenanceCommand(this.cwd, this.output),
       new VersionCommand(this.output),
       new FlagCommand(this.cwd, this.output, this.input, this.caller),
       new CardsCommand(this.cwd, this.output),

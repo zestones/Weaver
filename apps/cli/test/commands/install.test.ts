@@ -215,6 +215,7 @@ test('without a command, or with one it does not know, weaver lists what it can 
       'uninstall [claude] [codex]',
       'update [--dry-run] [--offline]',
       'doctor',
+      'maintenance on|off [<session>]',
       'version',
       'flag <place>...',
       'cards [<number>] [--all] [--file <path>] [--label <family:value>]',

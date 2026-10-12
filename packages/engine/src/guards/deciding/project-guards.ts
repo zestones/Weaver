@@ -2,6 +2,7 @@ import type { ToolCall } from '../../agents/tool-calls/tool-call.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import type { DeclaredGuard } from '../../declaration/content/declared-guard.ts'
 import type { Repository } from '../../lib/git/repository.ts'
+import { DeclarationGuard } from '../kinds/declaration-guard.ts'
 import { EngineGuard } from '../kinds/engine-guard.ts'
 import type { Guard } from '../kinds/guard.ts'
 import { OwnerCommandGuard } from '../kinds/owner-command-guard.ts'
@@ -13,9 +14,11 @@ export class ProjectGuards {
   private readonly guards: readonly Guard[]
 
   constructor(declaration: Declaration, repo: Repository) {
+    // The guards no maintenance lifts come first: a call they refuse is refused, whatever else it does.
     this.guards = [
-      new EngineGuard(repo, declaration.skills),
+      new EngineGuard(repo),
       new OwnerCommandGuard(),
+      new DeclarationGuard(repo, declaration.skills),
       ...declaration.guards.flatMap((declared) => this.guardsOf(declared, repo)),
     ]
   }
@@ -31,7 +34,7 @@ export class ProjectGuards {
   }
 
   private guardsOf(declared: DeclaredGuard, repo: Repository): Guard[] {
-    const fields = { id: declared.id, statement: declared.statement }
+    const fields = { id: declared.id, statement: declared.statement, liftable: true }
 
     return [
       ...(declared.writes.length > 0 ? [new WritesGuard(fields, repo.top, declared.writes)] : []),

@@ -1,5 +1,5 @@
-import { mkdirSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { mkdirSync, readdirSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import type { Repository } from '../../lib/git/repository.ts'
 import { AttributionWindow, type WatchedCall } from '../attribution/attribution-window.ts'
 import { Touch } from '../attribution/touch.ts'
@@ -8,11 +8,12 @@ import { Journal } from '../journal/journal.ts'
 import type { OwnerRequest } from '../owner/owner-request.ts'
 import { Reconciliation } from '../owner/reconciliation.ts'
 import { UnitOfWork } from '../unit/unit-of-work.ts'
-import type { UnitFile } from '../unit/unit-record.ts'
+import type { LiftedCall, UnitFile } from '../unit/unit-record.ts'
 import type { SessionRecord } from './session-record.ts'
 import { SessionStore, type Transaction } from './session-store.ts'
 
 const REPAIR = 'fix'
+const SHORT_ID_LENGTH = 8
 
 export class Session {
   readonly repo: Repository
@@ -24,7 +25,7 @@ export class Session {
 
   constructor(repo: Repository, sessionId: string, agent: string) {
     this.repo = repo
-    this.dir = join(repo.gitDir, 'weaver', 'sessions', sessionId.replace(/[^\w.-]/g, '_'))
+    this.dir = join(Session.rootIn(repo), sessionId.replace(/[^\w.-]/g, '_'))
     this.id = basename(this.dir)
     this.agent = agent
     this.store = new SessionStore(this.dir, agent)
@@ -32,8 +33,59 @@ export class Session {
     mkdirSync(this.dir, { recursive: true })
   }
 
+  static rootIn(repo: Repository): string {
+    return join(repo.gitDir, 'weaver', 'sessions')
+  }
+
   state(): SessionRecord | null {
     return this.store.load()
+  }
+
+  // The first characters of its id that no other session of the repository shares, eight at least: what the owner
+  // types to name it.
+  get shortId(): string {
+    const others = readdirSync(dirname(this.dir)).filter((id) => id !== this.id)
+
+    for (let length = SHORT_ID_LENGTH; length < this.id.length; length += 1) {
+      const start = this.id.slice(0, length)
+
+      if (!others.some((other) => other.startsWith(start))) return start
+    }
+
+    return this.id
+  }
+
+  // When the session was last at work; null when it left no state.
+  get seenAt(): Date | null {
+    return this.store.changedAt()
+  }
+
+  get lastRequest(): string | null {
+    return this.unit().requests.at(-1) ?? null
+  }
+
+  // Since when the owner lifts the guards of the project for this session; null outside maintenance.
+  get maintenance(): string | null {
+    return this.state()?.maintenance ?? null
+  }
+
+  // False when maintenance was already as asked.
+  maintain(on: boolean): boolean {
+    const { value: changed } = this.store.transact((latest) => {
+      const changed = (latest.maintenance !== null) !== on
+
+      return { record: changed ? { ...latest, maintenance: on ? new Date().toISOString() : null } : latest, value: changed }
+    })
+
+    if (changed) this.log({ kind: 'maintenance', on })
+
+    return changed
+  }
+
+  // What a guard would have refused waits for the owner with the unit of work it was made in.
+  lift(tool: string, call: LiftedCall): void {
+    this.store.update((latest) => ({ ...latest, unit: new UnitOfWork(latest.unit).withLifted(call).record }))
+    this.log({ kind: 'lift', tool, ...call })
   }
 
   log(event: EventBody): void {

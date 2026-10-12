@@ -14,6 +14,7 @@ import { UnitVerdict } from '../../verdict/unit-verdict.ts'
 import { Answer } from '../exchange/answer.ts'
 import { FlaggedNotice } from '../exchange/flagged-notice.ts'
 import { HeadAlert } from '../exchange/head-alert.ts'
+import { MaintenanceNotice } from '../exchange/maintenance-notice.ts'
 import type { Turn } from '../exchange/turn.ts'
 import type { Moment } from './moment.ts'
 
@@ -69,12 +70,19 @@ export class EndOfTurn implements Moment {
     // who writes #review is answered by the review, not by how the agent words its reply.
     if (unit.isEmpty && this.reviews.follows(session, declaration, unit)) return this.check(session, declaration, unit, lastMessage)
     if (!finished) return unit.isEmpty ? Answer.empty() : this.pending(session, declaration)
-    if (!unit.isEmpty) return this.check(session, declaration, unit, lastMessage)
+    // What maintenance let through waits for the owner in a report, even when no file changed.
+    if (!unit.isEmpty || unit.lifted.length > 0) return this.check(session, declaration, unit, lastMessage)
+    if (!unit.hasRequests) return Answer.empty()
 
     // A turn that changed no file still ends its unit, so the next request starts with nothing of this one.
-    if (unit.hasRequests) session.settle({})
+    session.settle({})
 
-    return Answer.empty()
+    return this.over(session, Answer.empty())
+  }
+
+  // The owner is the one who closes maintenance: they are reminded of it when a task ends, and nothing more.
+  private over(session: Session, answer: Answer): Answer {
+    return answer.before(new MaintenanceNotice(session).reminder)
   }
 
   private async repair(session: Session, declaration: Declaration, unit: UnitOfWork, deadline: number): Promise<readonly string[]> {
@@ -125,12 +133,15 @@ export class EndOfTurn implements Moment {
       session.settle(unit.files)
       if (review !== null) new ReviewCards(session.repo).open(review, session, unit, declaration)
 
-      return Answer.saying(report.summary(reportPath))
+      return this.over(session, Answer.saying(report.summary(reportPath)))
     }
 
     return declaration.checkLimits.isExhaustedAfter(session.failRound())
-      ? Answer.saying(
-          `[weaver] The checks still fail after ${String(declaration.checkLimits.maxRefusals)} refusal(s); the agent may stop. Report: ${reportPath}`,
+      ? this.over(
+          session,
+          Answer.saying(
+            `[weaver] The checks still fail after ${String(declaration.checkLimits.maxRefusals)} refusal(s); the agent may stop. Report: ${reportPath}`,
+          ),
         )
       : Answer.blocking(report.refusal(reportPath))
   }

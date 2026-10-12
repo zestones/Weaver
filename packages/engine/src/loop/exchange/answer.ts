@@ -67,6 +67,15 @@ export class Answer {
     return new Answer({ ...this.body, systemMessage: said === undefined ? alert : `${alert} ${said}` })
   }
 
+  // What is said last, once the rest is.
+  before(note: string | null): Answer {
+    if (note === null) return this
+
+    const said = this.body?.systemMessage
+
+    return new Answer({ ...this.body, systemMessage: said === undefined ? note : `${said} ${note}` })
+  }
+
   print(): string {
     return this.body === null ? '' : JSON.stringify(this.body)
   }

@@ -1,5 +1,5 @@
 import type { ExecutionCatalog, RuntimeHook } from '@weaver/agent-sdk'
-import { DeclarationParts, type Declaration, type ReviewPolicy, type ReviewerName } from '@weaver/engine'
+import { DeclarationParts, RepositorySessions, type Declaration, type ReviewPolicy, type ReviewerName } from '@weaver/engine'
 import { RegistryError, type Card } from '@weaver/memory'
 import type { EngineLink } from '../../link/engine-link.ts'
 import { OwnRelease } from '../../link/own-release.ts'
@@ -49,6 +49,7 @@ export class DoctorCommand implements Command {
       ...this.review(project),
       ...this.writer(project),
       ...this.cards(project),
+      ...this.maintenance(project),
       this.hook(),
       ...runtimes.flatMap((runtime, index) => [this.runtime(runtime), ...(held[index] ?? [])]),
       this.anyRuntime(runtimes),
@@ -259,6 +260,14 @@ export class DoctorCommand implements Command {
     } catch {
       return false
     }
+  }
+
+  // Maintenance lasts until the owner turns it off: a session left in it is said here.
+  private maintenance(project: Project): Finding[] {
+    return new RepositorySessions(project.repository).underMaintenance().map((session) => ({
+      state: 'note',
+      text: `the session ${session.shortId} (${session.agent}) is in maintenance: the guards of the project let its calls through. weaver maintenance off ${session.shortId} puts them back.`,
+    }))
   }
 
   private hook(): Finding {

@@ -190,10 +190,10 @@ test('a call a guard refuses does not judge: the runtime is told to deny it, wit
   assert.equal(edit.hookSpecificOutput?.permissionDecision, 'deny')
   assert.equal(
     edit.hookSpecificOutput?.permissionDecisionReason,
-    '[weaver tools] Writing tools/markers.mjs is refused. The checks and the history are the owner’s.',
+    '[weaver tools] Writing tools/markers.mjs is refused. The checks and the history are the owner’s. Only the owner lifts the guards, for this session: `weaver maintenance on session-`.',
   )
   assert.match(commit.hookSpecificOutput?.permissionDecisionReason ?? '', /^\[weaver tools\] Running `git commit` is refused\./)
-  assert.match(own.hookSpecificOutput?.permissionDecisionReason ?? '', /weaver:protected/)
+  assert.match(own.hookSpecificOutput?.permissionDecisionReason ?? '', /weaver:declaration/)
   assert.deepEqual(kinds(), ['refuse', 'refuse', 'refuse'])
   assert.deepEqual(stop(), {}, 'nothing was written, so nothing is left to check')
 })

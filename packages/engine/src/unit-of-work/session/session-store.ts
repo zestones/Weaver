@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { UnitOfWork } from '../unit/unit-of-work.ts'
 import type { SessionRecord } from './session-record.ts'
@@ -8,7 +8,7 @@ export interface Transaction<Value> {
   readonly value: Value
 }
 
-const VERSION = 5
+const VERSION = 6
 const LOCK_WAIT_MS = 5000
 const LOCK_POLL_MS = 20
 
@@ -29,6 +29,11 @@ export class SessionStore {
     const record = JSON.parse(readFileSync(this.path, 'utf8')) as Partial<SessionRecord>
 
     return record.version === VERSION ? (record as SessionRecord) : null
+  }
+
+  // When the state last changed, which is when the session was last seen at work; null without a state.
+  changedAt(): Date | null {
+    return existsSync(this.path) ? statSync(this.path).mtime : null
   }
 
   transact<Value>(change: (record: SessionRecord) => Transaction<Value>): Transaction<Value> {
@@ -59,6 +64,7 @@ export class SessionStore {
       failedReview: null,
       head: null,
       flagged: [],
+      maintenance: null,
     }
   }
 

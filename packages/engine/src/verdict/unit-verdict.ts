@@ -2,6 +2,7 @@ import { DeclarationFolder } from '../declaration/reading/declaration-folder.ts'
 import type { UnitDiff } from '../unit-of-work/diff/unit-diff.ts'
 import type { EventBody } from '../unit-of-work/journal/journal-event.ts'
 import type { UnitOfWork } from '../unit-of-work/unit/unit-of-work.ts'
+import type { LiftedCall } from '../unit-of-work/unit/unit-record.ts'
 import type { UnitReview } from '../review/rounds/unit-review.ts'
 import type { CheckOutcome } from '../checks/results/check-outcome.ts'
 
@@ -17,6 +18,8 @@ export interface VerdictFields {
 
 // The one rule the engine brings itself: the declaration that says what is checked is the owner's.
 const DECLARATION_RULE = 'weaver:declaration'
+// And the one that follows what the owner's maintenance let through.
+const MAINTENANCE_RULE = 'weaver:maintenance'
 
 export class UnitVerdict {
   readonly unit: number
@@ -24,6 +27,8 @@ export class UnitVerdict {
   readonly maxRefusals: number
   readonly diff: UnitDiff
   readonly unattributed: readonly string[]
+  // The calls a guard would have refused, which the owner's maintenance let through.
+  readonly lifted: readonly LiftedCall[]
   readonly outcomes: readonly CheckOutcome[]
   // The files the repairs of the checks rewrote before the verdict.
   readonly repaired: readonly string[]
@@ -37,6 +42,7 @@ export class UnitVerdict {
     this.maxRefusals = fields.maxRefusals
     this.diff = fields.diff
     this.unattributed = fields.unit.unattributed
+    this.lifted = fields.unit.lifted
     this.outcomes = fields.outcomes
     this.repaired = fields.repaired
     this.review = fields.review
@@ -60,7 +66,11 @@ export class UnitVerdict {
       ? [`${DECLARATION_RULE} ${DeclarationFolder.NAME}: the unit changed the project's declaration`]
       : []
 
-    return [...findings, ...advisory, ...declaration, ...(this.review?.toValidate() ?? [])]
+    const lifted = this.lifted.map(
+      ({ guard, what }) => `${MAINTENANCE_RULE} ${guard}: ${what} went through in maintenance, which this guard refuses`,
+    )
+
+    return [...findings, ...advisory, ...lifted, ...declaration, ...(this.review?.toValidate() ?? [])]
   }
 
   event(): EventBody {
