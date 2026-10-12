@@ -73,3 +73,15 @@ Work that is understood and deliberately postponed. Each entry says what it is, 
 **What would make it urgent.** A writer whose cost is to be compared with what a review costs, or a project where one run writes many cards.
 
 **Where to start.** `writing/running/writer-run.ts`, in the memory, holds the time and the cost of a run when it ends. The journal is `unit-of-work/journal/journal.ts`, in the engine.
+
+## A skill that sets Weaver up in a project
+
+**What.** A skill an agent follows to put Weaver on a project that does not have it. It reads what the project already runs, its linter, its compiler, its tests, its formatter, the scripts of its manifest and its CI, and proposes the checks, the guards and the rules that say the same in `.weaver/`. It writes them once the owner agrees, tries each check, and ends with `weaver doctor`. The commands that are the owner's stay theirs: the skill says when to type `weaver install`.
+
+**Why it matters.** The first hour is where a newcomer stops. A new project starts with no check and no guard, the vocabulary is dense, and the only guide is the README. What to declare is written in the project itself, which an agent reads faster than its owner can describe it.
+
+**Why it waits.** Weaver was set up on one project, by the person who wrote it: a skill drawn from that one case would pass its habits off as the way to do it. A check that looks at the whole project also needs the comparison with the base, above, or the skill would declare checks that hold an agent for errors it did not write.
+
+**What would make it urgent.** A second project to put Weaver on, or a first person other than its owner who tries it.
+
+**Where to start.** `weaver install` already writes skills as templates, from the classes of `apps/cli/src/skills/`: this one would be a fourth, read before the project declares anything rather than named by its settings. The schemas of `declaration/schema/` say what each file of `.weaver/` may hold, and `weaver doctor` checks the result. Once the hooks are wired, `.weaver/` is the owner's: the skill writes it before `weaver install`, or in a session the owner put in maintenance.
