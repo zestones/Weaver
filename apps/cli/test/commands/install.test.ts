@@ -79,7 +79,7 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   )
   assert.ok(lines.includes(`${SKILL} created: it tells the agent how to end a task. Adapt it to your project.`))
   assert.ok(lines.some((line) => line.includes(`${CLAUDE} is not ignored by git`)))
-  assert.ok(lines.some((line) => line.includes('This is temporary')))
+  assert.ok(lines.some((line) => line.startsWith('Wired to the Weaver checkout that holds ')))
 })
 
 test('the command install writes is one the runtime can run as it is', async () => {
@@ -94,7 +94,7 @@ test('the command install writes is one the runtime can run as it is', async () 
 
 test('install twice wires once, and leaves what the owner put in the files', async () => {
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine', timeout: 5 }] }
-  const declared = JSON.stringify({ version: 1, checks: { ...LIMITS, maxRefusals: 5 } })
+  const declared = JSON.stringify({ version: 2, checks: { ...LIMITS, maxRefusals: 5 } })
 
   writeJson(top, CLAUDE, { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine], Notification: [mine] } })
   writeJson(top, CONFIG, JSON.parse(declared))
@@ -213,6 +213,7 @@ test('without a command, or with one it does not know, weaver lists what it can 
     [
       'install [claude] [codex]',
       'uninstall [claude] [codex]',
+      'update [--dry-run] [--offline]',
       'doctor',
       'version',
       'flag <place>...',
@@ -230,4 +231,26 @@ test('without a command, or with one it does not know, weaver lists what it can 
   assert.deepEqual(await weaver(top, ['help']), usage)
   assert.deepEqual((await weaver(top, ['status'])).status, 2, 'status went away with the ledger')
   assert.equal((await weaver(top, ['frobnicate'])).status, 2)
+})
+
+test('install leaves a project whose configuration is in another format to weaver update, and wires nothing', async () => {
+  writeJson(top, CONFIG, { version: 1, checks: { maxRefusals: 5, totalTimeoutSeconds: 600, parallel: 2 } })
+
+  const behind = await weaver(top, ['install', 'claude'])
+
+  assert.equal(behind.status, 1)
+  assert.deepEqual(behind.lines, [
+    '.weaver/ is in an earlier format than this Weaver reads: run weaver update, which brings this project and Weaver to the same one.',
+  ])
+  assert.deepEqual(readJson(top, CONFIG), { version: 1, checks: { maxRefusals: 5, totalTimeoutSeconds: 600, parallel: 2 } })
+
+  writeJson(top, CONFIG, { version: 3, checks: LIMITS })
+
+  const ahead = await weaver(top, ['install', 'claude'])
+
+  assert.equal(ahead.status, 1)
+  assert.deepEqual(ahead.lines, [
+    '.weaver/ is in a later format than this Weaver reads: run weaver update, which brings this project and Weaver to the same one.',
+  ])
+  assert.equal(existsSync(join(top, CLAUDE)), false)
 })

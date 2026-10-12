@@ -11,8 +11,8 @@
       "description": "The schema this file follows, for the editor."
     },
     "version": {
-      "const": 1,
-      "description": "The version of this format."
+      "const": 2,
+      "description": "The version of this format. `weaver update` brings the files of an earlier version to this one."
     },
     "finish": {
       "type": "object",

@@ -62,7 +62,7 @@ test('hooks that point to a Weaver that is no longer there are a problem, and so
   const dead = await weaver(top, ['doctor'], { link: moved })
 
   assert.equal(stale.status, 1)
-  assert.ok(stale.lines.includes('PROBLEM Codex: the hooks in .codex/hooks.json point somewhere else. Run weaver install.'))
+  assert.ok(stale.lines.includes('PROBLEM Codex: the hooks in .codex/hooks.json point somewhere else. Run weaver update.'))
   assert.equal(dead.status, 1)
   assert.ok(dead.lines.includes(`PROBLEM the hook does not start: ${moved.hook}. Build Weaver with pnpm build.`))
 })
@@ -192,7 +192,7 @@ test('the checks that warn right after a call are counted, and a time the end of
 
   assert.equal((await weaver(top, ['doctor'])).lines[1], 'ok      1 check(s) warn right after a call, in 30 s at most')
 
-  writeConfig(top, { settings: { version: 1, checks: { ...LIMITS, warnTimeoutSeconds: 120 } } })
+  writeConfig(top, { settings: { ...SETTINGS, checks: { ...LIMITS, warnTimeoutSeconds: 120 } } })
 
   const { status, lines } = await weaver(top, ['doctor'])
 
@@ -348,4 +348,37 @@ test('a registry that cannot be read is a problem, in the words of the registry'
   assert.equal(status, 1)
   assert.match(problem, /^PROBLEM the registry at .*\/\.git\/weaver\/registry\.sqlite could not be used: /)
   assert.deepEqual(await weaver(top, ['cards']), { status: 1, lines: [problem.replace('PROBLEM ', 'weaver: ')] })
+})
+
+test('a project wired to another release is told which one, and which one this is', async () => {
+  const older = `"/usr/bin/node" "/home/someone/.local/share/weaver/v0.1.0/node_modules/@weaver/engine/dist/bin/hook.js" Stop --agent=claude --weaver`
+
+  writeConfig(top, { settings: SETTINGS })
+  mkdirSync(join(top, '.claude'), { recursive: true })
+  writeFileSync(
+    join(top, '.claude/settings.local.json'),
+    JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: older }] }] } }),
+  )
+
+  const { status, lines } = await weaver(top, ['doctor'])
+
+  assert.equal(status, 1)
+  assert.ok(
+    lines.includes(
+      'PROBLEM Claude Code: the hooks in .claude/settings.local.json are those of Weaver v0.1.0, and this is v0.0.0-dev. Run weaver update.',
+    ),
+    lines.join('\n'),
+  )
+})
+
+test('a project whose configuration lacks migrations is told which, and that nothing is checked until weaver update', async () => {
+  writeConfig(top, { settings: { version: 1, checks: { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 } } })
+
+  const { status, lines } = await weaver(top, ['doctor'])
+
+  assert.equal(status, 1)
+  assert.equal(
+    lines[0],
+    'PROBLEM .weaver/ is 1 migration(s) behind this Weaver (0002-check-commands): nothing is checked until weaver update brings it up to date.',
+  )
 })

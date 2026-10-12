@@ -13,6 +13,8 @@ cd "$(git rev-parse --show-toplevel)"
 # On a rehearsal the tag does not exist yet: the commit at hand stands for it.
 head="$(git rev-parse --quiet --verify "refs/tags/$version^{commit}" || git rev-parse HEAD)"
 previous="$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$head^" 2>/dev/null || true)"
+heading="What this first release holds"
+[[ -n "$previous" ]] && heading="What changed since $previous"
 
 cat <<NOTES
 ## Install
@@ -29,9 +31,11 @@ The release goes to \`~/.local/share/weaver/$version/\`, and \`~/.local/bin/weav
 
 ## Upgrade notes
 
-A supervised project runs the version it was wired with. Run \`weaver install\` again in each of them: until then \`weaver doctor\` says that its hooks point somewhere else.
+From a release that has it, \`weaver update\` does the three commands above. In a supervised project it then applies the migrations the configuration lacks, naming each, and wires the hooks to this release.
 
-## ${previous:+What changed since $previous}${previous:-What this first release holds}
+A supervised project runs the release that wired it until \`weaver update\` is run in it, and \`weaver doctor\` says when one is behind. \`weaver update --dry-run\` shows what would change and writes nothing.
+
+## $heading
 
 NOTES
 

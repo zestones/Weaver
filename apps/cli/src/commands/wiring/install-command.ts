@@ -1,5 +1,6 @@
 import { dirname } from 'node:path'
 import type { EngineLink } from '../../link/engine-link.ts'
+import { OwnRelease } from '../../link/own-release.ts'
 import type { Output } from '../../output/output.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
@@ -8,7 +9,7 @@ import type { Command } from '../line/command.ts'
 export class InstallCommand implements Command {
   readonly name = 'install'
   readonly usage = 'install [claude] [codex]'
-  readonly summary = 'Plug Weaver into this project: the hooks of the agent runtimes, and a starter configuration if there is none.'
+  readonly summary = 'Put Weaver on this project: the hooks of the agent runtimes, and a starter configuration if there is none.'
   readonly ownerOnly = true
   private readonly cwd: string
   private readonly output: Output
@@ -26,6 +27,16 @@ export class InstallCommand implements Command {
 
     if (!this.link.isAlive()) {
       this.output.say(`The hook does not start (${this.link.hook}). Build Weaver first with pnpm build, then run this again.`)
+
+      return 1
+    }
+
+    const migrations = project.migrations()
+
+    if (migrations.isBehind || migrations.isAhead) {
+      const which = migrations.isBehind ? 'an earlier format than this Weaver reads' : 'a later format than this Weaver reads'
+
+      this.output.say(`${project.configName}/ is in ${which}: run weaver update, which brings this project and Weaver to the same one.`)
 
       return 1
     }
@@ -49,10 +60,17 @@ export class InstallCommand implements Command {
       if (skill.create()) this.output.say(`${skill.path} created: ${skill.purpose} Adapt it to your project.`)
     }
 
-    this.output.say(
-      `Wired to the Weaver checkout that holds ${dirname(this.link.hook)}. This is temporary: run weaver install again if it moves, and weaver doctor to check it.`,
-    )
+    this.output.say(this.wired())
 
     return 0
+  }
+
+  // A release keeps its folder; a checkout may move, and its build may go.
+  private wired(): string {
+    const own = new OwnRelease()
+
+    return own.isCheckout
+      ? `Wired to the Weaver checkout that holds ${dirname(this.link.hook)}: run weaver install again if it moves, and weaver doctor to check it.`
+      : `Wired to Weaver ${own.tag}. weaver update keeps this project up to date, and weaver doctor checks it.`
   }
 }

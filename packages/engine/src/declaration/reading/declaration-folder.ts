@@ -1,8 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Declaration } from '../content/declaration.ts'
+import { DeclarationMigrations } from '../migrating/running/declaration-migrations.ts'
 import type { PartName } from '../schema/declaration-document.ts'
-import { DeclarationParts } from './declaration-parts.ts'
+import { DeclarationError } from './declaration-error.ts'
+import { DeclarationParts, type PartTexts } from './declaration-parts.ts'
 
 // Where a project declares what Weaver holds it to. A repository is supervised as soon as the settings are there; the
 // other files are optional.
@@ -26,13 +28,48 @@ export class DeclarationFolder {
   load(): Declaration | null {
     if (!existsSync(this.settings)) return null
 
+    const texts = this.texts()
+
+    this.failOnAnotherFormat(texts)
+
+    return new DeclarationParts(DeclarationFolder.NAME, texts, (path) => this.projectFile(path)).declaration()
+  }
+
+  // Files written for another format are not read against this one: every field that moved would read as a mistake.
+  private failOnAnotherFormat(texts: PartTexts): void {
+    const migrations = new DeclarationMigrations(texts)
+    const written = `${DeclarationParts.FILES.settings}: these files are in the format of version ${String(migrations.written)}`
+    const read = `this Weaver reads version ${String(DeclarationMigrations.LATEST)}`
+
+    if (migrations.isBehind) {
+      throw new DeclarationError(DeclarationFolder.NAME, [`${written}, and ${read}: run weaver update, which brings them to it`])
+    }
+
+    if (migrations.isAhead) {
+      throw new DeclarationError(DeclarationFolder.NAME, [
+        `${written}, and ${read}: run weaver update, which installs the release that reads them`,
+      ])
+    }
+  }
+
+  // The text of each file of the declaration that exists.
+  texts(): PartTexts {
     const written = Object.entries(DeclarationParts.FILES).flatMap(([part, file]): [PartName, string][] => {
       const path = join(this.path, file)
 
       return existsSync(path) ? [[part as PartName, readFileSync(path, 'utf8')]] : []
     })
 
-    return new DeclarationParts(DeclarationFolder.NAME, Object.fromEntries(written), (path) => this.projectFile(path)).declaration()
+    return Object.fromEntries(written)
+  }
+
+  write(texts: PartTexts): void {
+    for (const [part, text] of Object.entries(texts) as [PartName, string][]) {
+      const path = join(this.path, DeclarationParts.FILES[part])
+
+      mkdirSync(dirname(path), { recursive: true })
+      writeFileSync(path, text)
+    }
   }
 
   private projectFile(path: string): string | null {

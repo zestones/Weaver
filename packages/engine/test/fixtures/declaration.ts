@@ -39,7 +39,7 @@ function split(project: Raw): Split {
   const { sections, ...writes } = (writer ?? {}) as { sections?: readonly string[]; skill?: string }
   const cardSkill = sections === undefined ? writes.skill : (writes.skill ?? CARD_SKILL)
   const parts: Partial<Record<PartName, unknown>> = {
-    settings: { version: 1, ...(skill === undefined ? {} : { finish: { skill } }), checks: { ...LIMITS, ...(limits as Raw | undefined) } },
+    settings: { version: 2, ...(skill === undefined ? {} : { finish: { skill } }), checks: { ...LIMITS, ...(limits as Raw | undefined) } },
     guards,
     checks:
       checks === undefined

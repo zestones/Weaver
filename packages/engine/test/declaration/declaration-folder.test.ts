@@ -30,7 +30,7 @@ const problems = (project: Record<string, unknown>) => problemsOf(() => parse(pr
 const problemsIn = (texts: PartTexts) => problemsOf(() => new DeclarationParts('.weaver', texts).declaration())
 
 // The settings every project writes: its limits, with the values a new project starts with.
-const SETTINGS = '{"version":1,"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
+const SETTINGS = '{"version":2,"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
 
 const VALID = {
   scope: { exclude: ['design/lab'] },
@@ -168,7 +168,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
   assert.deepEqual(
     problemsIn({
       settings: JSON.stringify({
-        version: 2,
+        version: '2',
         checks: { maxRefusals: 0, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 },
         chekcs: {},
       }),
@@ -185,7 +185,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
     }),
     [
       'settings.json: chekcs is not a known field',
-      'settings.json: version must be 1',
+      'settings.json: version must be 2',
       'settings.json: checks.maxRefusals must be at least 1',
       'project/guards.json: 9x is not a valid name',
       'project/guards.json: 9x.statement is missing',
@@ -209,7 +209,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
 
 test('a file writes every limit Weaver applies: one left out is a problem, never a value the file does not show', () => {
   const written = {
-    settings: '{"version":1,"checks":{}}',
+    settings: '{"version":2,"checks":{}}',
     checks: JSON.stringify({ c: { judge: ['true'], rules: { plain: 'x', owner: { statement: 'y' } } } }),
     reviewers: '{"runtime":"codex"}',
   }

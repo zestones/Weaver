@@ -5,6 +5,7 @@ import type { Input } from '../../input/input.ts'
 import { StandardInput } from '../../input/standard-input.ts'
 import { EngineLink } from '../../link/engine-link.ts'
 import type { Output } from '../../output/output.ts'
+import { ReleaseChannel } from '../../releases/release-channel.ts'
 import { CloseCommand } from '../changes/close-command.ts'
 import { LabelCommand } from '../changes/label-command.ts'
 import { ReopenCommand } from '../changes/reopen-command.ts'
@@ -18,6 +19,7 @@ import { FlagCommand } from '../memory/flag-command.ts'
 import { DoctorCommand } from '../wiring/doctor-command.ts'
 import { InstallCommand } from '../wiring/install-command.ts'
 import { UninstallCommand } from '../wiring/uninstall-command.ts'
+import { UpdateCommand } from '../wiring/update-command.ts'
 import { VersionCommand } from '../wiring/version-command.ts'
 import type { Command } from './command.ts'
 
@@ -31,6 +33,7 @@ export class CommandLine {
   private readonly executions: ExecutionCatalog
   private readonly caller: Caller
   private readonly input: Input
+  private readonly channel: ReleaseChannel | null
 
   constructor(
     cwd: string,
@@ -39,6 +42,7 @@ export class CommandLine {
     executions: ExecutionCatalog = new ExecutionCatalog(),
     caller: Caller = new ProcessCaller(),
     input: Input = new StandardInput(),
+    channel: ReleaseChannel | null = null,
   ) {
     this.cwd = cwd
     this.output = output
@@ -46,6 +50,7 @@ export class CommandLine {
     this.executions = executions
     this.caller = caller
     this.input = input
+    this.channel = channel
   }
 
   async run(argv: readonly string[]): Promise<number> {
@@ -83,6 +88,7 @@ export class CommandLine {
     return [
       new InstallCommand(this.cwd, this.output, link),
       new UninstallCommand(this.cwd, this.output, link),
+      new UpdateCommand(this.cwd, this.output, link, this.channel ?? new ReleaseChannel()),
       new DoctorCommand(this.cwd, this.output, link, this.executions),
       new VersionCommand(this.output),
       new FlagCommand(this.cwd, this.output, this.input, this.caller),

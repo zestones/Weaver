@@ -1,7 +1,15 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { DeclarationError, DeclarationFolder, DeclarationParts, Repository, type Declaration, type PartName } from '@weaver/engine'
+import {
+  DeclarationError,
+  DeclarationFolder,
+  DeclarationMigrations,
+  DeclarationParts,
+  Repository,
+  type Declaration,
+  type PartName,
+} from '@weaver/engine'
 import { CardRegistry } from '@weaver/memory'
 import type { EngineLink } from '../link/engine-link.ts'
 import { CardSkill } from '../skills/card-skill.ts'
@@ -41,12 +49,58 @@ export class Project {
     return DeclarationFolder.in(this.top).load()
   }
 
+  // The format the files of the declaration are in, and the migrations they lack.
+  migrations(): DeclarationMigrations {
+    return new DeclarationMigrations(DeclarationFolder.in(this.top).texts())
+  }
+
+  // Brings the declaration up to date with this Weaver: the migrations it lacks, then the `$schema` lines that name
+  // another installation. What that changes, for the owner who reads the diff; nothing is written unless asked.
+  bringUpToDate(link: EngineLink, write: boolean): string[] {
+    const folder = DeclarationFolder.in(this.top)
+    const { texts, applied } = new DeclarationMigrations(folder.texts()).run()
+    const pointed = this.pointedAt(link, { ...folder.texts(), ...texts })
+    const files = Object.keys(pointed).length
+
+    if (write) folder.write({ ...texts, ...pointed })
+
+    return [
+      ...applied.flatMap((migration) => [`${migration.label}: ${migration.summary}`, ...migration.changes.map((change) => `  ${change}`)]),
+      ...(files === 0 ? [] : [`the \`$schema\` lines point at the schemas of this Weaver, in ${String(files)} file(s)`]),
+    ]
+  }
+
+  // The files whose `$schema` line names another installation, written again with the schemas of this one.
+  private pointedAt(link: EngineLink, texts: Readonly<Partial<Record<PartName, string>>>): Partial<Record<PartName, string>> {
+    const pointed: Partial<Record<PartName, string>> = {}
+
+    for (const [part, text] of Object.entries(texts) as [PartName, string][]) {
+      const document = this.documentOf(text)
+
+      if (document !== null && typeof document.$schema === 'string' && document.$schema !== link.schemaOf(part)) {
+        pointed[part] = `${JSON.stringify({ ...document, $schema: link.schemaOf(part) }, null, 2)}\n`
+      }
+    }
+
+    return pointed
+  }
+
+  private documentOf(text: string): Record<string, unknown> | null {
+    try {
+      const value: unknown = JSON.parse(text)
+
+      return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+    } catch {
+      return null
+    }
+  }
+
   // The settings, and one empty file for each part of what the project asks, each naming the schema an editor checks
   // it against. Who reviews and who writes the cards are the owner's to add: both cost money.
   createConfig(link: EngineLink): boolean {
     const folder = DeclarationFolder.in(this.top)
     const starter: Readonly<Partial<Record<PartName, object>>> = {
-      settings: { version: 1, finish: { skill: FinishSkill.PATH }, checks: STARTING_LIMITS },
+      settings: { version: DeclarationMigrations.LATEST, finish: { skill: FinishSkill.PATH }, checks: STARTING_LIMITS },
       guards: {},
       checks: {},
       scripts: {},

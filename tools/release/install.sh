@@ -4,8 +4,8 @@
 #   ~/.local/share/weaver/<version>/   the release, as it was published
 #   ~/.local/bin/weaver                the command, linked to that version
 #
-# Versions stay side by side. A supervised project runs the one it was wired with until `weaver install` is run in
-# it again, so an older version is removed by hand, once no project points at it.
+# Versions stay side by side. A supervised project runs the one it was wired with until `weaver update` is run in
+# it, so an older version is removed by hand, once no project points at it.
 set -euo pipefail
 
 archive="${1:?usage: install.sh <weaver-vX.Y.Z.tar.gz>}"
@@ -47,4 +47,4 @@ tar -xzf "$archive" -C "$home/$version" --strip-components=1
 ln -sfn "$home/$version/dist/bin/weaver.js" "$bin/weaver"
 
 echo "$("$bin/weaver" version) is installed in $home/$version, and $bin/weaver points at it."
-echo "Run weaver install in each supervised project: its hooks still point at the version it was wired with."
+echo "Run weaver update in each supervised project: it stays on the release that wired it until then."

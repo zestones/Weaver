@@ -36,6 +36,8 @@ const TIMEOUT_SECONDS: Readonly<Record<string, number>> = {
   Stop: END_OF_TURN_SECONDS,
 }
 const DEFAULT_TIMEOUT_SECONDS = 60
+// A release is installed in a folder named after its tag.
+const RELEASE_FOLDER = /[\\/]weaver[\\/](v\d+\.\d+\.\d+[^\\/"]*)[\\/]/
 
 export abstract class RuntimeSettings {
   static readonly END_OF_TURN_SECONDS = END_OF_TURN_SECONDS
@@ -84,6 +86,16 @@ export abstract class RuntimeSettings {
     if (commands.length === 0) return 'absent'
 
     return this.commands().every((command) => commands.includes(command)) ? 'installed' : 'stale'
+  }
+
+  // The release whose hooks are wired here, by its tag; null when they are those of a checkout, or when none is.
+  wiredTag(): string | null {
+    const commands = Object.values(this.read().hooks ?? {})
+      .flatMap((groups) => groups.flatMap((group) => group.hooks ?? []))
+      .map((hook) => hook.command ?? '')
+      .filter((command) => this.link.owns(command))
+
+    return commands.map((command) => RELEASE_FOLDER.exec(command)?.[1] ?? null).find((tag) => tag !== null) ?? null
   }
 
   get runtime(): AgentName {

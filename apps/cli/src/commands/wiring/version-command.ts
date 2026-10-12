@@ -1,12 +1,7 @@
-import { readFileSync } from 'node:fs'
+import { OwnRelease } from '../../link/own-release.ts'
 import type { Output } from '../../output/output.ts'
 import type { Command } from '../line/command.ts'
 
-interface Manifest {
-  readonly version: string
-}
-
-// A release stamps its version in the manifest it ships; a checkout keeps the development default.
 export class VersionCommand implements Command {
   readonly name = 'version'
   readonly usage = 'version'
@@ -19,9 +14,7 @@ export class VersionCommand implements Command {
   }
 
   run(): number {
-    const manifest = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')) as Manifest
-
-    this.output.say(`weaver ${manifest.version}`)
+    this.output.say(`weaver ${new OwnRelease().version}`)
 
     return 0
   }

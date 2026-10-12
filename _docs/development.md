@@ -61,13 +61,33 @@ The scripts of `tools/release/` do the work, and run on a workstation as they do
 
 ### Installing a release
 
+The first time, with the three files a release carries:
+
 ```sh
-gh release download v0.1.0 --repo zestones/Weaver --dir weaver-v0.1.0 && cd weaver-v0.1.0
+gh release download --repo zestones/Weaver --dir weaver-release && cd weaver-release
 sha256sum --check --ignore-missing SHA256SUMS
-bash install.sh weaver-v0.1.0.tar.gz
+bash install.sh weaver-v*.tar.gz
 ```
 
-The release goes to `~/.local/share/weaver/v0.1.0/`, and `~/.local/bin/weaver` points at it. Versions stay side by side: a supervised project runs the one it was wired with, until `weaver install` is run in it again. After an upgrade, `weaver doctor` says in each project that its hooks point somewhere else. An older version is removed by hand, once no project points at it.
+The release goes to `~/.local/share/weaver/<version>/`, and `~/.local/bin/weaver` points at it. Versions stay side by side: a supervised project runs the one that wired it until `weaver update` is run in it, and `weaver doctor` says which release wired a project that is behind.
+
+After that, `weaver update` is the one command that keeps things up to date. It does three things in order:
+
+1. **Weaver.** It reads the latest release on GitHub. When that one is later, it fetches its archive, its checksums and its `install.sh`, runs that script, then starts the release it installed with `update --offline`: that release finishes, since the one that fetched it may not know its format.
+2. **The configuration.** It applies the migrations the project lacks, and names each with what it changed.
+3. **The hooks.** It wires again the runtimes that were wired, and plugs in no other.
+
+`--dry-run` says what it would do and writes nothing. `--offline` looks for no release; a checkout looks for none either, since git updates it. The command is the owner's. `weaver install` only puts Weaver on a project: it leaves a project in another format to `weaver update`.
+
+### Migrations
+
+`version`, in `settings.json`, is the version of the format of the files of `.weaver/`, not the version of Weaver. A change that an earlier Weaver could not read, such as a field renamed or a field that becomes required, is a new version, and comes with its migration:
+
+- a file in `packages/engine/src/declaration/migrations/`, named by the version it brings the files to and by what it changes, such as `0002-check-commands.ts`. Its class extends `Migration` and lists operations;
+- the operations are in `migrating/operations/`: `RenamedField`, `AddedField`. A change none of them expresses is a new operation, with its test;
+- the migration is added to `DeclarationMigrations.ALL`, and the `const` of `version` in the settings schema goes up by one. A test holds the three together: the list, the files and the schema.
+
+A migration is never edited once a release carries it. Files of an earlier version are not read as they are: the hooks and `weaver doctor` tell the owner to run `weaver update`.
 
 ## TypeScript and packages
 

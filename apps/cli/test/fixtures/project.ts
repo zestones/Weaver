@@ -8,6 +8,7 @@ import { CommandLine } from '../../src/commands/line/command-line.ts'
 import type { Input } from '../../src/input/input.ts'
 import type { EngineLink } from '../../src/link/engine-link.ts'
 import type { Output } from '../../src/output/output.ts'
+import type { ReleaseChannel } from '../../src/releases/release-channel.ts'
 
 interface Run {
   readonly status: number
@@ -22,6 +23,8 @@ interface Around {
   readonly input?: string
   // The agent runtimes of the machine.
   readonly executions?: ExecutionCatalog
+  // Where releases come from, how one is installed and which one runs.
+  readonly channel?: ReleaseChannel
 }
 
 class RecordingOutput implements Output {
@@ -71,14 +74,15 @@ export async function weaver(cwd: string, args: readonly string[], around: Aroun
   const output = new RecordingOutput()
   const caller = new GivenCaller(around.under ?? null)
   const input = new GivenInput(around.input ?? '')
-  const status = await new CommandLine(cwd, output, around.link ?? null, around.executions ?? EXECUTIONS, caller, input).run(args)
+  const line = new CommandLine(cwd, output, around.link ?? null, around.executions ?? EXECUTIONS, caller, input, around.channel ?? null)
+  const status = await line.run(args)
 
   return { status, lines: output.lines }
 }
 
 // The limits every project writes, with the values a new project starts with.
 export const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 }
-export const SETTINGS = { version: 1, checks: LIMITS }
+export const SETTINGS = { version: 2, checks: LIMITS }
 export const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
 
 // What a project declares, each part in the file Weaver reads it from.

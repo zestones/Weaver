@@ -6,10 +6,9 @@ import type { PartName } from '@weaver/engine'
 
 const MARK = '--weaver'
 
-// TODO(distribution): temporary. Weaver is not distributed yet, so a project is wired to this checkout by absolute
-// paths. The hook commands and the `$schema` line belong to this machine, and stop working when the checkout moves, when
-// its `dist/` is removed or when this version of Node is uninstalled. Replace them with an installed package and a
-// hosted schema once Weaver is published.
+// A project is wired to one installation of Weaver by absolute paths: a release in its own folder, or a checkout. The
+// hook commands and the `$schema` lines belong to this machine and to that installation: they stop working when it
+// is removed or when this version of Node is uninstalled, and `weaver install` writes them again after an update.
 export class EngineLink {
   readonly hook: string
   // The folder that holds one schema for each file of a declaration.

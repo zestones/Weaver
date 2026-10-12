@@ -5,7 +5,7 @@ Weaver supervises the coding agents that work in a repository. It plugs into the
 Weaver knows no rule by itself. Everything it enforces is declared by the supervised project, in a `.weaver/` folder.
 
 > [!NOTE]
-> Weaver runs today from a checkout of this repository, on the command line. It is not distributed as a package yet, and its web interface, the workbench, is not built. [What is not there yet](#what-is-not-there-yet) lists the rest.
+> Weaver is installed from the [releases](https://github.com/zestones/Weaver/releases) of this repository and runs on the command line. Its web interface, the workbench, is not built. [What is not there yet](#what-is-not-there-yet) lists the rest.
 
 ## What it does
 
@@ -154,35 +154,39 @@ A command that needs more than the names of the files reads what Weaver sets in 
 
 ## Try it
 
-You need Node.js 24 (24.13 or later), pnpm, git, and Claude Code or Codex.
+You need Node.js 24 (24.13 or later), git, the GitHub CLI for the first install, and Claude Code or Codex.
 
 ```sh
-git clone https://github.com/zestones/Weaver.git && cd Weaver
-pnpm install --frozen-lockfile
-pnpm build
-ln -s "$PWD/apps/cli/dist/bin/weaver.js" ~/.local/bin/weaver
+gh release download --repo zestones/Weaver --dir weaver-release && cd weaver-release
+sha256sum --check --ignore-missing SHA256SUMS
+bash install.sh weaver-v*.tar.gz
 ```
 
-Then, from a terminal of your own, at the root of the project to supervise:
+The release goes to `~/.local/share/weaver/<version>/`, and `~/.local/bin/weaver` points at it. Then, from a terminal of your own, at the root of the project to supervise:
 
 ```sh
 weaver install     # the hooks of Claude Code and Codex, and a starter .weaver/ if there is none
 weaver doctor      # is everything alive?
 ```
 
-The hooks point at this checkout, for as long as Weaver is not distributed. Codex loads the hooks of a project only once it trusts the project, and runs each one only once you have approved it with `/hooks`: `weaver doctor` says where that stands. Who reviews and who writes the cards are yours to add in `.weaver/llm/`, since both cost money.
+Codex loads the hooks of a project only once it trusts the project, and runs each one only once you have approved it with `/hooks`: `weaver doctor` says where that stands. Who reviews and who writes the cards are yours to add in `.weaver/llm/`, since both cost money.
 
-| Command                                        | What it does                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------------- |
-| `weaver install [claude] [codex]`              | Plugs Weaver into the project: the hooks, and a starter configuration.  |
-| `weaver uninstall [claude] [codex]`            | Removes the hooks, and leaves everything else as it is.                 |
-| `weaver doctor`                                | Checks the configuration, the hook, and each agent runtime.             |
-| `weaver version`                               | Says which version of Weaver this is.                                   |
-| `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.   |
-| `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`. |
-| `weaver cards reopen\|retitle\|label\|rewrite` | Corrects a card, or opens it again.                                     |
-| `weaver cards tie\|untie\|separate`            | Ties two cards that may be about the same thing, or undoes a merge.     |
-| `weaver close <number> fixed\|wontfix\|issue`  | Closes a card, with a reason.                                           |
+To stay up to date there is one command, `weaver update`, which you run in a supervised project whenever you like. It does three things in order: it installs the latest release of Weaver when you do not have it, it applies to `.weaver/` the migrations the project lacks, naming each and what it changed, and it wires the hooks to that release. `weaver update --dry-run` shows what it would do and writes nothing.
+
+Releases stay side by side, and a project runs the one that wired it until `weaver update` is run there: `weaver doctor` says when a project is behind. A release that changes the format of `.weaver/` comes with the migration from the format before; `version`, in `settings.json`, is the number of that format.
+
+| Command                                        | What it does                                                                                           |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `weaver install [claude] [codex]`              | Puts Weaver on the project: the hooks, and a starter configuration if there is none.                   |
+| `weaver uninstall [claude] [codex]`            | Removes the hooks, and leaves everything else as it is.                                                |
+| `weaver update [--dry-run] [--offline]`        | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks. |
+| `weaver doctor`                                | Checks the configuration, the hook, and each agent runtime.                                            |
+| `weaver version`                               | Says which version of Weaver this is.                                                                  |
+| `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.                                  |
+| `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`.                                |
+| `weaver cards reopen\|retitle\|label\|rewrite` | Corrects a card, or opens it again.                                                                    |
+| `weaver cards tie\|untie\|separate`            | Ties two cards that may be about the same thing, or undoes a merge.                                    |
+| `weaver close <number> fixed\|wontfix\|issue`  | Closes a card, with a reason.                                                                          |
 
 ## What it costs
 
@@ -196,7 +200,7 @@ Orders of magnitude, not a benchmark: seen on one machine on 2026-10-11, a few r
 - **The recall.** Telling an agent what the cards and the git history know of the code it is about to change, so that it does not undo a correction or a decision.
 - **A comparison with the base.** A check that looks at the whole project reports what is wrong in the working tree, whoever wrote it. Two sessions in one folder can therefore hold each other back.
 - **Guards decided by a program.** A guard is a list of paths and commands today. What depends on a detail of the call, such as killing processes by a broad pattern, cannot be expressed.
-- **A distribution.** An installable package and hosted schemas, in place of the link to a checkout.
+- **Hosted schemas.** The `$schema` line of a file of `.weaver/` names a path of this machine and of one release. `weaver update` writes it again.
 
 [To do later](_docs/todo-later.md) says why each of these waits, and where it would start.
 

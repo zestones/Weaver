@@ -2,6 +2,7 @@ import type { ExecutionCatalog, RuntimeHook } from '@weaver/agent-sdk'
 import { DeclarationParts, type Declaration, type ReviewPolicy, type ReviewerName } from '@weaver/engine'
 import { RegistryError, type Card } from '@weaver/memory'
 import type { EngineLink } from '../../link/engine-link.ts'
+import { OwnRelease } from '../../link/own-release.ts'
 import type { Output } from '../../output/output.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
@@ -60,6 +61,17 @@ export class DoctorCommand implements Command {
 
   private configuration(project: Project): Finding {
     try {
+      const behind = project.migrations().pending()
+
+      if (behind.length > 0) {
+        const labels = behind.map((migration) => migration.label).join(', ')
+
+        return {
+          state: 'problem',
+          text: `${project.configName}/ is ${String(behind.length)} migration(s) behind this Weaver (${labels}): nothing is checked until weaver update brings it up to date.`,
+        }
+      }
+
       const declaration = project.declaration()
 
       if (declaration === null) {
@@ -261,7 +273,11 @@ export class DoctorCommand implements Command {
     if (wiring === 'installed') return { state: 'ok', text: `${runtime.label}: wired in ${runtime.file}` }
     if (wiring === 'absent') return { state: 'note', text: `${runtime.label}: not wired` }
 
-    return { state: 'problem', text: `${runtime.label}: the hooks in ${runtime.file} point somewhere else. Run weaver install.` }
+    const wired = runtime.wiredTag()
+    const own = new OwnRelease()
+    const whose = wired === null || wired === own.tag ? 'point somewhere else' : `are those of Weaver ${wired}, and this is ${own.tag}`
+
+    return { state: 'problem', text: `${runtime.label}: the hooks in ${runtime.file} ${whose}. Run weaver update.` }
   }
 
   // A runtime may hold hooks and not run them, without a word: it alone says. Nothing is said of a runtime that has

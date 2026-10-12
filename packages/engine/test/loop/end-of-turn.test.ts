@@ -139,7 +139,7 @@ test('what waits for the owner is counted, listed in the report and never blocks
   agentWrites(session, { [A_FILE]: '// eslint-disable-next-line\nexport const a = 2\n' })
   writeFiles(session.repo.top, { '.weaver/settings.json': '{}\n' })
   agentRuns(session, "python3 -c \"open('.weaver/settings.json', 'w').write('{}')\"", () => {
-    writeFiles(session.repo.top, { '.weaver/settings.json': '{"version":1}\n' })
+    writeFiles(session.repo.top, { '.weaver/settings.json': '{"version":2}\n' })
   })
 
   const markers = new CheckOutcome({ ...PASSING, id: 'markers', rules: ['S1'], toValidate: [finding] })
