@@ -250,7 +250,7 @@ test('at a terminal the page is coloured: how the card stands, its places, the n
   assert.equal(lines.includes('  \u001B[90mExpected\u001B[39m  the token is refreshed before a request goes out.'), true)
   assert.equal(
     lines.includes(
-      '\u001B[33m▸\u001B[39m \u001B[1m42\u001B[22m \u001B[90m│\u001B[39m     \u001B[1mreturn\u001B[22m self._cached  \u001B[90m# never renewed\u001B[39m',
+      '\u001B[33m▸\u001B[39m \u001B[1m42\u001B[22m \u001B[90m│\u001B[39m     \u001B[35mreturn\u001B[39m self._cached  \u001B[90m# never renewed\u001B[39m',
     ),
     true,
   )

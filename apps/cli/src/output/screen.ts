@@ -9,6 +9,7 @@ const PROBLEM = 'X'
 const ALERT = '!'
 const NEUTRAL = '-'
 const INDENT = '  '
+const PAGE_MARGIN = '  '
 
 // How Weaver's commands look, in one place: a command says what it has to say, and this draws it. The conventions
 // are those of the Command Line Interface Guidelines (clig.dev) and of the design guide of GitHub's command line.
@@ -60,12 +61,21 @@ export class Screen {
     for (const row of rows) this.said(row)
   }
 
-  // What is drawn for a person at a terminal, such as a card: `drawn` gives its lines for a terminal that wide. A
-  // program is given what is written, which it reads better than anything drawn from it.
+  // What is drawn for a person at a terminal, such as a card: `drawn` gives its lines for a page that wide. The page
+  // is set apart from the commands around it, by a margin on each side and a blank line above and under. A program
+  // is given what is written, which it reads better than anything drawn from it.
   async page(written: string, drawn: (paint: Paint, width: number) => Promise<readonly string[]>): Promise<void> {
     const { paint, width } = this.output
 
-    for (const line of !paint.enabled || width === null ? [written] : await drawn(paint, width)) this.said(line)
+    if (!paint.enabled || width === null) {
+      this.said(written)
+
+      return
+    }
+
+    const lines = await drawn(paint, width - PAGE_MARGIN.length * 2)
+
+    for (const line of ['', ...lines, '']) this.said(line === '' ? '' : `${PAGE_MARGIN}${line}`)
   }
 
   // Something to type, told apart from the sentence around it.

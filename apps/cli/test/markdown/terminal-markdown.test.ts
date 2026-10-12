@@ -165,15 +165,19 @@ test('what Markdown marks inside a line is drawn word by word, and a name with a
   )
 })
 
-test('code is coloured by the grammar of its language: comments step back, strings and keywords stand out', () => {
+test('code is coloured by the grammar of its language, each kind of thing in a colour of the terminal', () => {
   const colours = new CodeColours(coloured)
   const lines = (text: string, language: string): string[] => colours.rows(text, language, Infinity).map(([row = '']) => row)
 
-  assert.deepEqual(lines('def f(x):\n    return "a # b"  # why', 'python'), [
-    '\u001B[1mdef\u001B[22m f(x):',
-    '    \u001B[1mreturn\u001B[22m \u001B[32m"a # b"\u001B[39m  \u001B[90m# why\u001B[39m',
+  assert.deepEqual(lines('class Mapper(Base):\n    def attach(self, n=3):\n        return f"a {n} # b", len(x), None  # why', 'python'), [
+    '\u001B[35mclass\u001B[39m \u001B[36mMapper\u001B[39m(\u001B[36mBase\u001B[39m):',
+    '    \u001B[35mdef\u001B[39m \u001B[34mattach\u001B[39m(self, n=\u001B[33m3\u001B[39m):',
+    '        \u001B[35mreturn\u001B[39m \u001B[32mf"a \u001B[39m{n}\u001B[32m # b"\u001B[39m, \u001B[36mlen\u001B[39m(x), \u001B[33mNone\u001B[39m  \u001B[90m# why\u001B[39m',
   ])
-  assert.deepEqual(lines('const a = `x<y` // y', 'ts'), ['\u001B[1mconst\u001B[22m a = \u001B[32m`x<y`\u001B[39m \u001B[90m// y\u001B[39m'])
+  assert.deepEqual(lines('const a = `x<y` // y', 'ts'), [
+    '\u001B[35mconst\u001B[39m a = \u001B[32m`x<y`\u001B[39m \u001B[90m// y\u001B[39m',
+  ])
+  assert.deepEqual(lines('{"a": [1, "s"]}', 'json'), ['{\u001B[34m"a"\u001B[39m: [\u001B[33m1\u001B[39m, \u001B[32m"s"\u001B[39m]}'])
   assert.deepEqual(lines('+added\n-removed\n kept', 'diff'), ['\u001B[32m+added\u001B[39m', '\u001B[31m-removed\u001B[39m', ' kept'])
   assert.deepEqual(
     lines('/* a comment\n   on two lines */', 'js'),
@@ -189,7 +193,7 @@ test('a line of code longer than the page goes on on the next row, broken after 
 
   assert.deepEqual(colours.rows('x = "a long string"  # and why\ny = 1', 'python', 12), [
     ['x = \u001B[32m"a long \u001B[39m', '\u001B[32mstring"\u001B[39m  \u001B[90m# \u001B[39m', '\u001B[90mand why\u001B[39m'],
-    ['y = 1'],
+    ['y = \u001B[33m1\u001B[39m'],
   ])
   assert.deepEqual(
     new CodeColours(plain).rows('abcdefgh\n\nij', '', 3),
@@ -210,5 +214,9 @@ test('the screen draws a page for a person at a terminal, and gives a program wh
 
   assert.deepEqual(await said(plain, 80), ['# Title'])
   assert.deepEqual(await said(coloured, null), ['# Title'], 'a pipe is not a terminal, whatever was asked')
-  assert.deepEqual(await said(coloured, 80), ['\u001B[1mTitle\u001B[22m', '80 columns'])
+  assert.deepEqual(
+    await said(coloured, 80),
+    ['', '  \u001B[1mTitle\u001B[22m', '  76 columns', ''],
+    'a page is set apart: a margin on each side, a blank line above and under',
+  )
 })

@@ -50,6 +50,14 @@ export class Paint {
     return this.styled(33, 39, text)
   }
 
+  blue(text: string): string {
+    return this.styled(34, 39, text)
+  }
+
+  magenta(text: string): string {
+    return this.styled(35, 39, text)
+  }
+
   cyan(text: string): string {
     return this.styled(36, 39, text)
   }

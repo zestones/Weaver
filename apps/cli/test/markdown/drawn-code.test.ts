@@ -39,7 +39,7 @@ test('an excerpt of a file keeps its line numbers, and points at the line that m
     '  11 │ }',
   ])
   assert.deepEqual(new DrawnCode(new Paint(true), 80).excerpt([{ number: 7, text: 'return 1' }], 'typescript', 7), [
-    '\u001B[33m▸\u001B[39m \u001B[1m7\u001B[22m \u001B[90m│\u001B[39m \u001B[1mreturn\u001B[22m 1',
+    '\u001B[33m▸\u001B[39m \u001B[1m7\u001B[22m \u001B[90m│\u001B[39m \u001B[35mreturn\u001B[39m \u001B[33m1\u001B[39m',
   ])
   assert.deepEqual(new DrawnCode(plain, 80).excerpt(lines.slice(0, 1), 'typescript', null), ['  9 │ try {'])
 })

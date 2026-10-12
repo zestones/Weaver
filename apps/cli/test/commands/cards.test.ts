@@ -154,19 +154,18 @@ test('at a terminal the card is drawn, and a program still reads it as Markdown'
   write(top, 1)
 
   const read = await weaver(top, ['cards', '1'])
-  const { status, lines } = await weaver(top, ['cards', '1'], { terminal: 60 })
+  const { status, lines } = await weaver(top, ['cards', '1'], { terminal: 80 })
   const page = lines.map((line) => line.replaceAll(STYLES, ''))
 
   assert.equal(status, 0)
   assert.equal(read.lines.join('\n'), cardOf(top, 1).markdown(), 'what is piped is the Markdown, to the letter')
-  assert.equal(page[0], 'Nothing refreshes the token')
-  assert.match(page[1] ?? '', /^#1 · open · flagged by claude · \d{4}-\d{2}-\d{2} \d{2}:\d{2} ·$/)
-  assert.equal(page[2], 'type:bug, area:auth')
-  assert.ok(page.includes('Observation ────────────────────────────────────────────────'), 'a part of the card opens under a rule')
-  assert.ok(page.includes('  Seen      no call of refresh() exists under src/.'), 'the flag is drawn field by field')
-  assert.ok(page.includes('▸ 42 │ return cached'), 'the line that was flagged is pointed at')
-  assert.equal(page.at(-1), 'Close it with weaver close 1 fixed|wontfix|issue [reason].')
-  assert.equal(lines[0], '\u001B[1mNothing\u001B[22m \u001B[1mrefreshes\u001B[22m \u001B[1mthe\u001B[22m \u001B[1mtoken\u001B[22m')
+  assert.deepEqual(page.slice(0, 2), ['', '  Nothing refreshes the token'], 'the page is set apart by a margin')
+  assert.match(page[2] ?? '', /^ {2}#1 · open · flagged by claude · \d{4}-\d{2}-\d{2} \d{2}:\d{2} · type:bug, area:auth$/)
+  assert.ok(page.includes(`  Observation ${'─'.repeat(64)}`), 'a part of the card opens under a rule that ends with the page')
+  assert.ok(page.includes('    Seen      no call of refresh() exists under src/.'), 'the flag is drawn field by field')
+  assert.ok(page.includes('  ▸ 42 │ return cached'), 'the line that was flagged is pointed at')
+  assert.deepEqual(page.slice(-2), ['  Close it with weaver close 1 fixed|wontfix|issue [reason].', ''])
+  assert.equal(lines[1], '  \u001B[1mNothing\u001B[22m \u001B[1mrefreshes\u001B[22m \u001B[1mthe\u001B[22m \u001B[1mtoken\u001B[22m')
 })
 
 test('words that cards does not know are answered with how it is written', async () => {

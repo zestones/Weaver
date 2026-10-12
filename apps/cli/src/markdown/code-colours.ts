@@ -13,12 +13,47 @@ interface Run {
 // had to escape, or text.
 const PIECES = /<span class="([^"]*)">|<\/span>|&(amp|lt|gt|quot|#x27|#39);|[^<&]+|[<&]/g
 const ESCAPED: Readonly<Record<string, string>> = { amp: '&', lt: '<', gt: '>', quot: '"', '#x27': "'", '#39': "'" }
-const STEPPING_BACK = new Set(['comment', 'quote', 'meta', 'doctag'])
-const QUOTED = new Set(['string', 'regexp', 'char', 'symbol', 'addition'])
-const STRUCTURE = new Set(['keyword', 'literal', 'type', 'section', 'selector-tag'])
+// `plain` is the colour of the text around: what a string holds between braces is code again, not a string.
+type Ink = 'plain' | 'bold' | 'italic' | 'dim' | 'red' | 'green' | 'yellow' | 'blue' | 'magenta' | 'cyan'
 
-// The lines of a code block, coloured by the grammar of their language: comments step back, strings and keywords
-// stand out, and nothing else is touched. A language the highlighter does not know is left as it is.
+// The colour of each kind of thing a grammar names, taken from the palette of the terminal so that code follows the
+// theme of its owner. A kind is looked up with what narrows it first: `title class_`, then `title`.
+const THEME: Readonly<Record<string, Ink>> = {
+  comment: 'dim',
+  quote: 'dim',
+  doctag: 'dim',
+  keyword: 'magenta',
+  'selector-tag': 'magenta',
+  'template-tag': 'magenta',
+  string: 'green',
+  regexp: 'green',
+  char: 'green',
+  symbol: 'green',
+  addition: 'green',
+  subst: 'plain',
+  number: 'yellow',
+  literal: 'yellow',
+  bullet: 'yellow',
+  title: 'blue',
+  section: 'blue',
+  attr: 'blue',
+  attribute: 'blue',
+  name: 'blue',
+  'title class_': 'cyan',
+  type: 'cyan',
+  built_in: 'cyan',
+  meta: 'cyan',
+  variable: 'cyan',
+  'template-variable': 'cyan',
+  // `self` and `this` are on every line of a method: coloured, they would be all one sees.
+  'variable language_': 'plain',
+  deletion: 'red',
+  strong: 'bold',
+  emphasis: 'italic',
+}
+
+// The lines of a code block, coloured by the grammar of their language. A language the highlighter does not know is
+// left as it is.
 export class CodeColours {
   private readonly paint: Paint
 
@@ -108,12 +143,11 @@ export class CodeColours {
   }
 
   private styleOf(kinds: string): Style | null {
-    const kind = kinds.split(' ')[0]?.replace(/^hljs-/, '') ?? ''
+    const [kind = '', narrowed = ''] = kinds.replace(/^hljs-/, '').split(' ')
+    const ink = THEME[`${kind} ${narrowed}`] ?? THEME[kind]
 
-    if (STEPPING_BACK.has(kind)) return (text) => this.paint.dim(text)
-    if (QUOTED.has(kind)) return (text) => this.paint.green(text)
-    if (kind === 'deletion') return (text) => this.paint.red(text)
+    if (ink === undefined) return null
 
-    return STRUCTURE.has(kind) ? (text) => this.paint.bold(text) : null
+    return ink === 'plain' ? (text) => text : (text) => this.paint[ink](text)
   }
 }
