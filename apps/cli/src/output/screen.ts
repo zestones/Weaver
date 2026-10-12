@@ -59,6 +59,24 @@ export class Screen {
     for (const row of rows) this.said(row)
   }
 
+  // A document in Markdown: drawn for a person at a terminal, and given as it is written to a program, which reads
+  // Markdown better than what is drawn from it.
+  async markdown(text: string): Promise<void> {
+    const { paint, width } = this.output
+
+    if (!paint.enabled || width === null) {
+      this.said(text)
+
+      return
+    }
+
+    // The parser of Markdown and the grammars of the languages are loaded here, to draw a document: no other
+    // command pays for them.
+    const { TerminalMarkdown } = await import('../markdown/terminal-markdown.ts')
+
+    for (const line of new TerminalMarkdown(paint, width).lines(text)) this.said(line)
+  }
+
   // Something to type, told apart from the sentence around it.
   command(text: string): string {
     return this.output.paint.cyan(text)

@@ -28,15 +28,24 @@ interface Around {
   readonly executions?: ExecutionCatalog
   // Where releases come from, how one is installed and which one runs.
   readonly channel?: ReleaseChannel
+  // The width of the terminal the command answers to. Left out: its answer is read by a program.
+  readonly terminal?: number
 }
 
 // What a command printed, in the order it came: what it said, and what it sent to the error stream. Nothing is
 // coloured, as when a program reads it.
 class RecordingOutput implements Output {
-  readonly paint = new Paint(false)
+  readonly paint: Paint
   readonly failPaint = new Paint(false)
+  readonly width: number | null
   readonly lines: string[] = []
   readonly errors: string[] = []
+
+  // With a width, the output is a terminal that many columns wide, and what is said is coloured.
+  constructor(width: number | null = null) {
+    this.width = width
+    this.paint = new Paint(width !== null)
+  }
 
   say(line: string): void {
     this.lines.push(...line.split('\n'))
@@ -102,7 +111,7 @@ export async function failuresOf(cwd: string, args: readonly string[]): Promise<
 
 // These tests may themselves run under an agent: who runs a command is always given, never read from the processes.
 export async function weaver(cwd: string, args: readonly string[], around: Around = {}): Promise<Run> {
-  const output = new RecordingOutput()
+  const output = new RecordingOutput(around.terminal ?? null)
   const caller = new GivenCaller(around.under ?? null)
   const input = new GivenInput(around.input ?? '')
   const line = new CommandLine(cwd, output, around.link ?? null, around.executions ?? EXECUTIONS, caller, input, around.channel ?? null)

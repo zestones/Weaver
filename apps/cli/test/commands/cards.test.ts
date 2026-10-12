@@ -19,6 +19,8 @@ const OTHER_FLAG = [
   'Did: worked around.',
 ].join('\n')
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-cards-'))
+// What colours a line at a terminal, to read a drawn page as the words it shows.
+const STYLES = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
 // The cards of a list, each on one line: its number and how it stands, what it is about, then what is under it.
 const cardsOf = (lines: readonly string[]): string[] => {
   const cards: string[][] = []
@@ -145,6 +147,28 @@ test('a number prints the card as Markdown', async () => {
     /^# Nothing refreshes the token\n\n- Card: #1\n[^]*\n## Observation\n[^]*\n## Flag\n\n```text\nSeen: no call of refresh\(\)/,
   )
   assert.deepEqual(await weaver(top, ['cards', '7']), { status: 1, lines: ['X No card has the number 7'] })
+})
+
+test('at a terminal the card is drawn, and a program still reads it as Markdown', async () => {
+  flag(top)
+  write(top, 1)
+
+  const read = await weaver(top, ['cards', '1'])
+  const { status, lines } = await weaver(top, ['cards', '1'], { terminal: 60 })
+  const page = lines.map((line) => line.replaceAll(STYLES, ''))
+
+  assert.equal(status, 0)
+  assert.equal(read.lines.join('\n'), cardOf(top, 1).markdown(), 'what is piped is the Markdown, to the letter')
+  assert.deepEqual(page.slice(0, 5), [
+    'Nothing refreshes the token',
+    '───────────────────────────',
+    '',
+    'Card                 #1',
+    'Origin               flag',
+  ])
+  assert.ok(page.includes('Observation'), 'a heading is drawn without its marks')
+  assert.ok(page.includes('  │ Seen: no call of refresh() exists under src/.'), 'the flag is set apart as the code it is')
+  assert.equal(lines[0], '\u001B[1mNothing\u001B[22m \u001B[1mrefreshes\u001B[22m \u001B[1mthe\u001B[22m \u001B[1mtoken\u001B[22m')
 })
 
 test('words that cards does not know are answered with how it is written', async () => {

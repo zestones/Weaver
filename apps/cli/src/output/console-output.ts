@@ -1,11 +1,12 @@
 import type { Output } from './output.ts'
 import { Paint } from './paint.ts'
 
-type Stream = NodeJS.WritableStream & { readonly isTTY?: boolean }
+type Stream = NodeJS.WritableStream & { readonly isTTY?: boolean; readonly columns?: number }
 
 export class ConsoleOutput implements Output {
   readonly paint: Paint
   readonly failPaint: Paint
+  readonly width: number | null
   private readonly out: Stream
   private readonly err: Stream
   private readonly closed = new Set<Stream>()
@@ -16,6 +17,7 @@ export class ConsoleOutput implements Output {
     this.err = err
     this.paint = Paint.for(out, env, plain)
     this.failPaint = Paint.for(err, env, plain)
+    this.width = out.isTTY === true ? (out.columns ?? null) : null
 
     // A reader that leaves early, as in `weaver doctor | head -1`, is not an error: the rest is simply not said.
     for (const stream of new Set([out, err])) {

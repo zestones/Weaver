@@ -135,6 +135,7 @@ The conventions are those of the [Command Line Interface Guidelines](https://cli
 - A sentence starts with a capital and says what happened; a count takes its plural from `Counted`, never `(s)`.
 - A state is a mark at the start of the line, so that it reads without colour. Colour only repeats it, and `Paint` leaves it out for a pipe, for `NO_COLOR`, for a dumb terminal and for `--no-color`.
 - A command declares its `help`: the part of the help it is listed in, its description, the words of its usage line, and examples. `weaver help` is built from these, so a command that is added is documented by being written.
+- A document in Markdown, such as a card, goes through `Screen.markdown`. At a terminal it is drawn by `markdown/terminal-markdown.ts`; anywhere else it is given as it is written. The document is read by [marked](https://marked.js.org/) and its code is coloured by the grammars of [highlight.js](https://highlightjs.org/): what Weaver holds is only how each thing they find is drawn. Both are loaded when a document is drawn and not before, so no other command pays for them. They are the only two packages the command line takes from outside this repository, and neither brings another with it.
 - A test reads what a command prints through `weaver()` in `test/fixtures/project.ts`, which records both streams without colour: what a test asserts is what an agent reads.
 
 ### What holds these rules

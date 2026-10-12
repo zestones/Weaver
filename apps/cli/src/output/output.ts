@@ -4,6 +4,8 @@ export interface Output {
   // The styles of what is said and of what fails: each stream is a terminal or not by itself.
   readonly paint: Paint
   readonly failPaint: Paint
+  // How many columns the terminal of the answer has; null when the answer does not go to one.
+  readonly width: number | null
   // The answer of the command, on the standard output.
   say(line: string): void
   // What went wrong, on the error stream: it stays out of what a program reads of the answer.

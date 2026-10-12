@@ -39,7 +39,7 @@ export class CardsCommand implements Command {
     this.screen = new Screen(output)
   }
 
-  run(args: readonly string[]): number {
+  run(args: readonly string[]): number | Promise<number> {
     const [first = ''] = args
 
     if (args.length === 1 && /^\d+$/.test(first)) return this.show(Number(first))
@@ -69,7 +69,7 @@ export class CardsCommand implements Command {
     return asked
   }
 
-  private show(number: number): number {
+  private async show(number: number): Promise<number> {
     const registry = Project.locate(this.cwd).recordedRegistry()
 
     try {
@@ -77,7 +77,7 @@ export class CardsCommand implements Command {
 
       if (card === null) throw new Error(`no card has the number ${String(number)}`)
 
-      this.screen.line(card.markdown())
+      await this.screen.markdown(card.markdown())
 
       return 0
     } finally {

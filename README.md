@@ -198,14 +198,14 @@ Releases stay side by side, and a project runs the one that wired it until `weav
 | `weaver stats [--since <day>\|<n>d] [--json]`  | Counts what Weaver kept of its work in the project: times, verdicts, warnings, reviews, cards.                                 |
 | `weaver version`                               | Says which version of Weaver this is.                                                                                          |
 | `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.                                                          |
-| `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`.                                                        |
+| `weaver cards [<number>]`                      | Lists the cards that wait, or shows one: drawn at a terminal, as Markdown for a program. `--all`, `--file`, `--label`.         |
 | `weaver cards reopen\|retitle\|label\|rewrite` | Corrects a card, or opens it again.                                                                                            |
 | `weaver cards tie\|untie\|separate`            | Ties two cards that may be about the same thing, or undoes a merge.                                                            |
 | `weaver close <number> fixed\|wontfix\|issue`  | Closes a card, with a reason.                                                                                                  |
 
 `weaver help` lists the commands by what they are for, and `weaver help <command>`, or `--help` anywhere on a line, says how one is used, with examples. A mistyped command is answered with the one that was probably meant.
 
-What a command prints follows the [Command Line Interface Guidelines](https://clig.dev/) and the design guide of GitHub's command line. The answer goes to the standard output and what went wrong to the error stream, with an exit status of 0 for a success, 1 for a failure and 2 for a command that was mistyped. A line that states how something stands starts with a mark, `✓` done, `X` a problem, `!` something to look at, `-` neither, so that the state is read without colour. Colour is only added for a person at a terminal: not in a pipe, not when `NO_COLOR` is set, not with `--no-color`. An agent and a script read the same text as you do.
+What a command prints follows the [Command Line Interface Guidelines](https://clig.dev/) and the design guide of GitHub's command line. The answer goes to the standard output and what went wrong to the error stream, with an exit status of 0 for a success, 1 for a failure and 2 for a command that was mistyped. A line that states how something stands starts with a mark, `✓` done, `X` a problem, `!` something to look at, `-` neither, so that the state is read without colour. Colour is only added for a person at a terminal: not in a pipe, not when `NO_COLOR` is set, not with `--no-color`. An agent and a script read the same text as you do. One thing is drawn only for you: a card, which is Markdown. At a terminal its marks are drawn, its head is lined up, its prose is folded and its code is coloured; in a pipe, with `NO_COLOR` or with `--no-color`, it is the Markdown as it is written.
 
 ## What it keeps of its own work
 

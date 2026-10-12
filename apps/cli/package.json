@@ -18,7 +18,9 @@
   "dependencies": {
     "@weaver/agent-sdk": "workspace:*",
     "@weaver/engine": "workspace:*",
-    "@weaver/memory": "workspace:*"
+    "@weaver/memory": "workspace:*",
+    "highlight.js": "11.12.0",
+    "marked": "18.1.0"
   },
   "devDependencies": {
     "vitest": "5.0.3"

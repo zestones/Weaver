@@ -20,8 +20,17 @@ export class Paint {
     return new Paint(stream.isTTY === true && !refused && (env.NO_COLOR ?? '') === '' && env.TERM !== 'dumb')
   }
 
+  // Whether anything is drawn at all: off, a document is given as it is written.
+  get enabled(): boolean {
+    return this.on
+  }
+
   bold(text: string): string {
     return this.styled(1, 22, text)
+  }
+
+  italic(text: string): string {
+    return this.styled(3, 23, text)
   }
 
   // Grey, for what comes second: a hint, a path, a heading of a table.
