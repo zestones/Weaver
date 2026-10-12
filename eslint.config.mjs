@@ -61,7 +61,7 @@ const layerRules = Object.entries(LAYERS).flatMap(([root, layers]) =>
 )
 
 export default defineConfig(
-  globalIgnores(['**/node_modules/**', '**/dist/**', '**/coverage/**', '.cache/**']),
+  globalIgnores(['**/node_modules/**', '**/dist/**', '**/coverage/**', '.cache/**', 'legacy/**']),
   {
     files: ['**/*.{js,mjs}'],
     extends: [js.configs.recommended],
