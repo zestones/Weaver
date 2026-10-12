@@ -10,7 +10,7 @@ The work is in the clone, `~/Documents/Github/others/Adaptive-Runtime-Intelligen
 
 2. **Decide the choices listed at the end of this file.** Each one can be reversed.
 
-3. **Move the clone to the next release of Weaver**, once you have published it. The format of a check changed there: `fix` is `repair`, `verify` is `judge`, and `settings.json` needs `checks.warnTimeoutSeconds`. The clone stays on the 0.1.0 format until then. After the rename, the checks that are fast on one file can declare a `warn`: the lint, the ast-grep rules, the name and the place of a new file, the backend lint. Their scripts are not written.
+3. **Move the clone to the next release of Weaver**, once you have published it. Install it with the three commands of its notes, since 0.1.0 has no `weaver update`, then run `weaver update` in the clone: it applies the migration `0002-check-commands` to `.weaver/` (`fix` becomes `repair`, `verify` becomes `judge`, `checks.warnTimeoutSeconds` is added) and wires the hooks again. Until then the clone stays on 0.1.0, which is still installed beside it. After the move, the checks that are fast on one file can declare a `warn`: the lint, the ast-grep rules, the name and the place of a new file, the backend lint. Their scripts are not written.
 
 4. **Try a real task that touches the backend.** Only two of the nine backend families ran here, and the clone has neither the API's Python environment nor the docs toolchain.
 
