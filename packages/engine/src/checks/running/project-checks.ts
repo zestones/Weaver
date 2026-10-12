@@ -17,14 +17,14 @@ export class ProjectChecks implements CheckRunner {
 
   async warn(declaration: Declaration, call: CallDiff, deadline: number): Promise<CheckOutcome[]> {
     const env = call.environment()
-    const waiting = declaration.checks.map((declared) => this.checkOf(declaration, declared)).filter((check) => check.warns)
-    const outcomes: CheckOutcome[] = []
+    const warning = declaration.checks.map((declared) => this.checkOf(declaration, declared)).filter((check) => check.warns)
+    const waiting = [...warning]
+    const done = new Map<string, CheckOutcome>()
     const next = async (): Promise<void> => {
       for (let check = waiting.shift(); check !== undefined; check = waiting.shift()) {
-        const left = deadline - Date.now()
-        const outcome = left <= 0 ? null : await this.warning(check, call, env, left)
+        const outcome = await this.warning(check, call, env, deadline - Date.now())
 
-        if (outcome !== null) outcomes.push(outcome)
+        if (outcome !== null) done.set(check.id, outcome)
       }
     }
 
@@ -34,7 +34,8 @@ export class ProjectChecks implements CheckRunner {
       call.forget()
     }
 
-    return outcomes
+    // In the order the project declares them, whichever ended first.
+    return warning.flatMap((check) => done.get(check.id) ?? [])
   }
 
   repairs(declaration: Declaration): boolean {

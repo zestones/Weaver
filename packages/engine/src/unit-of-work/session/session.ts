@@ -92,11 +92,12 @@ export class Session {
     this.journal.append({ session: this.id, agent: this.agent }, event)
   }
 
-  request(request: OwnerRequest): void {
-    this.reconciled((record) => ({
+  // The number of the unit of work the request joins.
+  request(request: OwnerRequest): number {
+    return this.reconciled((record) => ({
       ...record,
       unit: new UnitOfWork(record.unit).withRequest(request.intent(record.lastReply)).record,
-    }))
+    })).unit.number
   }
 
   watch(callId: string, call: WatchedCall): void {

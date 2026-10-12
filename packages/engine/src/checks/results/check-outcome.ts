@@ -1,4 +1,5 @@
 import type { Finding } from '../../declaration/rules/finding.ts'
+import type { CheckRun } from '../../unit-of-work/journal/journal-event.ts'
 
 export type CheckStatus = 'pass' | 'fail' | 'timeout' | 'skip'
 
@@ -47,6 +48,18 @@ export class CheckOutcome {
 
   get ran(): boolean {
     return this.status !== 'skip'
+  }
+
+  // What the journal keeps of it.
+  get run(): CheckRun {
+    return {
+      id: this.id,
+      status: this.status,
+      ms: this.ms,
+      failures: this.failures.length,
+      toValidate: this.toValidate.length,
+      candidates: this.candidates.length,
+    }
   }
 
   get failedWithoutBlocking(): boolean {

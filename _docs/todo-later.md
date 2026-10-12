@@ -61,3 +61,15 @@ Work that is understood and deliberately postponed. Each entry says what it is, 
 **What would make it urgent.** Checks that time out at the end of a task while another session is checking, or an owner who runs three agents or more in one repository.
 
 **Where to start.** The checks of an end of task are started in `checks/running/project-checks.ts`, which counts the ones that run. The count would be kept in the state folder of the repository, which its sessions share, as files that each name the process holding a place: a place whose holder died is free again. Two things are to be decided first. The wait is taken from `totalTimeoutSeconds`, and one run of a slow check can last most of it, so a session that waits for another may run out of time before it has started anything: the source harness ended such a check as a timeout, which holds the task. And `parallel` counts checks, not what a check starts: a check that runs three programs at once takes one place. The source harness does it in `gates/runner/slots.ts`, for the checks it marks as heavy only.
+
+## The cost of the writer, counted once
+
+**What.** One run of the writer of the cards leaves one line in the journal, with its time, its cost and the cards it wrote.
+
+**Why it matters.** A run writes several cards and copies its time and its cost on each of them: adding up what the cards say counts a run as many times as it wrote cards. `weaver stats` therefore counts the cards the writer wrote and the writings that failed, and says nothing of what the writer costs.
+
+**Why it waits.** The writer runs in a process of its own, in the package of the memory, which knows nothing of the engine and of its journal. Giving it a line of the journal means deciding which of the two owns the journal.
+
+**What would make it urgent.** A writer whose cost is to be compared with what a review costs, or a project where one run writes many cards.
+
+**Where to start.** `writing/running/writer-run.ts`, in the memory, holds the time and the cost of a run when it ends. The journal is `unit-of-work/journal/journal.ts`, in the engine.

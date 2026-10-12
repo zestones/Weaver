@@ -26,11 +26,12 @@ pnpm build
 # machine that built it.
 pnpm --filter @weaver/cli deploy --prod --config.node-linker=hoisted "$work/$name"
 rm -f "$work/$name/pnpm-workspace.yaml"
+# The command says its version, and the engine writes it on each line of its journal.
 node -e '
   const { readFileSync, writeFileSync } = require("node:fs")
-  const [path, version] = process.argv.slice(1)
-  writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, "utf8")), version }, null, 2) + "\n")
-' "$work/$name/package.json" "${version#v}"
+  const [version, ...paths] = process.argv.slice(1)
+  for (const path of paths) writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, "utf8")), version }, null, 2) + "\n")
+' "${version#v}" "$work/$name/package.json" "$work/$name/node_modules/@weaver/engine/package.json"
 
 # The copy is tried before it is packed: it says its version, and its hook starts.
 said="$(node "$work/$name/dist/bin/weaver.js" version)"

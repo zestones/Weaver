@@ -1,6 +1,6 @@
 {
   "name": "@weaver/engine",
-  "version": "0.0.0",
+  "version": "0.0.0-dev",
   "description": "The engine of the unit-of-work loop: it reads what a project declares and what an agent does, and decides when the work may end",
   "private": true,
   "type": "module",

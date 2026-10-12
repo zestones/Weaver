@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
 import type { Repository } from '../../src/lib/git/repository.ts'
+import { Journal } from '../../src/unit-of-work/journal/journal.ts'
 import { declarationFiles, writeDeclaration } from '../fixtures/declaration.ts'
 import { makeRepo, writeFiles } from '../fixtures/repo.ts'
 
@@ -103,6 +104,12 @@ function write(files: Readonly<Record<string, string>>, after = 'PostToolUse'): 
 }
 
 const told = (answer: Answer): string => answer.hookSpecificOutput?.additionalContext ?? ''
+// What the journal keeps of the checks that warned or could have, call after call.
+const warnings = (): unknown[] =>
+  new Journal(repo)
+    .read()
+    .flatMap((event) => (event.kind === 'warn' ? [event] : []))
+    .map(({ tool, files, warned, checks }) => ({ tool, files, warned, checks: checks.map(({ id, status }) => `${id} ${status}`) }))
 
 test('a check that warns tells the agent right after a call what it found on the files of that call, and holds nothing', () => {
   hook('UserPromptSubmit', { prompt: 'add b' })
@@ -171,6 +178,23 @@ test('a warning that does not end in the time the settings give says nothing, an
 
   assert.deepEqual(write({ 'src/e.js': 'export const e = 5\n' }), {})
   assert.ok(Date.now() - startedAt < 10_000, 'the call does not wait for the warning to end by itself')
+  assert.deepEqual(
+    warnings(),
+    [{ tool: 'Write', files: 1, warned: [], checks: ['slow timeout'] }],
+    'the journal keeps that it ran out of time',
+  )
+})
+
+test('the journal keeps each run of a check that warns, whether it told the agent something or not', () => {
+  hook('UserPromptSubmit', { prompt: 'add g, then fix it' })
+  write({ 'src/g.js': 'export const g = ;\n' })
+  write({ 'src/g.js': 'export const g = 7\n' })
+  write({ 'notes.md': 'no check is about this file\n' })
+
+  assert.deepEqual(warnings(), [
+    { tool: 'Write', files: 1, warned: ['syntax'], checks: ['syntax fail', 'names pass'] },
+    { tool: 'Write', files: 1, warned: [], checks: ['syntax pass', 'names pass'] },
+  ])
 })
 
 test('a command that failed after it wrote a file is warned of what it wrote, under the event that ended it', () => {

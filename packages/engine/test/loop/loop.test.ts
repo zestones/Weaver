@@ -116,7 +116,13 @@ function write(path: string, content: string, session?: string): void {
 }
 
 const stop = (message = FINISHED, session?: string): Answer => hook('Stop', { last_assistant_message: message }, session)
-const kinds = (): string[] => new Journal(repo).read().map((event) => event.kind)
+// What happened to the work. How the hook itself ran, what was asked and how each turn ended are kept too, and told apart.
+const ABOUT_THE_RUN = new Set(['hook', 'request', 'turn'])
+const kinds = (repository: Repository = repo): string[] =>
+  new Journal(repository)
+    .read()
+    .map((event) => event.kind)
+    .filter((kind) => !ABOUT_THE_RUN.has(kind))
 
 test('a unit is refused until its own diff passes the declared gates, then settles', () => {
   hook('UserPromptSubmit', { prompt: 'add b' })
@@ -537,8 +543,78 @@ test('a linked worktree has its own sessions and shares the journal with its rep
 
   assert.match(stop().reason ?? '', /FAIL syntax/)
   assert.equal(existsSync(join(main.gitDir, 'weaver', 'sessions')), false, 'the session belongs to the worktree it works in')
+  assert.deepEqual(kinds(main), ['touch', 'check'])
+})
+
+test('the journal keeps how Weaver itself ran: what was asked, each run of the hook, each end of turn, each check', () => {
+  const journal = (): ReturnType<Journal['read']> => new Journal(repo).read()
+
+  hook('UserPromptSubmit', { prompt: 'add b #review', transcript_path: '/somewhere/session-1.jsonl' })
+  hook('UserPromptSubmit', { prompt: '<task-notification>a subagent is done</task-notification>' })
+  write('src/b.js', 'export const b = ;\n')
+  hook('Stop', { last_assistant_message: 'Shall I go on?' })
+  stop()
+  write('src/b.js', 'export const b = 2\n')
+  stop()
+
+  const events = journal()
+  const asked = events.filter((event) => event.kind === 'request')
+  const hooks = events.filter((event) => event.kind === 'hook')
+  const checks = events.filter((event) => event.kind === 'check')
+
   assert.deepEqual(
-    new Journal(main).read().map((event) => event.kind),
-    ['touch', 'check'],
+    asked.map(({ unit, text, directives, transcript }) => ({ unit, text, directives, transcript })),
+    [{ unit: 1, text: 'add b #review', directives: ['#review'], transcript: '/somewhere/session-1.jsonl' }],
+    'what a runtime injects is not a request of the owner',
+  )
+  assert.deepEqual(
+    hooks.map(({ event, tool }) => [event, tool]),
+    [
+      ['UserPromptSubmit', null],
+      ['UserPromptSubmit', null],
+      ['PreToolUse', 'Write'],
+      ['PostToolUse', 'Write'],
+      ['Stop', null],
+      ['Stop', null],
+      ['PreToolUse', 'Write'],
+      ['PostToolUse', 'Write'],
+      ['Stop', null],
+    ],
+  )
+  assert.ok(hooks.every(({ ms, subagent, session }) => ms > 0 && subagent === null && session === 'session-1'))
+  assert.deepEqual(
+    events.filter((event) => event.kind === 'turn').map(({ unit, finished, held }) => [unit, finished, held]),
+    [
+      [1, false, 'reminder'],
+      [1, true, 'checks'],
+      [1, true, null],
+    ],
+  )
+  assert.deepEqual(
+    checks.map(({ passed, lines, repaired, checks: runs }) => [passed, lines, repaired, runs.map(({ id, status }) => `${id} ${status}`)]),
+    [
+      [false, 1, 0, ['syntax fail', 'markers pass']],
+      [true, 1, 0, ['syntax pass', 'markers pass']],
+    ],
+  )
+  assert.ok(checks.every(({ checks: runs }) => runs.every(({ ms, failures }) => ms >= 0 && failures === 0)))
+  assert.ok(
+    events.every(({ weaver, v }) => weaver === '0.0.0-dev' && v === 2),
+    'each line says which Weaver wrote it',
+  )
+})
+
+test('a hook that cannot do its work is kept as an error: a configuration it cannot read, a moment that fails', () => {
+  writeFiles(repo.top, { '.weaver/project/checks.json': '{ "syntax": ' })
+
+  assert.match(hook('UserPromptSubmit', { prompt: 'add b' }).systemMessage ?? '', /^\[weaver\] Nothing is checked: /)
+  assert.deepEqual(hook('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' }, tool_use_id: 'x' }), {})
+  assert.deepEqual(
+    new Journal(repo).read().map(({ kind, session, ...event }) => [kind, session, 'event' in event ? event.event : null]),
+    [
+      ['error', 'session-1', 'UserPromptSubmit'],
+      ['error', 'session-1', 'PreToolUse'],
+    ],
+    'no run of the hook is counted while nothing is checked',
   )
 })

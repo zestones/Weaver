@@ -88,7 +88,10 @@ export class UnitVerdict {
       failed: this.blocking.map((outcome) => outcome.id),
       toValidate: this.toValidate().length,
       files: this.diff.files.length,
+      lines: this.diff.addedLines,
+      repaired: this.repaired.length,
       ms: this.ms,
+      checks: this.outcomes.map((outcome) => outcome.run),
     }
   }
 }

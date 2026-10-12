@@ -151,9 +151,9 @@ export class ReviewRounds {
 
   private async delivered(store: ReviewStore, content: string, work: ReviewedWork, policy: ReviewPolicy): Promise<UnitReview> {
     const record = await this.awaited(store, content, policy.waitSeconds * 1000)
-    const { runtime, reason } = record.assignment
+    const { runtime, reason, model } = record.assignment
     const round = work.unit.reviewRounds + 1
-    const about = { content, round, maxRefusals: policy.maxRefusals }
+    const about = { content, round, maxRefusals: policy.maxRefusals, model, rules: record.request.rules.length }
 
     if (record.state === 'running') {
       const seconds = (Date.now() - Date.parse(record.startedAt)) / 1000

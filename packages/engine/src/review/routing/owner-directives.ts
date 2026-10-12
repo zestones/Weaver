@@ -13,6 +13,10 @@ export class OwnerDirectives {
     this.words = new Set(requests.flatMap((request) => [...request.matchAll(WORD)].map((match) => (match[1] ?? '').toLowerCase())))
   }
 
+  get given(): string[] {
+    return KNOWN.filter((word) => this.words.has(word))
+  }
+
   // One request of the unit that asks for a review is enough to have one.
   get skipsReview(): boolean {
     return this.words.has('#no-review') && !this.words.has('#review') && !this.words.has('#critical')

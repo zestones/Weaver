@@ -17,6 +17,9 @@ export interface UnitReviewFields {
   readonly maxRefusals: number
   readonly answers?: readonly FindingAnswer[]
   readonly problems?: readonly string[]
+  // The model that reviewed and how many rules it was given, for a review that ran.
+  readonly model?: string | null
+  readonly rules?: number
 }
 
 const REVIEW_RULE = 'weaver:review'
@@ -36,6 +39,8 @@ export class UnitReview {
   readonly answers: readonly FindingAnswer[]
   // What keeps the author's answers from being taken.
   readonly problems: readonly string[]
+  private readonly model: string | null
+  private readonly rules: number
 
   constructor(fields: UnitReviewFields) {
     this.standing = fields.standing
@@ -45,6 +50,8 @@ export class UnitReview {
     this.maxRefusals = fields.maxRefusals
     this.answers = fields.answers ?? []
     this.problems = fields.problems ?? []
+    this.model = fields.model ?? null
+    this.rules = fields.rules ?? 0
   }
 
   // A finding never holds a change by itself: the author is held until it has answered, not until it has complied.
@@ -130,12 +137,15 @@ export class UnitReview {
     if (!JUST_RUN.has(standing)) return []
 
     const counts = {
+      rules: this.rules,
       findings: outcome.findings.length,
+      findingRules: outcome.findings.map((finding) => finding.rule),
       suspicions: outcome.suspicions.length,
       dropped: outcome.dropped.length + outcome.truncated,
+      experiments: outcome.experiments.length,
     }
 
-    return [{ kind: 'review', unit, runtime, reason, standing, ...counts, failure, seconds, costUsd }]
+    return [{ kind: 'review', unit, runtime, model: this.model, reason, standing, ...counts, failure, seconds, costUsd }]
   }
 
   // Why a finding still waits for the owner once the unit ends; null when the author fixed it.

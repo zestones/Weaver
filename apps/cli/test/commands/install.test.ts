@@ -240,6 +240,7 @@ test('without a command, or with one it does not know, weaver lists what it can 
       'update [--dry-run] [--offline]',
       'doctor',
       'maintenance on|off [<session>]',
+      'stats [--since <day>|<n>d] [--json]',
       'version',
       'flag <place>...',
       'cards [<number>] [--all] [--file <path>] [--label <family:value>]',

@@ -7,6 +7,7 @@ import { ReviewCards } from '../../review/cards/review-cards.ts'
 import type { ReviewRounds } from '../../review/rounds/review-rounds.ts'
 import { AgentReviewer } from '../../review/running/agent-reviewer.ts'
 import { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
+import type { EventOf } from '../../unit-of-work/journal/journal-event.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
 import { Report } from '../../verdict/report.ts'
@@ -19,6 +20,13 @@ import type { Turn } from '../exchange/turn.ts'
 import type { Moment } from './moment.ts'
 
 const PENDING = '[weaver] Checks pending: the unit of work stays open until the agent reports it finished.'
+
+// The end of turn being answered: whose it is, the unit of work it leaves, and whether the agent said it had finished.
+interface EndingTurn {
+  readonly session: Session
+  readonly unit: number
+  readonly finished: boolean
+}
 
 export class EndOfTurn implements Moment {
   readonly speaksToOwner = true
@@ -68,16 +76,25 @@ export class EndOfTurn implements Moment {
 
     // A turn that changed no file follows the review of the work before it, whatever its last message says: the owner
     // who writes #review is answered by the review, not by how the agent words its reply.
-    if (unit.isEmpty && this.reviews.follows(session, declaration, unit)) return this.check(session, declaration, unit, lastMessage)
-    if (!finished) return unit.isEmpty ? Answer.empty() : this.pending(session, declaration)
+    const turn = { session, unit: unit.number, finished }
+
+    if (unit.isEmpty && this.reviews.follows(session, declaration, unit)) return this.check(turn, declaration, unit, lastMessage)
+    if (!finished) return unit.isEmpty ? this.ended(turn, null, Answer.empty()) : this.pending(turn, declaration)
     // What maintenance let through waits for the owner in a report, even when no file changed.
-    if (!unit.isEmpty || unit.lifted.length > 0) return this.check(session, declaration, unit, lastMessage)
-    if (!unit.hasRequests) return Answer.empty()
+    if (!unit.isEmpty || unit.lifted.length > 0) return this.check(turn, declaration, unit, lastMessage)
+    if (!unit.hasRequests) return this.ended(turn, null, Answer.empty())
 
     // A turn that changed no file still ends its unit, so the next request starts with nothing of this one.
     session.settle({})
 
-    return this.over(session, Answer.empty())
+    return this.ended(turn, null, this.over(session, Answer.empty()))
+  }
+
+  // Each end of turn is kept, with what held the agent back if anything did.
+  private ended(turn: EndingTurn, held: EventOf<'turn'>['held'], answer: Answer): Answer {
+    turn.session.log({ kind: 'turn', unit: turn.unit, finished: turn.finished, held })
+
+    return answer
   }
 
   // The owner is the one who closes maintenance: they are reminded of it when a task ends, and nothing more.
@@ -94,11 +111,14 @@ export class EndOfTurn implements Moment {
   }
 
   // The only way to speak to an agent that has stopped is to refuse its stop.
-  private pending(session: Session, declaration: Declaration): Answer {
-    return session.remind() ? Answer.blocking(declaration.finish.reminder()) : Answer.saying(PENDING)
+  private pending(turn: EndingTurn, declaration: Declaration): Answer {
+    return turn.session.remind()
+      ? this.ended(turn, 'reminder', Answer.blocking(declaration.finish.reminder()))
+      : this.ended(turn, null, Answer.saying(PENDING))
   }
 
-  private async check(session: Session, declaration: Declaration, finished: UnitOfWork, lastMessage: string | null): Promise<Answer> {
+  private async check(turn: EndingTurn, declaration: Declaration, finished: UnitOfWork, lastMessage: string | null): Promise<Answer> {
+    const { session } = turn
     const startedAt = Date.now()
     const deadline = declaration.checkLimits.deadlineFrom(startedAt)
     const repaired = finished.isEmpty ? [] : await this.repair(session, declaration, finished, deadline)
@@ -125,24 +145,23 @@ export class EndOfTurn implements Moment {
 
     for (const event of review?.events(unit.number) ?? []) session.log(event)
 
-    if (review?.holds === true) return Answer.blocking(report.reviewRefusal(review, reportPath))
+    if (review?.holds === true) return this.ended(turn, 'review', Answer.blocking(report.reviewRefusal(review, reportPath)))
     // The review goes on by itself: the unit stays open for it, and the agent is not kept waiting.
-    if (review?.standing === 'running') return Answer.saying(report.summary(reportPath))
+    if (review?.standing === 'running') return this.ended(turn, null, Answer.saying(report.summary(reportPath)))
 
     if (verdict.passed) {
       session.settle(unit.files)
       if (review !== null) new ReviewCards(session.repo).open(review, session, unit, declaration)
 
-      return this.over(session, Answer.saying(report.summary(reportPath)))
+      return this.ended(turn, null, this.over(session, Answer.saying(report.summary(reportPath))))
     }
 
-    return declaration.checkLimits.isExhaustedAfter(session.failRound())
-      ? this.over(
-          session,
-          Answer.saying(
-            `[weaver] The checks still fail after ${String(declaration.checkLimits.maxRefusals)} refusal(s); the agent may stop. Report: ${reportPath}`,
-          ),
-        )
-      : Answer.blocking(report.refusal(reportPath))
+    if (!declaration.checkLimits.isExhaustedAfter(session.failRound())) {
+      return this.ended(turn, 'checks', Answer.blocking(report.refusal(reportPath)))
+    }
+
+    const given = `[weaver] The checks still fail after ${String(declaration.checkLimits.maxRefusals)} refusal(s); the agent may stop. Report: ${reportPath}`
+
+    return this.ended(turn, null, this.over(session, Answer.saying(given)))
   }
 }

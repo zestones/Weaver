@@ -1,6 +1,7 @@
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import { CallDiff } from '../../unit-of-work/diff/call-diff.ts'
+import type { Session } from '../../unit-of-work/session/session.ts'
 import { CallWarning } from '../../verdict/call-warning.ts'
 import { Answer } from '../exchange/answer.ts'
 import { HeadAlert } from '../exchange/head-alert.ts'
@@ -33,15 +34,27 @@ export class AfterCall implements Moment {
 
     if (call.isEmpty || !this.checks.warns(turn.declaration)) return Answer.silent().after(alert)
 
-    return this.warning(turn.declaration, call).then((warning) =>
+    return this.warning(session, turn.declaration, call, turn.event.call?.name ?? '').then((warning) =>
       (warning === null ? Answer.silent() : Answer.telling(this.event, warning)).after(alert),
     )
   }
 
   // What the checks that warn found on what the call changed. The agent is told and not held: the edit is made, and
   // the verdict comes at the end of the task.
-  private async warning(declaration: Declaration, call: CallDiff): Promise<string | null> {
-    const outcomes = await this.checks.warn(declaration, call, declaration.checkLimits.warnDeadlineFrom(Date.now()))
+  private async warning(session: Session, declaration: Declaration, call: CallDiff, tool: string): Promise<string | null> {
+    const startedAt = Date.now()
+    const outcomes = await this.checks.warn(declaration, call, declaration.checkLimits.warnDeadlineFrom(startedAt))
+
+    if (outcomes.length > 0) {
+      session.log({
+        kind: 'warn',
+        tool,
+        files: call.files.length,
+        ms: Date.now() - startedAt,
+        checks: outcomes.map((outcome) => outcome.run),
+        warned: outcomes.filter((outcome) => outcome.blocking).map((outcome) => outcome.id),
+      })
+    }
 
     return new CallWarning(declaration, outcomes).text
   }

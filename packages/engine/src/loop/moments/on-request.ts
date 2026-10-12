@@ -19,9 +19,17 @@ export class OnRequest implements Moment {
     // A subagent's prompt is its parent's words, not the owner's.
     if (turn.event.subagent || !request.isFromOwner) return briefed
 
-    session?.request(request)
+    const directives = new OwnerDirectives([prompt])
 
-    const mistyped = turn.declaration.review === null ? [] : new OwnerDirectives([prompt]).problems()
+    session?.log({
+      kind: 'request',
+      unit: session.request(request),
+      text: request.kept,
+      directives: directives.given,
+      transcript: turn.event.transcriptPath,
+    })
+
+    const mistyped = turn.declaration.review === null ? [] : directives.problems()
 
     return briefed.after(mistyped.length === 0 ? null : `[weaver] ${mistyped.join(' ')}`)
   }

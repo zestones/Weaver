@@ -33,15 +33,19 @@ export abstract class Check {
   }
 
   // What the check finds on the files a call just changed, read as a verdict would be. null when it has nothing to
-  // say of them: no warning of its own, none of its files, or a run that did not end in time.
+  // say of them: no warning of its own, or none of its files. A warning that did not end in time, or had none left,
+  // is kept as such and tells the agent nothing.
   async warn(call: CallDiff, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<CheckOutcome | null> {
     const files = this.concerned(call.files)
 
     if (this.declared.warn === null || files.length === 0) return null
+    if (timeoutMs <= 0) return this.outcome({ status: 'timeout', blocking: false, ms: 0, output: '' })
 
     const result = await this.launch(this.declared.warn, files, call.repo, env, timeoutMs)
 
-    return result === null || result.code === TIMED_OUT ? null : this.read(result)
+    if (result === null) return null
+
+    return result.code === TIMED_OUT ? this.outcome({ status: 'timeout', blocking: false, ms: result.ms, output: '' }) : this.read(result)
   }
 
   // The repair is an attempt and `judge` gives the verdict: what the repair prints or how it exits decides nothing.

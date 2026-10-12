@@ -1,20 +1,34 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Repository } from '../../lib/git/repository.ts'
+import { EngineManifest } from './engine-manifest.ts'
 import type { EventBody, EventSource, JournalEvent } from './journal-event.ts'
 
-const SCHEMA_VERSION = 1
+// The second shape of the lines: each says which Weaver wrote it, a verdict holds each of its checks, and how the hook
+// ran, what was asked, each end of turn and each warning are kept.
+const SCHEMA_VERSION = 2
 const REPO_LOG = 'repo'
+// The journal is never rewritten: a line an earlier Weaver wrote lacks what was kept since, and is read with nothing
+// there. `v` tells a count that was nothing from one that was not kept.
+const SINCE_ADDED: Readonly<Record<string, object>> = {
+  check: { lines: 0, repaired: 0, checks: [] },
+  review: { model: null, reason: '', standing: 'unknown', rules: 0, findingRules: [], suspicions: 0, dropped: 0, experiments: 0 },
+}
+const UNKNOWN_WEAVER = 'unknown'
 
 export class Journal {
-  private readonly dir: string
+  // The folder of the journal: one file of lines for each session.
+  readonly dir: string
+  private weaver: string | null = null
 
   constructor(repo: Repository) {
     this.dir = join(repo.stateDir, 'events')
   }
 
   append(source: EventSource, body: EventBody, at = new Date().toISOString()): JournalEvent {
-    const event: JournalEvent = { v: SCHEMA_VERSION, at, ...source, ...body }
+    this.weaver ??= new EngineManifest().version
+
+    const event: JournalEvent = { v: SCHEMA_VERSION, at, weaver: this.weaver, ...source, ...body }
 
     mkdirSync(this.dir, { recursive: true })
 
@@ -54,7 +68,9 @@ export class Journal {
       if (line.trim() === '') return []
 
       try {
-        return [JSON.parse(line) as JournalEvent]
+        const kept = JSON.parse(line) as { readonly kind: string }
+
+        return [{ weaver: UNKNOWN_WEAVER, ...SINCE_ADDED[kept.kind], ...kept } as JournalEvent]
       } catch {
         return []
       }

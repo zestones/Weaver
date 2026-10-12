@@ -25,11 +25,16 @@ export class OwnerRequest {
     return start !== '' && !SYSTEM_PREFIXES.some((prefix) => start.startsWith(prefix))
   }
 
+  // The request as it is kept: a pasted log is cut, and says by how much.
+  get kept(): string {
+    return this.clip(this.text, TEXT_LIMIT)
+  }
+
   intent(answering: string | null): Intent {
     return {
       at: new Date().toISOString(),
       source: 'prompt',
-      text: this.clip(this.text, TEXT_LIMIT),
+      text: this.kept,
       answering: answering === null ? null : this.clip(answering, REPLY_LIMIT),
     }
   }

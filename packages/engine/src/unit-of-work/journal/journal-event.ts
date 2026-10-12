@@ -6,6 +6,19 @@ export interface EventSource {
 interface EventBase extends EventSource {
   readonly v: number
   readonly at: string
+  // The version of the Weaver that wrote the line.
+  readonly weaver: string
+}
+
+// How one check ended, at the end of a task or right after a call. The three counts are those of its findings: the
+// ones that hold the task, the ones that wait for the owner, the ones listed for the reviewer.
+export interface CheckRun {
+  readonly id: string
+  readonly status: 'pass' | 'fail' | 'timeout' | 'skip'
+  readonly ms: number
+  readonly failures: number
+  readonly toValidate: number
+  readonly candidates: number
 }
 
 interface TouchEvent {
@@ -24,7 +37,55 @@ interface CheckEvent {
   readonly failed: readonly string[]
   readonly toValidate: number
   readonly files: number
+  // The lines the unit added, and the files a repair rewrote before the checks judged.
+  readonly lines: number
+  readonly repaired: number
   readonly ms: number
+  readonly checks: readonly CheckRun[]
+}
+
+// What the checks that warn did right after one call: `warned` names the ones that told the agent something.
+interface WarnEvent {
+  readonly kind: 'warn'
+  readonly tool: string
+  readonly files: number
+  readonly ms: number
+  readonly checks: readonly CheckRun[]
+  readonly warned: readonly string[]
+}
+
+// One run of the hook, from the start of its process to its answer: what supervision costs the agent.
+interface HookEvent {
+  readonly kind: 'hook'
+  readonly event: string
+  readonly tool: string | null
+  // The subagent that made the call. Its session is the one of its parent.
+  readonly subagent: string | null
+  readonly ms: number
+}
+
+// One end of turn: whether the agent said its task was finished, and what kept it from stopping, if anything did.
+interface TurnEvent {
+  readonly kind: 'turn'
+  readonly unit: number
+  readonly finished: boolean
+  readonly held: 'checks' | 'review' | 'reminder' | null
+}
+
+// What the owner asked, as the unit of work keeps it, and where the runtime writes the transcript of the session.
+interface RequestEvent {
+  readonly kind: 'request'
+  readonly unit: number
+  readonly text: string
+  readonly directives: readonly string[]
+  readonly transcript: string | null
+}
+
+// Weaver could not do its work: a hook that failed, or a configuration it could not read.
+interface ErrorEvent {
+  readonly kind: 'error'
+  readonly event: string
+  readonly message: string
 }
 
 interface SettleEvent {
@@ -66,12 +127,18 @@ interface ReviewEvent {
   readonly kind: 'review'
   readonly unit: number
   readonly runtime: string
+  readonly model: string | null
   // Why this runtime reviewed, or why no review was run.
   readonly reason: string
   readonly standing: string
+  // How many rules the reviewer was given to judge.
+  readonly rules: number
   readonly findings: number
+  // The rule of each finding, in the order of the findings.
+  readonly findingRules: readonly string[]
   readonly suspicions: number
   readonly dropped: number
+  readonly experiments: number
   readonly failure: string | null
   readonly seconds: number
   readonly costUsd: number | null
@@ -96,6 +163,11 @@ interface FlagEvent {
 export type EventBody =
   | TouchEvent
   | CheckEvent
+  | WarnEvent
+  | HookEvent
+  | TurnEvent
+  | RequestEvent
+  | ErrorEvent
   | SettleEvent
   | HeadMovedEvent
   | RefuseEvent

@@ -20,6 +20,7 @@ Weaver knows no rule by itself. Everything it enforces is declared by the superv
 | Leaves the deciding to you      | An agent cannot close a card, change one, or unplug Weaver: the commands that decide refuse to run under an agent. Weaver also guards its own configuration, its state and the hooks.          |
 | Steps aside when you say so     | `weaver maintenance on` lifts the guards for one session, when you want its agent to do what they forbid. Its work is still checked, and what the guards would have refused is listed for you. |
 | Says whether it is really alive | `weaver doctor` checks the configuration, the hook, and each runtime. It asks Codex whether it runs the hooks, since Codex may hold them and work without Weaver, without a word.              |
+| Keeps count of its own work     | Each run of the hook, each check, each warning, each review and each end of turn leaves a line in a journal. `weaver stats` counts them, and leaves what the numbers mean to you.              |
 
 ## How it plugs in
 
@@ -194,12 +195,39 @@ Releases stay side by side, and a project runs the one that wired it until `weav
 | `weaver update [--dry-run] [--offline]`        | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks. |
 | `weaver doctor`                                | Checks the configuration, the hook, and each agent runtime.                                            |
 | `weaver maintenance on\|off [<session>]`       | Lifts the guards of the project for one session of an agent, or puts them back.                        |
+| `weaver stats [--since <day>\|<n>d] [--json]`  | Counts what Weaver kept of its work in the project: times, verdicts, warnings, reviews, cards.         |
 | `weaver version`                               | Says which version of Weaver this is.                                                                  |
 | `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.                                  |
 | `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`.                                |
 | `weaver cards reopen\|retitle\|label\|rewrite` | Corrects a card, or opens it again.                                                                    |
 | `weaver cards tie\|untie\|separate`            | Ties two cards that may be about the same thing, or undoes a merge.                                    |
 | `weaver close <number> fixed\|wontfix\|issue`  | Closes a card, with a reason.                                                                          |
+
+## What it keeps of its own work
+
+Weaver writes what it does in a journal, one line for each event, under `.git/weaver/events/`: nothing of it is committed, and nothing leaves the machine. Each line says when, in which session, under which runtime and by which version of Weaver.
+
+| Line          | What it keeps                                                                                                                           |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `request`     | What you asked, the directives it carried, and where the runtime writes the transcript of the session.                                  |
+| `hook`        | One run of the hook: the event, the tool, the subagent that made the call, and the time it took from the start of its process.          |
+| `touch`       | The files a call changed.                                                                                                               |
+| `warn`        | The checks that ran right after a call: how each ended, in how long, and which ones told the agent something.                           |
+| `turn`        | One end of turn: whether the agent said it had finished, and what held it back, the checks, a review or the reminder.                   |
+| `check`       | One verdict: the files and the lines of the unit of work, what a repair rewrote, the time, and each check with its status and its time. |
+| `review`      | One review: the runtime and the model, the rules given, the findings and the rule of each, the time and the cost.                       |
+| `answer`      | What the author answered to one finding: fixed, not fixed, or nothing.                                                                  |
+| `settle`      | The end of a unit of work, by a verdict or by your own commit.                                                                          |
+| `refuse`      | A call a guard refused.                                                                                                                 |
+| `lift`        | A call a guard would have refused, let through in maintenance.                                                                          |
+| `maintenance` | Maintenance turned on or off for a session.                                                                                             |
+| `flag`        | A flag an agent made, and the card it became.                                                                                           |
+| `head-moved`  | A call that moved `HEAD`.                                                                                                               |
+| `error`       | Weaver could not do its work: a hook that failed, a configuration it could not read.                                                    |
+
+`weaver stats` counts these lines and the cards of the registry: how many, how long, how often. `--since 2026-10-01` or `--since 7d` starts the count on a day, and `--json` gives the same figures to a program. It states what was kept and concludes nothing: what the numbers mean is yours to work out, with the lines themselves at hand.
+
+Weaver does not see what the agent itself spends: its tokens, its cost, its model. The path of the transcript, kept with each request, is what ties a session of the journal to them.
 
 ## What it costs
 

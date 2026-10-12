@@ -71,7 +71,10 @@ test('each real call records one flag, for the runtime and the session the hook 
 
   assert.equal(cardsOf(repo).length, 5)
   assert.deepEqual(
-    new Journal(repo).read().map((event) => event.kind),
+    new Journal(repo)
+      .read()
+      .map((event) => event.kind)
+      .filter((kind) => kind !== 'hook'),
     ['flag', 'flag', 'flag', 'flag', 'flag'],
   )
 })

@@ -31,6 +31,7 @@ export abstract class AbstractAgent implements Agent {
       call: tool === null ? null : this.call(tool, payload.record('tool_input'), cwd),
       agentId: payload.text('agent_id'),
       lastMessage: payload.text('last_assistant_message'),
+      transcriptPath: payload.text('transcript_path'),
     })
   }
 

@@ -128,6 +128,44 @@ test('findings send the author back, and each one needs its answer: fixed with a
   )
 })
 
+test('the journal keeps who reviewed and on what: the model, the rules it was given, the rule of each finding', async () => {
+  const experiment = { command: 'npm test', observed: 'the tests pass' }
+  const twice = new ReviewOutcome({
+    ...BY,
+    findings: [FINDING, { ...FINDING, line: 2 }],
+    experiments: [experiment],
+    seconds: 42,
+    costUsd: 0.0312,
+  })
+
+  await finish(stubReviewer([twice]), reviewed({ reviewers: { codex: { model: 'a-model' } } }))
+
+  assert.deepEqual(
+    eventsOf(session, 'review').map(({ runtime, model, rules, findings, findingRules, experiments, seconds, costUsd }) => ({
+      runtime,
+      model,
+      rules,
+      findings,
+      findingRules,
+      experiments,
+      seconds,
+      costUsd,
+    })),
+    [
+      {
+        runtime: 'codex',
+        model: 'a-model',
+        rules: 1,
+        findings: 2,
+        findingRules: ['N1', 'N1'],
+        experiments: 1,
+        seconds: 42,
+        costUsd: 0.0312,
+      },
+    ],
+  )
+})
+
 test('a finding the author leaves goes to the owner with its reason, and changes nothing else', async () => {
   const reviewer = stubReviewer([found])
 
