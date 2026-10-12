@@ -150,7 +150,7 @@ test('a number prints the card as Markdown', async () => {
 })
 
 test('at a terminal the card is drawn, and a program still reads it as Markdown', async () => {
-  flag(top)
+  flag(top, { context: [contextOf('src/auth/token.ts', 42, '    return cached')] })
   write(top, 1)
 
   const read = await weaver(top, ['cards', '1'])
@@ -159,15 +159,13 @@ test('at a terminal the card is drawn, and a program still reads it as Markdown'
 
   assert.equal(status, 0)
   assert.equal(read.lines.join('\n'), cardOf(top, 1).markdown(), 'what is piped is the Markdown, to the letter')
-  assert.deepEqual(page.slice(0, 5), [
-    'Nothing refreshes the token',
-    '───────────────────────────',
-    '',
-    'Card                 #1',
-    'Origin               flag',
-  ])
-  assert.ok(page.includes('Observation'), 'a heading is drawn without its marks')
-  assert.ok(page.includes('  │ Seen: no call of refresh() exists under src/.'), 'the flag is set apart as the code it is')
+  assert.equal(page[0], 'Nothing refreshes the token')
+  assert.match(page[1] ?? '', /^#1 · open · flagged by claude · \d{4}-\d{2}-\d{2} \d{2}:\d{2} ·$/)
+  assert.equal(page[2], 'type:bug, area:auth')
+  assert.ok(page.includes('Observation ────────────────────────────────────────────────'), 'a part of the card opens under a rule')
+  assert.ok(page.includes('  Seen      no call of refresh() exists under src/.'), 'the flag is drawn field by field')
+  assert.ok(page.includes('▸ 42 │ return cached'), 'the line that was flagged is pointed at')
+  assert.equal(page.at(-1), 'Close it with weaver close 1 fixed|wontfix|issue [reason].')
   assert.equal(lines[0], '\u001B[1mNothing\u001B[22m \u001B[1mrefreshes\u001B[22m \u001B[1mthe\u001B[22m \u001B[1mtoken\u001B[22m')
 })
 

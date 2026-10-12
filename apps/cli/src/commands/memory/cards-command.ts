@@ -18,13 +18,13 @@ const EVERY_STATE: readonly CardState[] = ['raw', 'open', 'closed', 'merged']
 export class CardsCommand implements Command {
   readonly name = 'cards'
   readonly usage = 'cards [<number>] [--all] [--file <path>] [--label <family:value>]'
-  readonly summary = 'List the cards that wait for you, or print one'
+  readonly summary = 'List the cards that wait for you, or show one'
   readonly ownerOnly = false
   readonly help = {
     group: 'Cards',
-    description: 'List the cards that wait for you, newest first, or print one as Markdown.',
+    description: 'List the cards that wait for you, newest first, or show one: drawn at a terminal, as Markdown for a program.',
     words: [
-      ['[<number>]', 'Print this card as Markdown'],
+      ['[<number>]', 'Show this card'],
       ['--all', 'List the closed and the merged cards too'],
       ['--file <path>', 'Only the cards about this file'],
       ['--label <family:value>', 'Only the cards that carry this label'],
@@ -77,7 +77,13 @@ export class CardsCommand implements Command {
 
       if (card === null) throw new Error(`no card has the number ${String(number)}`)
 
-      await this.screen.markdown(card.markdown())
+      // The parser of Markdown and the grammars of the languages are loaded here, to draw a card: no other command
+      // pays for them.
+      await this.screen.page(card.markdown(), async (paint, width) => {
+        const { CardPage } = await import('../../cards/card-page.ts')
+
+        return new CardPage(card, paint, width).lines()
+      })
 
       return 0
     } finally {

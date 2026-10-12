@@ -1,34 +1,38 @@
 import { lexer, type Token, type Tokens } from 'marked'
 import { Paint } from '../output/paint.ts'
 import type { Atom } from './atom.ts'
-import { CodeColours } from './code-colours.ts'
+import { DrawnCode } from './drawn-code.ts'
 import { InlineMarkdown } from './inline-markdown.ts'
 import { WrappedLines } from './wrapped-lines.ts'
 
 // A line of prose wider than this is hard to read, however wide the terminal is.
 const TEXT_WIDTH = 100
 const NARROWEST = 20
-// An item that names something and says what it is, as the head of a card does: `State: open`.
-const NAMED = /^([A-Z][^:`*\n]{0,30}):(?:[ \t]+\S[^]*)?$/
 const BAR = '│'
+const CALLOUT = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/
 const BULLET = '•'
 const INDENT = '  '
 
 // A document in Markdown as a person reads it at a terminal. The document is read by a parser of Markdown; what is
 // here is only how each thing it finds is drawn: the marks are no longer shown, prose is folded to the width of a
-// page, the items that name things are lined up, code is set apart and coloured by its language.
+// page, code is set apart and coloured by its language.
 export class TerminalMarkdown {
+  // The width prose is folded to.
+  readonly width: number
   private readonly paint: Paint
   private readonly inline: InlineMarkdown
-  private readonly code: CodeColours
+  private readonly code: DrawnCode
   private readonly wrapped: WrappedLines
-  private readonly width: number
+  private readonly edge: number
 
-  constructor(paint: Paint, width: number) {
+  // `edge` is the width of the terminal. Prose is folded on a page no wider than reads well; code, whose lines are
+  // as long as they are, runs to the edge.
+  constructor(paint: Paint, edge: number, page = Math.min(edge, TEXT_WIDTH)) {
     this.paint = paint
     this.inline = new InlineMarkdown(paint)
-    this.code = new CodeColours(paint)
-    this.width = Math.max(NARROWEST, Math.min(width, TEXT_WIDTH))
+    this.edge = Math.max(NARROWEST, edge)
+    this.width = Math.max(NARROWEST, page)
+    this.code = new DrawnCode(paint, this.edge)
     this.wrapped = new WrappedLines(this.width)
   }
 
@@ -54,7 +58,7 @@ export class TerminalMarkdown {
     if (token.type === 'heading') return this.heading(token as Tokens.Heading)
     if (token.type === 'code') return this.fenced(token as Tokens.Code)
     if (token.type === 'list') return this.list(token as Tokens.List, listIndent)
-    if (token.type === 'blockquote') return this.under(`${INDENT}${this.paint.dim(BAR)} `, (token as Tokens.Blockquote).tokens)
+    if (token.type === 'blockquote') return this.quote(token as Tokens.Blockquote)
     if (token.type === 'table') return this.table(token as Tokens.Table)
     if (token.type === 'hr') return [this.paint.dim('─'.repeat(Math.min(this.width, 40)))]
     if (token.type === 'paragraph' || token.type === 'text') return this.wrapped.of(this.atomsOf(token))
@@ -63,54 +67,45 @@ export class TerminalMarkdown {
     return token.raw.trimEnd().split('\n')
   }
 
-  // The title of the document is underlined; the headings under it are only strong.
+  // The title of the document is underlined. A heading under it opens a part of the page: a rule runs from it to
+  // the edge. The headings below are only strong.
   private heading(heading: Tokens.Heading): string[] {
     const atoms = this.inline.atoms(heading.tokens, (word) => this.paint.bold(word))
     const lines = this.wrapped.of(atoms)
     const read = atoms.reduce((sum, atom) => sum + atom.width + 1, -1)
+    const [only = ''] = lines
 
-    return heading.depth === 1 ? [...lines, this.paint.dim('─'.repeat(Math.max(1, Math.min(this.width, read))))] : lines
+    if (heading.depth === 1) return [...lines, this.paint.dim('─'.repeat(Math.max(1, Math.min(this.width, read))))]
+    if (heading.depth > 2 || lines.length > 1 || read + 2 >= this.width) return lines
+
+    return [`${only} ${this.paint.dim('─'.repeat(this.width - read - 1))}`]
   }
 
-  // Code is not folded: where a line of it breaks means something.
+  // A quote that opens with `[!NOTE]` is a callout, as GitHub draws them: its kind is its title.
+  private quote(quote: Tokens.Blockquote): string[] {
+    const [mark = '', kind] = CALLOUT.exec(quote.text) ?? []
+    const bar = `${INDENT}${this.paint.dim(BAR)} `
+
+    if (kind === undefined) return this.under(bar, quote.tokens)
+
+    const title = `${kind.charAt(0)}${kind.slice(1).toLowerCase()}`
+    const loud = kind === 'WARNING' || kind === 'CAUTION'
+
+    return [`${bar}${loud ? this.paint.yellow(title) : this.paint.bold(title)}`, ...this.under(bar, lexer(quote.text.slice(mark.length)))]
+  }
+
   private fenced(code: Tokens.Code): string[] {
-    return this.code.lines(code.text, code.lang ?? '').map((line) => `${INDENT}${this.paint.dim(BAR)} ${line}`)
+    return this.code.block(code.text, code.lang ?? '')
   }
 
   private list(list: Tokens.List, indent: string): string[] {
-    const names = list.ordered ? [] : list.items.map((item) => this.nameOf(item))
-    const lined = names.length > 1 && names.every((name) => name !== null)
-    const nameWidth = Math.max(0, ...names.map((name) => name?.length ?? 0))
     const first = typeof list.start === 'number' ? list.start : 1
 
     return list.items.flatMap((item, index) => {
-      const name = names[index] ?? null
-
-      if (lined && name !== null) return this.named(item, name, nameWidth)
-
       const mark = list.ordered ? `${String(first + index)}.` : BULLET
 
       return this.item(item, `${indent}${this.paint.dim(mark)} `, ' '.repeat(indent.length + mark.length + 1))
     })
-  }
-
-  // The first words of an item, when they name what the item is about; null when the item is a sentence.
-  private nameOf(item: Tokens.ListItem): string | null {
-    const [first] = item.tokens
-
-    return first?.type === 'text' ? (NAMED.exec(first.raw.trimEnd())?.[1] ?? null) : null
-  }
-
-  // A name and what it is, the names of a list all as wide: what is said starts in one column. What is set under the
-  // item, such as the requests of the owner, stays under its name.
-  private named(item: Tokens.ListItem, name: string, nameWidth: number): string[] {
-    const [first, ...others] = item.tokens
-    const value = first === undefined ? [] : this.atomsOf(first).slice(name.split(/\s+/).length)
-    const label = this.paint.dim(name.padEnd(nameWidth))
-    const said =
-      value.length === 0 ? [this.paint.dim(name)] : this.wrapped.of(value, `${label}${INDENT}`, ' '.repeat(nameWidth + INDENT.length))
-
-    return [...said, ...this.under(INDENT, others, '')]
   }
 
   // The text of an item starts after its mark and stays under its first word; what follows it in the item is drawn
@@ -124,7 +119,8 @@ export class TerminalMarkdown {
 
   // Blocks drawn on a narrower page, each of their lines after a prefix: what a quote or an item holds.
   private under(prefix: string, tokens: readonly Token[], listIndent = INDENT): string[] {
-    const narrower = new TerminalMarkdown(this.paint, this.width - this.wrapped.visible(prefix))
+    const taken = this.wrapped.visible(prefix)
+    const narrower = new TerminalMarkdown(this.paint, this.edge - taken, this.width - taken)
 
     return narrower.blocks(tokens, listIndent).map((line) => `${prefix}${line}`.trimEnd())
   }

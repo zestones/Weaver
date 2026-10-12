@@ -1,4 +1,4 @@
-import type { Token, Tokens } from 'marked'
+import { Lexer, type Token, type Tokens } from 'marked'
 import type { Paint } from '../output/paint.ts'
 import type { Atom } from './atom.ts'
 
@@ -15,11 +15,28 @@ export class InlineMarkdown {
   }
 
   atoms(tokens: readonly Token[], overall: Style = (word) => word): Atom[] {
+    return this.gathered((add) => {
+      this.walk(tokens, overall, add)
+    })
+  }
+
+  // What someone typed where no Markdown is expected, such as a field of a flag: it is drawn as they typed it, and
+  // only what they set between backticks is told apart. Read as Markdown, `__init__` would lose its underscores.
+  typed(text: string, overall: Style = (word) => word): Atom[] {
+    return this.gathered((add) => {
+      for (const token of Lexer.lexInline(text)) {
+        if (token.type === 'codespan') add((token as Tokens.Codespan).text, (word) => overall(this.paint.cyan(word)))
+        else add(token.raw, overall)
+      }
+    })
+  }
+
+  private gathered(fill: (add: Add) => void): Atom[] {
     const atoms: Atom[] = []
     // Whether the next piece touches the atom before it: a full stop after a word in code belongs to that word.
     let glued = false
 
-    this.walk(tokens, overall, (raw, style) => {
+    fill((raw, style) => {
       for (const part of raw.split(/(\s+)/)) {
         if (part === '') continue
 

@@ -1,4 +1,5 @@
 import type { Output } from './output.ts'
+import type { Paint } from './paint.ts'
 import type { TextTable } from './text-table.ts'
 
 // The marks of a line that states how something stands. They are text, so that a program reading the output, or a
@@ -59,22 +60,12 @@ export class Screen {
     for (const row of rows) this.said(row)
   }
 
-  // A document in Markdown: drawn for a person at a terminal, and given as it is written to a program, which reads
-  // Markdown better than what is drawn from it.
-  async markdown(text: string): Promise<void> {
+  // What is drawn for a person at a terminal, such as a card: `drawn` gives its lines for a terminal that wide. A
+  // program is given what is written, which it reads better than anything drawn from it.
+  async page(written: string, drawn: (paint: Paint, width: number) => Promise<readonly string[]>): Promise<void> {
     const { paint, width } = this.output
 
-    if (!paint.enabled || width === null) {
-      this.said(text)
-
-      return
-    }
-
-    // The parser of Markdown and the grammars of the languages are loaded here, to draw a document: no other
-    // command pays for them.
-    const { TerminalMarkdown } = await import('../markdown/terminal-markdown.ts')
-
-    for (const line of new TerminalMarkdown(paint, width).lines(text)) this.said(line)
+    for (const line of !paint.enabled || width === null ? [written] : await drawn(paint, width)) this.said(line)
   }
 
   // Something to type, told apart from the sentence around it.

@@ -11,16 +11,10 @@ const plain = new Paint(false)
 const coloured = new Paint(true)
 // A document laid out for a terminal of this width, without its colours: what is asserted is where things are.
 const drawn = (markdown: string, width = 60): string[] => new TerminalMarkdown(plain, width).lines(markdown)
-const CARD = [
+const DOCUMENT = [
   '# The token is never refreshed',
   '',
-  '- Card: #7',
-  '- State: open',
-  '- Places: `src/auth/token.ts:42`',
-  '- Asked by the owner:',
-  '  1. refresh the token before it expires, and say what you changed in the session store',
-  '  2. #review',
-  '- Date: 2026-10-12',
+  'Seen on 2026-10-12.',
   '',
   '',
   '## Observation',
@@ -28,27 +22,25 @@ const CARD = [
   '`getToken` returns the cached value and nothing under `src/` calls `refresh()`:',
   '',
   '```ts',
-  'export function getToken(): string {',
-  '  return cached // never renewed',
-  '}',
+  '    export function getToken(): string {',
+  '      return cached // never renewed',
+  '    }',
   '```',
+  '',
+  '### What was not checked',
+  '',
+  '- Fix: none yet',
+  '- State: open',
 ].join('\n')
 
-test('a card is drawn as a page: its title underlined, its head lined up, its prose folded, its code set apart', () => {
-  assert.deepEqual(drawn(CARD), [
+test('a document is drawn as a page: its title underlined, its parts under a rule, its prose folded, its code set apart', () => {
+  assert.deepEqual(drawn(DOCUMENT), [
     'The token is never refreshed',
     '────────────────────────────',
     '',
-    'Card                #7',
-    'State               open',
-    'Places              src/auth/token.ts:42',
-    'Asked by the owner',
-    '  1. refresh the token before it expires, and say what you',
-    '     changed in the session store',
-    '  2. #review',
-    'Date                2026-10-12',
+    'Seen on 2026-10-12.',
     '',
-    'Observation',
+    'Observation ────────────────────────────────────────────────',
     '',
     'getToken returns the cached value and nothing under src/',
     'calls refresh():',
@@ -56,7 +48,17 @@ test('a card is drawn as a page: its title underlined, its head lined up, its pr
     '  │ export function getToken(): string {',
     '  │   return cached // never renewed',
     '  │ }',
+    '',
+    'What was not checked',
+    '',
+    '  • Fix: none yet',
+    '  • State: open',
   ])
+  assert.deepEqual(
+    drawn('## A heading that is longer than the page is wide', 30),
+    ['A heading that is longer than', 'the page is wide'],
+    'a heading that fills its line has no rule',
+  )
 })
 
 test('a list keeps its marks and its levels, and the lines of an item stay under its first word', () => {
@@ -80,15 +82,10 @@ test('a list keeps its marks and its levels, and the lines of an item stay under
     '  9. nine',
     '  10. ten',
   ])
-  assert.deepEqual(
-    drawn('- Fix: done\n- not a name, only a sentence'),
-    ['  • Fix: done', '  • not a name, only a sentence'],
-    'names are lined up only when every item has one',
-  )
   assert.deepEqual(drawn('- before the code:\n\n  ```\n  a = 1\n  ```\n- after'), ['  • before the code:', '      │ a = 1', '  • after'])
 })
 
-test('a quote, a rule and a table are drawn, what the page does not know is left as it is, and code is never folded', () => {
+test('a quote, a rule and a table are drawn, and what the page does not know is left as it is', () => {
   const page = [
     '> said by the owner,',
     '> on two lines',
@@ -100,10 +97,6 @@ test('a quote, a rule and a table are drawn, what the page does not know is left
     '| `lint` | 79 s |',
     '',
     '<details>kept</details>',
-    '',
-    '~~~',
-    'a line of code that is longer than the page is wide',
-    '~~~',
   ].join('\n')
 
   assert.deepEqual(drawn(page, 30), [
@@ -116,11 +109,22 @@ test('a quote, a rule and a table are drawn, what the page does not know is left
     '  lint   79 s',
     '',
     '<details>kept</details>',
-    '',
-    '  │ a line of code that is longer than the page is wide',
   ])
-  assert.deepEqual(drawn('wide\n\n\n\n## Next', 500), ['wide', '', 'Next'], 'one blank line sets two blocks apart')
+  assert.deepEqual(drawn('wide\n\n\n\n### Next', 500), ['wide', '', 'Next'], 'one blank line sets two blocks apart')
   assert.equal(Math.max(...drawn('word '.repeat(80), 500).map((line) => line.length)), 99, 'a page is never wider than prose reads well')
+})
+
+test('a quote that names its kind is a callout: the kind is its title', () => {
+  assert.deepEqual(drawn('> [!NOTE]\n> The lines date from an earlier commit,\n> not from this work.', 40), [
+    '  │ Note',
+    '  │ The lines date from an earlier',
+    '  │ commit, not from this work.',
+  ])
+  assert.deepEqual(new TerminalMarkdown(coloured, 40).lines('> [!WARNING] Not run.'), [
+    '  \u001B[90m│\u001B[39m \u001B[33mWarning\u001B[39m',
+    '  \u001B[90m│\u001B[39m Not run.',
+  ])
+  assert.deepEqual(drawn('> [!SOMETHING] else'), ['  │ [!SOMETHING] else'])
 })
 
 test('what Markdown marks inside a line is drawn word by word, and a name with an underscore stays whole', () => {
@@ -151,45 +155,60 @@ test('what Markdown marks inside a line is drawn word by word, and a name with a
     [5, 4],
     'what touches a word is part of it, and its width is the one it reads',
   )
+  assert.equal(
+    inline
+      .typed('`refresh()` is in __init__.py, see *args and [x](y)')
+      .map((atom) => atom.text)
+      .join(' '),
+    '\u001B[36mrefresh()\u001B[39m is in __init__.py, see *args and [x](y)',
+    'what was typed outside of Markdown keeps its marks, but for the backticks',
+  )
 })
 
 test('code is coloured by the grammar of its language: comments step back, strings and keywords stand out', () => {
-  const code = new CodeColours(coloured)
+  const colours = new CodeColours(coloured)
+  const lines = (text: string, language: string): string[] => colours.rows(text, language, Infinity).map(([row = '']) => row)
 
-  assert.deepEqual(code.lines('def f(x):\n    return "a # b"  # why', 'python'), [
+  assert.deepEqual(lines('def f(x):\n    return "a # b"  # why', 'python'), [
     '\u001B[1mdef\u001B[22m f(x):',
     '    \u001B[1mreturn\u001B[22m \u001B[32m"a # b"\u001B[39m  \u001B[90m# why\u001B[39m',
   ])
-  assert.deepEqual(code.lines('const a = `x<y` // y', 'ts'), [
-    '\u001B[1mconst\u001B[22m a = \u001B[32m`x<y`\u001B[39m \u001B[90m// y\u001B[39m',
-  ])
-  assert.deepEqual(code.lines('+added\n-removed\n kept', 'diff'), ['\u001B[32m+added\u001B[39m', '\u001B[31m-removed\u001B[39m', ' kept'])
+  assert.deepEqual(lines('const a = `x<y` // y', 'ts'), ['\u001B[1mconst\u001B[22m a = \u001B[32m`x<y`\u001B[39m \u001B[90m// y\u001B[39m'])
+  assert.deepEqual(lines('+added\n-removed\n kept', 'diff'), ['\u001B[32m+added\u001B[39m', '\u001B[31m-removed\u001B[39m', ' kept'])
   assert.deepEqual(
-    code.lines('/* a comment\n   on two lines */', 'js'),
+    lines('/* a comment\n   on two lines */', 'js'),
     ['\u001B[90m/* a comment\u001B[39m', '\u001B[90m   on two lines */\u001B[39m'],
     'a style never runs over the end of a line',
   )
-  assert.deepEqual(code.lines('return "x" # y', 'a-language-nobody-knows'), ['return "x" # y'])
-  assert.deepEqual(code.lines('a < b && c', ''), ['a < b && c'], 'code that names no language is left as it is')
+  assert.deepEqual(lines('return "x" # y', 'a-language-nobody-knows'), ['return "x" # y'])
+  assert.deepEqual(lines('a < b && c', ''), ['a < b && c'], 'code that names no language is left as it is')
 })
 
-test('the screen draws a document for a person at a terminal, and gives it as it is written to a program', async () => {
+test('a line of code longer than the page goes on on the next row, broken after a space, each row closing its styles', () => {
+  const colours = new CodeColours(coloured)
+
+  assert.deepEqual(colours.rows('x = "a long string"  # and why\ny = 1', 'python', 12), [
+    ['x = \u001B[32m"a long \u001B[39m', '\u001B[32mstring"\u001B[39m  \u001B[90m# \u001B[39m', '\u001B[90mand why\u001B[39m'],
+    ['y = 1'],
+  ])
+  assert.deepEqual(
+    new CodeColours(plain).rows('abcdefgh\n\nij', '', 3),
+    [['abc', 'def', 'gh'], [''], ['ij']],
+    'a word is cut only where no space is near',
+  )
+})
+
+test('the screen draws a page for a person at a terminal, and gives a program what is written', async () => {
   const said = async (paint: Paint, width: number | null): Promise<string[]> => {
     const lines: string[] = []
     const screen = new Screen({ paint, failPaint: plain, width, say: (line) => void lines.push(line), fail: () => undefined })
 
-    await screen.markdown('# Title\n\n- Card: #1\n- State: open')
+    await screen.page('# Title', (given, columns) => Promise.resolve([given.bold('Title'), `${String(columns)} columns`]))
 
     return lines
   }
 
-  assert.deepEqual(await said(plain, 80), ['# Title\n\n- Card: #1\n- State: open'])
-  assert.deepEqual(await said(coloured, null), ['# Title\n\n- Card: #1\n- State: open'], 'a pipe is not a terminal, whatever was asked')
-  assert.deepEqual(await said(coloured, 80), [
-    '\u001B[1mTitle\u001B[22m',
-    '\u001B[90m─────\u001B[39m',
-    '',
-    '\u001B[90mCard \u001B[39m  #1',
-    '\u001B[90mState\u001B[39m  open',
-  ])
+  assert.deepEqual(await said(plain, 80), ['# Title'])
+  assert.deepEqual(await said(coloured, null), ['# Title'], 'a pipe is not a terminal, whatever was asked')
+  assert.deepEqual(await said(coloured, 80), ['\u001B[1mTitle\u001B[22m', '80 columns'])
 })

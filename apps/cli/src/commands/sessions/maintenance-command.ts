@@ -1,5 +1,6 @@
 import { RepositorySessions, type Session } from '@weaver/engine'
 import { Counted } from '../../output/counted.ts'
+import { LocalMoment } from '../../output/local-moment.ts'
 import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
 import { TextTable } from '../../output/text-table.ts'
@@ -190,11 +191,6 @@ export class MaintenanceCommand implements Command {
   }
 
   private at(moment: Date | string | null): string {
-    if (moment === null) return 'an unknown time'
-
-    const date = new Date(moment)
-    const two = (value: number): string => String(value).padStart(2, '0')
-
-    return `${String(date.getFullYear())}-${two(date.getMonth() + 1)}-${two(date.getDate())} ${two(date.getHours())}:${two(date.getMinutes())}`
+    return moment === null ? 'an unknown time' : new LocalMoment(moment).text
   }
 }
