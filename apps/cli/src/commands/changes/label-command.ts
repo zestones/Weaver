@@ -7,7 +7,16 @@ type Label = readonly [family: string, value: string]
 export class LabelCommand extends CardChange {
   override readonly name = 'cards label'
   override readonly usage = 'cards label <number> <family:value>...'
-  override readonly summary = 'Replace the labels of a card, with labels the project declares.'
+  override readonly summary = 'Replace the labels of a card'
+  override readonly help = {
+    group: 'Cards',
+    description: 'Replace the labels of a card, with labels the project declares.',
+    words: [
+      ['<number>', 'The number of the card, as weaver cards shows it'],
+      ['<family:value>...', 'The labels the card keeps, among those the project declares'],
+    ],
+    examples: ['weaver cards label 12 type:bug area:auth'],
+  } as const
 
   protected override change([number = 0]: readonly number[], words: readonly string[], project: Project): RegistryChange | null {
     const given = words.flatMap((word): Label[] => {

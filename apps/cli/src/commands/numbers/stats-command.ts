@@ -6,6 +6,7 @@ import { LocalDay } from '../../numbers/local-day.ts'
 import { Period } from '../../numbers/period.ts'
 import { StatsPage, type ProjectFigures } from '../../numbers/stats-page.ts'
 import type { Output } from '../../output/output.ts'
+import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import type { Command } from '../line/command.ts'
 
@@ -18,14 +19,24 @@ const EVERY_STATE: readonly CardState[] = ['raw', 'open', 'closed', 'merged']
 export class StatsCommand implements Command {
   readonly name = 'stats'
   readonly usage = `stats [${SINCE} <day>|<n>d] [${AS_JSON}]`
-  readonly summary = 'Count what Weaver kept of its work in this project: times, verdicts, warnings, reviews, cards.'
+  readonly summary = 'Count what Weaver kept of its work'
   readonly ownerOnly = false
+  readonly help = {
+    group: 'Supervision',
+    description:
+      'Count what Weaver kept of its work in this project: times, verdicts, warnings, reviews, cards. It states the numbers and concludes nothing.',
+    words: [
+      [`${SINCE} <day>|<n>d`, 'Count from a day, as 2026-10-01, or from a number of days back, as 7d'],
+      [AS_JSON, 'Print the figures as JSON, for a program'],
+    ],
+    examples: ['weaver stats', `weaver stats ${SINCE} 7d`, `weaver stats ${AS_JSON}`],
+  } as const
   private readonly cwd: string
-  private readonly output: Output
+  private readonly screen: Screen
 
   constructor(cwd: string, output: Output) {
     this.cwd = cwd
-    this.output = output
+    this.screen = new Screen(output)
   }
 
   run(args: readonly string[]): number {
@@ -34,8 +45,7 @@ export class StatsCommand implements Command {
     const period = option === undefined ? Period.whole() : option === SINCE && others.length === 0 ? Period.from(since ?? '') : null
 
     if (period === null) {
-      this.output.say(`weaver ${this.usage}`)
-      this.output.say(`  ${SINCE} takes a day, as 2026-10-01, or a number of days back from now, as 7d.`)
+      this.screen.misuse(this.name, this.usage)
 
       return 2
     }
@@ -48,8 +58,8 @@ export class StatsCommand implements Command {
       cards: this.cards(project, period),
     }
 
-    if (args.includes(AS_JSON)) this.output.say(JSON.stringify(figures, null, 2))
-    else for (const line of new StatsPage(figures, journal.dir).lines()) this.output.say(line)
+    if (args.includes(AS_JSON)) this.screen.line(JSON.stringify(figures, null, 2))
+    else new StatsPage(figures, journal.dir).print(this.screen)
 
     return 0
   }

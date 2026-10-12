@@ -1,3 +1,4 @@
+import { counted } from '../lib/text/counted.ts'
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Declaration } from '../declaration/content/declaration.ts'
@@ -70,7 +71,7 @@ export class Report {
     }
 
     return [
-      `[weaver] The checks pass, and the reviewer (${outcome.runtime}) found ${String(outcome.findings.length)} point(s) on this unit of work (refusal ${String(round)} of ${String(maxRefusals)}).`,
+      `[weaver] The checks pass, and the reviewer (${outcome.runtime}) found ${counted(outcome.findings.length, 'point')} on this unit of work (refusal ${String(round)} of ${String(maxRefusals)}).`,
       'Fix each one, or decide to leave it: a finding never holds your change by itself, but each one needs your answer.',
       ANSWER_HOW,
       IN_WORDS,
@@ -89,16 +90,16 @@ export class Report {
     const parts =
       diff.files.length === 0
         ? ['[weaver] No file changed in this turn.']
-        : [`[weaver] ${String(ran)} check(s) passed on ${String(diff.files.length)} changed file(s).`]
+        : [`[weaver] ${counted(ran, 'check')} passed on ${counted(diff.files.length, 'changed file')}.`]
 
     if (diff.excluded.length > 0) {
-      parts.push(`Not looked at: ${diff.excluded.map(({ folder, files }) => `${String(files)} file(s) under ${folder}/`).join(', ')}.`)
+      parts.push(`Not looked at: ${diff.excluded.map(({ folder, files }) => `${counted(files, 'file')} under ${folder}/`).join(', ')}.`)
     }
 
     parts.push(...this.repairedLines(), ...this.reviewedLines())
 
     if (unattributed.length > 0) parts.push(`Changed during its commands, not charged: ${unattributed.join(', ')}.`)
-    if (waiting > 0) parts.push(`${String(waiting)} item(s) to validate.`)
+    if (waiting > 0) parts.push(`${counted(waiting, 'item')} to validate.`)
 
     return [...parts, `Report: ${reportPath}`].join(' ')
   }
@@ -153,8 +154,8 @@ export class Report {
     if (review === null) return []
 
     const { outcome, standing } = review
-    const found = `${String(outcome.findings.length)} finding(s)`
-    const suspected = outcome.suspicions.length === 0 ? '' : ` ${String(outcome.suspicions.length)} suspicion(s) for you.`
+    const found = counted(outcome.findings.length, 'finding')
+    const suspected = outcome.suspicions.length === 0 ? '' : ` ${counted(outcome.suspicions.length, 'suspicion')} for you.`
 
     if (standing === 'skipped') return [`No review: ${outcome.reason}.`]
     if (standing === 'running') {
@@ -183,7 +184,7 @@ export class Report {
     if (standing === 'skipped') return [`- no review: ${outcome.reason}`]
 
     const cost = outcome.costUsd === null ? '' : `, $${outcome.costUsd.toFixed(4)}`
-    const head = `- by ${outcome.runtime} (${outcome.reason}) in ${String(Math.round(outcome.seconds))} s${cost}, review round ${String(review.round)}, ${String(review.maxRefusals)} refusal(s) allowed`
+    const head = `- by ${outcome.runtime} (${outcome.reason}) in ${String(Math.round(outcome.seconds))} s${cost}, review round ${String(review.round)}, ${counted(review.maxRefusals, 'refusal')} allowed`
 
     if (standing === 'running') {
       return [
@@ -208,7 +209,7 @@ export class Report {
       ),
       ...this.listed('reported by the reviewer and not shown to the agent:', [
         ...outcome.dropped,
-        ...(outcome.truncated === 0 ? [] : [`${String(outcome.truncated)} more finding(s), past the limit`]),
+        ...(outcome.truncated === 0 ? [] : [`${counted(outcome.truncated, 'more finding')}, past the limit`]),
       ]),
     ]
   }
@@ -236,7 +237,7 @@ export class Report {
   private firstLine(command: string): string {
     const [first = '', ...others] = command.trim().split('\n')
 
-    return others.length === 0 ? first : `${first} [${String(others.length)} more line(s)]`
+    return others.length === 0 ? first : `${first} [${counted(others.length, 'more line')}]`
   }
 
   private listed(title: string, lines: readonly string[]): string[] {

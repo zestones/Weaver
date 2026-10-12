@@ -65,7 +65,7 @@ test('an edit by the owner in a file of the unit marks it foreign and is checked
 
   const checks = stubChecks([PASSING])
 
-  assert.match((await finishWith(session, checks)).systemMessage ?? '', /1 check\(s\) passed on 1 changed file/)
+  assert.match((await finishWith(session, checks)).systemMessage ?? '', /1 check passed on 1 changed file/)
   assert.deepEqual(checks.seen, [[A_FILE]])
 })
 

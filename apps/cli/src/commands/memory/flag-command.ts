@@ -3,6 +3,7 @@ import { FlagText } from '@weaver/memory'
 import type { Caller } from '../../caller/caller.ts'
 import type { Input } from '../../input/input.ts'
 import type { Output } from '../../output/output.ts'
+import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import type { Command } from '../line/command.ts'
 
@@ -11,17 +12,23 @@ const OWNER = 'owner'
 export class FlagCommand implements Command {
   readonly name = 'flag'
   readonly usage = 'flag <place>...'
-  readonly summary = 'Flag something you found, for later: where it is, and the five fields read on the standard input.'
+  readonly summary = 'Flag something you found, for later'
+  readonly help = {
+    group: 'Cards',
+    description: 'Flag something you found, for later: where it is, and the five fields read on the standard input.',
+    words: [['<place>...', 'Where it is: a file, or a file and a line as src/auth/token.ts:42']],
+    examples: ['weaver flag src/auth/token.ts:42 < flag.md'],
+  } as const
   // An agent flags too, and is answered in its own words below.
   readonly ownerOnly = false
   private readonly cwd: string
-  private readonly output: Output
+  private readonly screen: Screen
   private readonly input: Input
   private readonly caller: Caller
 
   constructor(cwd: string, output: Output, input: Input, caller: Caller) {
     this.cwd = cwd
-    this.output = output
+    this.screen = new Screen(output)
     this.input = input
     this.caller = caller
   }
@@ -31,7 +38,7 @@ export class FlagCommand implements Command {
 
     // The hook knows the session and the unit of work a flag comes from. This command would record it without them.
     if (agent !== null) {
-      this.output.say(
+      this.screen.error(
         `Nothing was recorded. The flag of an agent is recorded by Weaver's hook, which answers in place of this command: reading this means that the project is not wired for ${agent}. weaver doctor says what is missing.`,
       )
 
@@ -49,15 +56,14 @@ export class FlagCommand implements Command {
       )
 
       if (card !== null) {
-        this.output.say(`Flag #${String(card.number)} recorded.`)
+        this.screen.done(`Flag #${String(card.number)} recorded.`)
 
         return 0
       }
 
-      this.output.say('The flag was not recorded:')
-      for (const problem of problems) this.output.say(`  ${problem}`)
-      this.output.say('')
-      this.output.say(FlagText.FORMAT)
+      this.screen.error('The flag was not recorded:', ...problems)
+      this.screen.aside()
+      for (const line of FlagText.FORMAT.split('\n')) this.screen.aside(line)
 
       return 1
     } finally {

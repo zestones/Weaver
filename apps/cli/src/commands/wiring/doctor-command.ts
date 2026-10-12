@@ -3,7 +3,9 @@ import { DeclarationParts, RepositorySessions, type Declaration, type ReviewPoli
 import { RegistryError, type Card } from '@weaver/memory'
 import type { EngineLink } from '../../link/engine-link.ts'
 import { OwnRelease } from '../../link/own-release.ts'
+import { Counted } from '../../output/counted.ts'
 import type { Output } from '../../output/output.ts'
+import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
 import { RuntimeSettings } from '../../runtimes/runtime-settings.ts'
@@ -14,7 +16,6 @@ interface Finding {
   readonly text: string
 }
 
-const MARKS = { ok: 'ok     ', problem: 'PROBLEM', note: '-      ' }
 const REVIEWERS: readonly ReviewerName[] = ['claude', 'codex']
 const WHO: Readonly<Record<string, string>> = {
   same: 'the runtime that wrote the change',
@@ -24,16 +25,22 @@ const WHO: Readonly<Record<string, string>> = {
 export class DoctorCommand implements Command {
   readonly name = 'doctor'
   readonly usage = 'doctor'
-  readonly summary = 'Check that Weaver is alive in this project: its configuration, its hook, and each agent runtime.'
+  readonly summary = 'Check that Weaver is alive in this project'
   readonly ownerOnly = false
+  readonly help = {
+    group: 'Set up',
+    description: 'Check that Weaver is alive in this project: its configuration, its hook, and each agent runtime.',
+    words: [],
+    examples: ['weaver doctor'],
+  } as const
   private readonly cwd: string
-  private readonly output: Output
+  private readonly screen: Screen
   private readonly link: EngineLink
   private readonly executions: ExecutionCatalog
 
   constructor(cwd: string, output: Output, link: EngineLink, executions: ExecutionCatalog) {
     this.cwd = cwd
-    this.output = output
+    this.screen = new Screen(output)
     this.link = link
     this.executions = executions
   }
@@ -42,22 +49,41 @@ export class DoctorCommand implements Command {
     const project = Project.locate(this.cwd)
     const runtimes = new RuntimeCatalog().settings(project.top, this.link, [])
     const held = await Promise.all(runtimes.map((runtime) => this.held(runtime, project.top)))
-    const findings = [
-      this.configuration(project),
-      ...this.warnings(project),
-      ...this.finishSkill(project),
-      ...this.review(project),
-      ...this.writer(project),
-      ...this.cards(project),
-      ...this.maintenance(project),
-      this.hook(),
-      ...runtimes.flatMap((runtime, index) => [this.runtime(runtime), ...(held[index] ?? [])]),
-      this.anyRuntime(runtimes),
+    const wired = runtimes.flatMap((runtime, index) => [this.runtime(runtime), ...(held[index] ?? [])])
+    const sections: readonly (readonly [string, readonly Finding[]])[] = [
+      ['Project', [this.configuration(project), ...this.warnings(project), ...this.finishSkill(project)]],
+      ['Review', this.review(project)],
+      ['Cards', [...this.writer(project), ...this.cards(project)]],
+      ['Sessions', this.maintenance(project)],
+      ['Runtimes', [this.hook(), ...wired, this.anyRuntime(runtimes)]],
     ]
+    const problems = sections.flatMap(([, findings]) => findings).filter((finding) => finding.state === 'problem').length
 
-    for (const finding of findings) this.output.say(`${MARKS[finding.state]} ${finding.text}`)
+    for (const [title, findings] of sections) this.section(title, findings)
 
-    return findings.some((finding) => finding.state === 'problem') ? 1 : 0
+    this.screen.line()
+    if (problems === 0) this.screen.done('Weaver is alive in this project.')
+    else this.screen.problem(`${new Counted(problems, 'problem').text} to settle.`)
+
+    return problems === 0 ? 0 : 1
+  }
+
+  // What was raised elsewhere is said as a sentence here, as the other findings are.
+  private sentence(message: string): string {
+    return `${message.charAt(0).toUpperCase()}${message.slice(1)}`
+  }
+
+  // Nothing is said of a part of Weaver the project does not use.
+  private section(title: string, findings: readonly Finding[]): void {
+    if (findings.length === 0) return
+
+    this.screen.heading(title)
+
+    for (const { state, text } of findings) {
+      if (state === 'ok') this.screen.done(text, 1)
+      else if (state === 'problem') this.screen.problem(text, 1)
+      else this.screen.note(text, 1)
+    }
   }
 
   private configuration(project: Project): Finding {
@@ -69,7 +95,7 @@ export class DoctorCommand implements Command {
 
         return {
           state: 'problem',
-          text: `${project.configName}/ is ${String(behind.length)} migration(s) behind this Weaver (${labels}): nothing is checked until weaver update brings it up to date.`,
+          text: `${project.configName}/ is ${new Counted(behind.length, 'migration').text} behind this Weaver (${labels}): nothing is checked until weaver update brings it up to date.`,
         }
       }
 
@@ -78,7 +104,7 @@ export class DoctorCommand implements Command {
       if (declaration === null) {
         return {
           state: 'problem',
-          text: `no ${project.configName}/settings.json: Weaver does nothing in this project. Run weaver install.`,
+          text: `No ${project.configName}/settings.json: Weaver does nothing in this project. Run weaver install.`,
         }
       }
 
@@ -86,10 +112,10 @@ export class DoctorCommand implements Command {
 
       return {
         state: 'ok',
-        text: `${project.configName}: ${String(rules.length)} rule(s), ${String(checks.length)} check(s), ${String(guards.length)} guard(s)`,
+        text: `${project.configName}: ${new Counted(rules.length, 'rule').text}, ${new Counted(checks.length, 'check').text}, ${new Counted(guards.length, 'guard').text}`,
       }
     } catch (error) {
-      return { state: 'problem', text: error instanceof Error ? error.message : String(error) }
+      return { state: 'problem', text: this.sentence(error instanceof Error ? error.message : String(error)) }
     }
   }
 
@@ -104,11 +130,16 @@ export class DoctorCommand implements Command {
     const given = RuntimeSettings.AFTER_CALL_SECONDS
 
     return time < given
-      ? [{ state: 'ok', text: `${String(warning)} check(s) warn right after a call, in ${String(time)} s at most` }]
+      ? [
+          {
+            state: 'ok',
+            text: `${new Counted(warning, 'check warns', 'checks warn').text} right after a call, in ${String(time)} s at most`,
+          },
+        ]
       : [
           {
             state: 'problem',
-            text: `the warnings after a call (${String(time)} s) may last longer than the ${String(given)} s the end of a call is given: lower checks.warnTimeoutSeconds in ${DeclarationParts.FILES.settings}.`,
+            text: `The warnings after a call (${String(time)} s) may last longer than the ${String(given)} s the end of a call is given: lower checks.warnTimeoutSeconds in ${DeclarationParts.FILES.settings}.`,
           },
         ]
   }
@@ -124,7 +155,7 @@ export class DoctorCommand implements Command {
     const missing = skill.missingHeadings()
 
     return missing.length === 0
-      ? [{ state: 'ok', text: `the finish skill: ${skill.path}` }]
+      ? [{ state: 'ok', text: `The finish skill: ${skill.path}` }]
       : [
           {
             state: 'problem',
@@ -149,8 +180,8 @@ export class DoctorCommand implements Command {
     const routed = policy.runtime in WHO || policy.criticalPaths.length > 0 || policy.criticalLines !== null
     const review: Finding =
       judged === 0
-        ? { state: 'note', text: `the review is by ${who}, and it has no rule: it has nothing to judge` }
-        : { state: 'ok', text: `the review: by ${who}, for ${String(judged)} rule(s)${where}` }
+        ? { state: 'note', text: `The review is by ${who}, and it has no rule: it has nothing to judge` }
+        : { state: 'ok', text: `The review: by ${who}, for ${new Counted(judged, 'rule').text}${where}` }
 
     return [review, ...REVIEWERS.flatMap((name) => this.reviewer(name, policy, routed || policy.runtime === name))]
   }
@@ -159,11 +190,11 @@ export class DoctorCommand implements Command {
     const { model } = policy.reviewers[name]
     const named = model === null ? name : `${name} on ${model}`
 
-    if (this.executions.find(name)?.isAvailable() === true) return expected ? [{ state: 'ok', text: `the reviewer ${named} starts` }] : []
+    if (this.executions.find(name)?.isAvailable() === true) return expected ? [{ state: 'ok', text: `The reviewer ${named} starts` }] : []
 
     return expected
       ? [{ state: 'problem', text: `${named} may review here, and the ${name} command does not start: its reviews fail.` }]
-      : [{ state: 'note', text: `the ${name} command does not start: a request marked #critical has no reviewer` }]
+      : [{ state: 'note', text: `The ${name} command does not start: a request marked #critical has no reviewer` }]
   }
 
   private reviewSkill(project: Project): Finding[] {
@@ -172,7 +203,7 @@ export class DoctorCommand implements Command {
     if (skill === null) return []
 
     return skill.exists
-      ? [{ state: 'ok', text: `the review skill: ${skill.path}` }]
+      ? [{ state: 'ok', text: `The review skill: ${skill.path}` }]
       : [{ state: 'problem', text: `${skill.path} is missing, and the reviewer is pointed to it. Run weaver install to write a template.` }]
   }
 
@@ -189,7 +220,7 @@ export class DoctorCommand implements Command {
       : [
           {
             state: 'problem',
-            text: `the checks (${String(checks)} s) and the wait for a review (${String(wait)} s) may last longer than the ${String(given)} s the end of a turn is given: lower checks.totalTimeoutSeconds in ${files.settings} or waitSeconds in ${files.reviewers}.`,
+            text: `The checks (${String(checks)} s) and the wait for a review (${String(wait)} s) may last longer than the ${String(given)} s the end of a turn is given: lower checks.totalTimeoutSeconds in ${files.settings} or waitSeconds in ${files.reviewers}.`,
           },
         ]
   }
@@ -203,7 +234,7 @@ export class DoctorCommand implements Command {
     const named = writer.model === null ? writer.runtime : `${writer.runtime} on ${writer.model}`
     const starts: Finding =
       this.executions.find(writer.runtime)?.isAvailable() === true
-        ? { state: 'ok', text: `the writer ${named} starts` }
+        ? { state: 'ok', text: `The writer ${named} starts` }
         : { state: 'problem', text: `${named} writes the cards here, and the ${writer.runtime} command does not start: flags stay raw.` }
 
     if (skill === null) return [starts]
@@ -211,7 +242,7 @@ export class DoctorCommand implements Command {
     return [
       starts,
       skill.exists
-        ? { state: 'ok', text: `the card skill: ${skill.path}` }
+        ? { state: 'ok', text: `The card skill: ${skill.path}` }
         : { state: 'problem', text: `${skill.path} is missing, and the writer is pointed to it. Run weaver install to write a template.` },
     ]
   }
@@ -226,11 +257,11 @@ export class DoctorCommand implements Command {
       const raw = waiting.filter((card) => card.state === 'raw').length
 
       return [
-        { state: 'ok', text: `the registry: ${String(waiting.length)} card(s) wait for you` },
+        { state: 'ok', text: `The registry: ${new Counted(waiting.length, 'card waits', 'cards wait').text} for you` },
         ...(raw > 0 && this.lacksWriter(project) ? [this.unwritten(raw, project)] : []),
       ]
     } catch (error) {
-      if (error instanceof RegistryError) return [{ state: 'problem', text: error.message }]
+      if (error instanceof RegistryError) return [{ state: 'problem', text: this.sentence(error.message) }]
 
       throw error
     }
@@ -249,7 +280,7 @@ export class DoctorCommand implements Command {
   private unwritten(flags: number, project: Project): Finding {
     return {
       state: 'note',
-      text: `${String(flags)} flag(s) wait and no writer is declared: they stay raw. ${project.configName}/${DeclarationParts.FILES.writer} says who writes the cards.`,
+      text: `${new Counted(flags, 'flag waits', 'flags wait').text} and no writer is declared: a flag stays raw without one. ${project.configName}/${DeclarationParts.FILES.writer} says who writes the cards.`,
     }
   }
 
@@ -266,14 +297,14 @@ export class DoctorCommand implements Command {
   private maintenance(project: Project): Finding[] {
     return new RepositorySessions(project.repository).underMaintenance().map((session) => ({
       state: 'note',
-      text: `the session ${session.shortId} (${session.agent}) is in maintenance: the guards of the project let its calls through. weaver maintenance off ${session.shortId} puts them back.`,
+      text: `The session ${session.shortId} (${session.agent}) is in maintenance: the guards of the project let its calls through. weaver maintenance off ${session.shortId} puts them back.`,
     }))
   }
 
   private hook(): Finding {
     return this.link.isAlive()
-      ? { state: 'ok', text: `the hook starts: ${this.link.hook}` }
-      : { state: 'problem', text: `the hook does not start: ${this.link.hook}. Build Weaver with pnpm build.` }
+      ? { state: 'ok', text: `The hook starts: ${this.link.hook}` }
+      : { state: 'problem', text: `The hook does not start: ${this.link.hook}. Build Weaver with pnpm build.` }
   }
 
   private runtime(runtime: RuntimeSettings): Finding {
@@ -342,7 +373,7 @@ export class DoctorCommand implements Command {
   // With no runtime wired, no agent calls Weaver: nothing is refused and nothing is checked, without a word.
   private anyRuntime(runtimes: readonly RuntimeSettings[]): Finding {
     return runtimes.some((runtime) => runtime.wiring() !== 'absent')
-      ? { state: 'note', text: 'an agent started outside these runtimes is not supervised' }
-      : { state: 'problem', text: 'no agent runtime is wired: agents work here unsupervised. Run weaver install.' }
+      ? { state: 'note', text: 'An agent started outside these runtimes is not supervised' }
+      : { state: 'problem', text: 'No agent runtime is wired: agents work here unsupervised. Run weaver install.' }
   }
 }

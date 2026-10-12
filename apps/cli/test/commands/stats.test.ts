@@ -11,7 +11,7 @@ import { makeProject, SETTINGS, weaver, writeConfig, writeJson } from '../fixtur
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-stats-'))
 const top = makeProject(join(scratch, 'project'))
 const SESSION = '3f2a91c0-5b7e-4c1d-9a44-0d6f2e8b1c73'
-const USAGE = 'weaver stats [--since <day>|<n>d] [--json]'
+const USAGE = 'Usage: weaver stats [--since <day>|<n>d] [--json]'
 // Every run of the hook is said to have taken this long.
 const HOOK_MS = 120
 let calls = 0

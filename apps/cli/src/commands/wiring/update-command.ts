@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { DeclarationFolder, Repository } from '@weaver/engine'
 import type { EngineLink } from '../../link/engine-link.ts'
 import type { Output } from '../../output/output.ts'
+import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import type { ReleaseChannel } from '../../releases/release-channel.ts'
 import type { PublishedRelease } from '../../releases/release-source.ts'
@@ -21,16 +22,25 @@ const INSTALLER = 'install.sh'
 export class UpdateCommand implements Command {
   readonly name = 'update'
   readonly usage = `update [${DRY_RUN}] [${OFFLINE}]`
-  readonly summary = 'Bring Weaver and this project up to date: the latest release, the migrations of the configuration, the hooks.'
+  readonly summary = 'Bring Weaver and this project up to date'
   readonly ownerOnly = true
+  readonly help = {
+    group: 'Set up',
+    description: 'Bring Weaver and this project up to date: the latest release, the migrations of the configuration, the hooks.',
+    words: [
+      [DRY_RUN, 'Show what would change, and write nothing'],
+      [OFFLINE, 'Look for no release: bring this project to the Weaver that is installed'],
+    ],
+    examples: ['weaver update', `weaver update ${DRY_RUN}`],
+  } as const
   private readonly cwd: string
-  private readonly output: Output
+  private readonly screen: Screen
   private readonly link: EngineLink
   private readonly channel: ReleaseChannel
 
   constructor(cwd: string, output: Output, link: EngineLink, channel: ReleaseChannel) {
     this.cwd = cwd
-    this.output = output
+    this.screen = new Screen(output)
     this.link = link
     this.channel = channel
   }
@@ -39,9 +49,7 @@ export class UpdateCommand implements Command {
     const unknown = args.find((arg) => arg !== DRY_RUN && arg !== OFFLINE)
 
     if (unknown !== undefined) {
-      this.output.say(
-        `weaver update does not know ${unknown}: it takes ${DRY_RUN}, which writes nothing, and ${OFFLINE}, which looks for no release.`,
-      )
+      this.screen.misuse(this.name, this.usage, `weaver update does not know ${unknown}.`)
 
       return 2
     }
@@ -59,7 +67,7 @@ export class UpdateCommand implements Command {
     const { own, source } = this.channel
 
     if (own.isCheckout) {
-      this.output.say('Weaver runs from a checkout, which git updates: no release is looked for.')
+      this.screen.note('Weaver runs from a checkout, which git updates: no release is looked for.')
 
       return null
     }
@@ -69,9 +77,9 @@ export class UpdateCommand implements Command {
 
       if (own.isOlderThan(latest.tag)) return latest
 
-      this.output.say(`Weaver ${own.tag} is the latest release.`)
+      this.screen.done(`Weaver ${own.tag} is the latest release.`)
     } catch (error) {
-      this.output.say(`No release was looked for: ${error instanceof Error ? error.message : String(error)}. Weaver stays at ${own.tag}.`)
+      this.screen.alert(`No release was looked for: ${error instanceof Error ? error.message : String(error)}. Weaver stays at ${own.tag}.`)
     }
 
     return null
@@ -80,8 +88,8 @@ export class UpdateCommand implements Command {
   private announce(later: PublishedRelease): number {
     const { own } = this.channel
 
-    this.output.say(`Weaver ${later.tag} is published, and this is ${own.tag}: it would be installed.`)
-    this.output.say('What it changes in this project is its own to say: once it is installed, weaver update --dry-run shows it.')
+    this.screen.note(`Weaver ${later.tag} is published, and this is ${own.tag}: it would be installed.`)
+    this.screen.hint('What it changes in this project is its own to say: once it is installed, weaver update --dry-run shows it.', 1)
 
     return 0
   }
@@ -98,7 +106,7 @@ export class UpdateCommand implements Command {
 
       const installed = installer.install(folder, archive)
 
-      for (const line of installed.said) this.output.say(line)
+      for (const line of installed.said) this.screen.line(line)
       if (installed.status !== 0) return installed.status
     } finally {
       rmSync(folder, { recursive: true, force: true })
@@ -106,7 +114,7 @@ export class UpdateCommand implements Command {
 
     const finished = installer.start(installer.commandOf(later.tag), ['update', OFFLINE], this.cwd)
 
-    for (const line of finished.said) this.output.say(line)
+    for (const line of finished.said) this.screen.line(line)
 
     return finished.status
   }
@@ -116,7 +124,7 @@ export class UpdateCommand implements Command {
     const { own } = this.channel
 
     if (repository === null || !existsSync(DeclarationFolder.in(repository.top).settings)) {
-      this.output.say('No supervised project here: weaver install puts Weaver on a project.')
+      this.screen.note('No supervised project here: weaver install puts Weaver on a project.')
 
       return 0
     }
@@ -124,37 +132,51 @@ export class UpdateCommand implements Command {
     const project = new Project(repository)
 
     if (project.migrations().isAhead) {
-      this.output.say(`${project.configName}/ is in a later format than Weaver ${own.tag} reads, and no later release was installed.`)
+      this.screen.error(`${project.configName}/ is in a later format than Weaver ${own.tag} reads, and no later release was installed.`)
 
       return 1
     }
 
-    const done = [...this.configuration(project, dryRun), ...this.hooks(project, dryRun)]
+    const changed = [this.configuration(project, dryRun), this.hooks(project, dryRun)].includes(true)
 
-    for (const line of done) this.output.say(line)
-    if (done.length === 0) this.output.say(`This project is up to date with Weaver ${own.tag}.`)
-    if (dryRun && done.length > 0) this.output.say('Dry run: nothing was written.')
+    if (!changed) this.screen.done(`This project is up to date with Weaver ${own.tag}.`)
+    if (dryRun && changed) this.screen.hint('Dry run: nothing was written.')
 
     return 0
   }
 
-  private configuration(project: Project, dryRun: boolean): string[] {
-    const changes = project.bringUpToDate(this.link, !dryRun)
-    const head = `${project.configName}/ ${dryRun ? 'would be brought' : 'brought'} up to date:`
+  // What is done is marked as done, and what a dry run would do as only told. True when there was something to do.
+  private told(text: string, dryRun: boolean): void {
+    if (dryRun) this.screen.note(text)
+    else this.screen.done(text)
+  }
 
-    return changes.length === 0 ? [] : [head, ...changes.map((change) => `  ${change}`)]
+  private configuration(project: Project, dryRun: boolean): boolean {
+    const changes = project.bringUpToDate(this.link, !dryRun)
+
+    if (changes.length === 0) return false
+
+    this.told(`${project.configName}/ ${dryRun ? 'would be brought' : 'brought'} up to date:`, dryRun)
+    for (const change of changes) this.screen.line(`  ${change}`)
+
+    return true
   }
 
   // The runtimes that were wired stay wired, to this release: an update plugs nothing in that was not.
-  private hooks(project: Project, dryRun: boolean): string[] {
+  private hooks(project: Project, dryRun: boolean): boolean {
     const stale = new RuntimeCatalog().settings(project.top, this.link, []).filter((runtime) => runtime.wiring() === 'stale')
 
-    return stale.map((runtime) => {
+    for (const runtime of stale) {
       const from = runtime.wiredTag()
 
       if (!dryRun) runtime.install()
 
-      return `${runtime.label}: hooks ${dryRun ? 'would be written' : 'written'} again in ${runtime.file}${from === null ? '' : `, which were those of Weaver ${from}`}`
-    })
+      this.told(
+        `${runtime.label}: hooks ${dryRun ? 'would be written' : 'written'} again in ${runtime.file}${from === null ? '' : `, which were those of Weaver ${from}`}`,
+        dryRun,
+      )
+    }
+
+    return stale.length > 0
   }
 }

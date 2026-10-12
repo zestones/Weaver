@@ -25,7 +25,7 @@ beforeEach(() => {
 test('the owner flags from a terminal: the places and the five fields are recorded as theirs, with the lines as they were', async () => {
   assert.deepEqual(await weaver(top, ['flag', 'src/auth/token.ts:2', 'src/auth'], { input: FLAG_BODY }), {
     status: 0,
-    lines: ['Flag #1 recorded.'],
+    lines: ['✓ Flag #1 recorded.'],
   })
 
   const { origin, state, places, provenance, flag } = cardOf(top, 1).record
@@ -40,12 +40,15 @@ test('the owner flags from a terminal: the places and the five fields are record
   assert.equal(flag?.text, FLAG_BODY)
   assert.deepEqual([flag?.fields.seen, flag?.fields.did], ['no call of refresh() exists under src/.', 'left'])
   assert.equal(flag?.context[0]?.lineText, '  return cached')
-  assert.deepEqual((await weaver(top, ['cards'])).lines[1], '  #1 raw  src/auth/token.ts:2 +1  no call of refresh() exists under src/.')
+  assert.deepEqual((await weaver(top, ['cards'])).lines.slice(2, 4), [
+    '  #1  raw  no call of refresh() exists under src/.',
+    '           src/auth/token.ts:2 +1',
+  ])
 })
 
 test('a place is named from where the owner stands, and a flag may have none', async () => {
-  assert.deepEqual((await weaver(join(top, 'src/auth'), ['flag', 'token.ts:1'], { input: FLAG_BODY })).lines, ['Flag #1 recorded.'])
-  assert.deepEqual((await weaver(top, ['flag'], { input: FLAG_BODY })).lines, ['Flag #2 recorded.'])
+  assert.deepEqual((await weaver(join(top, 'src/auth'), ['flag', 'token.ts:1'], { input: FLAG_BODY })).lines, ['✓ Flag #1 recorded.'])
+  assert.deepEqual((await weaver(top, ['flag'], { input: FLAG_BODY })).lines, ['✓ Flag #2 recorded.'])
   assert.deepEqual(cardOf(top, 1).places, [{ file: 'src/auth/token.ts', line: 1 }])
   assert.deepEqual(cardOf(top, 2).places, [])
 })
@@ -59,10 +62,11 @@ test('a flag that cannot be used is not recorded: the owner reads what is missin
   assert.match(problems[0] ?? '', /^`Expected:` is missing: /)
   assert.deepEqual(await weaver(top, ['flag', 'src/auth/token.ts:2'], { input: body }), {
     status: 1,
-    lines: ['The flag was not recorded:', ...problems.map((problem) => `  ${problem}`), '', FlagText.FORMAT],
+    lines: ['X The flag was not recorded:', ...problems.map((problem) => `  ${problem}`), '', ...FlagText.FORMAT.split('\n')],
   })
   assert.equal(empty.status, 1)
-  assert.deepEqual([empty.lines.length, empty.lines[0], empty.lines.at(-1)], [4, 'The flag was not recorded:', FlagText.FORMAT])
+  assert.deepEqual([empty.lines[0], empty.lines.at(-1)], ['X The flag was not recorded:', FlagText.FORMAT.split('\n').at(-1)])
+  assert.equal(empty.lines.slice(-FlagText.FORMAT.split('\n').length).join('\n'), FlagText.FORMAT, 'the form is given as it is typed')
   assert.match(empty.lines[1] ?? '', /^ {2}\S/)
   assert.deepEqual((await weaver(top, ['cards'])).lines, ['Nothing waits for you.'])
 })
@@ -71,7 +75,7 @@ test('run under an agent, flag records nothing: the hook answers an agent, so re
   assert.deepEqual(await weaver(top, ['flag', 'src/auth/token.ts:2'], { input: FLAG_BODY, under: 'codex' }), {
     status: 1,
     lines: [
-      "Nothing was recorded. The flag of an agent is recorded by Weaver's hook, which answers in place of this command: reading this means that the project is not wired for codex. weaver doctor says what is missing.",
+      "X Nothing was recorded. The flag of an agent is recorded by Weaver's hook, which answers in place of this command: reading this means that the project is not wired for codex. weaver doctor says what is missing.",
     ],
   })
   assert.equal(existsSync(join(top, '.git/weaver')), false)

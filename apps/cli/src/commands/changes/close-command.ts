@@ -10,7 +10,17 @@ const LABELS = '{labels}'
 export class CloseCommand extends CardChange {
   override readonly name = 'close'
   override readonly usage = `close <number> ${CLOSINGS.join('|')} [reason]`
-  override readonly summary = 'Close a card: it was fixed, it will not be, or it is now an issue of its own.'
+  override readonly summary = 'Close a card'
+  override readonly help = {
+    group: 'Cards',
+    description: 'Close a card: it was fixed, it will not be, or it is now an issue of its own.',
+    words: [
+      ['<number>', 'The number of the card, as weaver cards shows it'],
+      ['fixed|wontfix|issue', 'Why it closes: it was fixed, it will not be, or it becomes an issue of its own'],
+      ['[reason]', 'A few words kept with the card'],
+    ],
+    examples: ['weaver close 12 fixed', 'weaver close 12 wontfix "the old behaviour is wanted"'],
+  } as const
 
   protected override change([number = 0]: readonly number[], [as, ...words]: readonly string[], project: Project): RegistryChange | null {
     const closing = CLOSINGS.find((known) => known === as)

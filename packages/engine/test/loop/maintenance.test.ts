@@ -92,7 +92,7 @@ test('in maintenance, what the guards of the project refuse goes through and wai
   const { systemMessage = '', decision } = await finishWith(session, stubChecks([PASSING]), project)
 
   assert.equal(decision, undefined)
-  assert.match(systemMessage, /^\[weaver\] 1 check\(s\) passed on 1 changed file\(s\)\. 3 item\(s\) to validate\. Report: \S+ /)
+  assert.match(systemMessage, /^\[weaver\] 1 check passed on 1 changed file\. 3 items to validate\. Report: \S+ /)
   assert.equal(systemMessage.endsWith(REMINDER), true, systemMessage)
   assert.match(
     reportOf(systemMessage),
@@ -126,7 +126,7 @@ test('what went through with no file changed still reaches the owner: the task e
 
   const { systemMessage = '' } = await finishWith(session, stubChecks([PASSING]), project)
 
-  assert.match(systemMessage, /^\[weaver\] No file changed in this turn\. 1 item\(s\) to validate\. Report: \S+ /)
+  assert.match(systemMessage, /^\[weaver\] No file changed in this turn\. 1 item to validate\. Report: \S+ /)
   assert.equal(systemMessage.endsWith(REMINDER), true)
   assert.match(reportOf(systemMessage), /- weaver:maintenance tools: Running `git commit` went through in maintenance/)
   assert.deepEqual(
@@ -156,7 +156,7 @@ test('the owner is reminded when a task ends, whatever ends it, and never while 
 
   assert.equal(refusal.decision, 'block')
   assert.doesNotMatch(`${refusal.reason ?? ''}${refusal.systemMessage ?? ''}`, /still in maintenance/, 'the agent goes back to work')
-  assert.match(given.systemMessage ?? '', /^\[weaver\] The checks still fail after 1 refusal\(s\); the agent may stop\. Report: \S+ /)
+  assert.match(given.systemMessage ?? '', /^\[weaver\] The checks still fail after 1 refusal; the agent may stop\. Report: \S+ /)
   assert.equal(given.systemMessage?.endsWith(REMINDER), true)
 })
 
@@ -181,6 +181,6 @@ test('the agent is told of maintenance with each request while it is on, and the
 
   const { systemMessage = '' } = await finishWith(session, stubChecks([PASSING]), project)
 
-  assert.match(systemMessage, /1 item\(s\) to validate\./, 'what went through while it was on is still listed')
+  assert.match(systemMessage, /1 item to validate\./, 'what went through while it was on is still listed')
   assert.doesNotMatch(systemMessage, /still in maintenance/)
 })

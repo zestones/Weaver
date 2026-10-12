@@ -8,10 +8,13 @@ import { CommandLine } from '../../src/commands/line/command-line.ts'
 import type { Input } from '../../src/input/input.ts'
 import type { EngineLink } from '../../src/link/engine-link.ts'
 import type { Output } from '../../src/output/output.ts'
+import { Paint } from '../../src/output/paint.ts'
+import { Screen } from '../../src/output/screen.ts'
 import type { ReleaseChannel } from '../../src/releases/release-channel.ts'
 
 interface Run {
   readonly status: number
+  // What the command printed, in the order it came, the error stream included.
   readonly lines: readonly string[]
 }
 
@@ -27,11 +30,21 @@ interface Around {
   readonly channel?: ReleaseChannel
 }
 
+// What a command printed, in the order it came: what it said, and what it sent to the error stream. Nothing is
+// coloured, as when a program reads it.
 class RecordingOutput implements Output {
+  readonly paint = new Paint(false)
+  readonly failPaint = new Paint(false)
   readonly lines: string[] = []
+  readonly errors: string[] = []
 
   say(line: string): void {
+    this.lines.push(...line.split('\n'))
+  }
+
+  fail(line: string): void {
     this.lines.push(line)
+    this.errors.push(line)
   }
 }
 
@@ -68,6 +81,24 @@ export function makeProject(top: string): string {
 
 // On the machine of these tests, Codex starts and Claude Code does not.
 const EXECUTIONS = new ExecutionCatalog([new ScriptedExecution('codex', []), new ClaudeCodeExecution('/nowhere/claude')])
+
+// What a page draws on a screen nobody colours.
+export function drawn(page: (screen: Screen) => void): string[] {
+  const output = new RecordingOutput()
+
+  page(new Screen(output))
+
+  return output.lines
+}
+
+// What a command sent to its error stream, apart from what it answered.
+export async function failuresOf(cwd: string, args: readonly string[]): Promise<readonly string[]> {
+  const output = new RecordingOutput()
+
+  await new CommandLine(cwd, output, null, EXECUTIONS, new GivenCaller(null), new GivenInput('')).run(args)
+
+  return output.errors
+}
 
 // These tests may themselves run under an agent: who runs a command is always given, never read from the processes.
 export async function weaver(cwd: string, args: readonly string[], around: Around = {}): Promise<Run> {

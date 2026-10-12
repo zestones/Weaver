@@ -150,7 +150,7 @@ test('a unit is refused until its own diff passes the declared gates, then settl
   const passed = stop()
 
   assert.equal(passed.decision, undefined)
-  assert.match(passed.systemMessage ?? '', /2 check\(s\) passed on 1 changed file\(s\)\./)
+  assert.match(passed.systemMessage ?? '', /2 checks passed on 1 changed file\./)
   assert.deepEqual(kinds(), ['touch', 'check', 'touch', 'check', 'touch', 'check', 'settle'])
 })
 
@@ -160,7 +160,7 @@ test('the FIXME that was there before the unit is not the unit’s: only the lin
     writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n// FIXME an old one, not this unit’s\n' })
   })
 
-  assert.match(stop().systemMessage ?? '', /2 check\(s\) passed/)
+  assert.match(stop().systemMessage ?? '', /2 checks passed/)
 })
 
 test('a finding under a human rule waits for the owner and does not hold the agent', () => {
@@ -171,7 +171,7 @@ test('a finding under a human rule waits for the owner and does not hold the age
   const report = readFileSync(/Report: (\S+)/.exec(answer.systemMessage ?? '')?.[1] ?? '', 'utf8')
 
   assert.equal(answer.decision, undefined)
-  assert.match(answer.systemMessage ?? '', /1 item\(s\) to validate\./)
+  assert.match(answer.systemMessage ?? '', /1 item to validate\./)
   assert.match(report, /- M2 src\/c\.js:1: lint suppression added/)
 })
 
@@ -213,7 +213,7 @@ test('a command that exits with an error is still charged with what it wrote bef
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n// FIXME an old one, not this unit’s\n', 'notes.md': 'the owner’s\n' })
   hook('PostToolUseFailure', call)
 
-  assert.match(stop().systemMessage ?? '', /passed on 1 changed file\(s\)\. Changed during its commands, not charged: notes\.md\./)
+  assert.match(stop().systemMessage ?? '', /passed on 1 changed file\. Changed during its commands, not charged: notes\.md\./)
 })
 
 test('a check may repair before it judges: what it rewrites stays the unit’s work, and the agent is told to read it again', () => {
@@ -256,7 +256,7 @@ process.exitCode = judging && untidy ? 1 : 0
 
   write('src/t.js', 'export const t = 1\nexport const u = 2\n')
 
-  assert.match(stop().systemMessage ?? '', /2 check\(s\) passed on 1 changed file\(s\)\. Report/)
+  assert.match(stop().systemMessage ?? '', /2 checks passed on 1 changed file\. Report/)
   assert.deepEqual(kinds(), ['touch', 'touch', 'check', 'touch', 'check', 'settle'])
   assert.deepEqual(stop(), {}, 'what the repair rewrote settled with the unit')
 })
@@ -289,16 +289,13 @@ process.stdin.on('end', () => {
   const refused = stop()
 
   assert.equal(refused.decision, 'block')
-  assert.match(refused.reason ?? '', /the reviewer \(codex\) found 1 point\(s\)[^]*\nF1 N1 src\/r\.js:1: name what the input is\n/)
+  assert.match(refused.reason ?? '', /the reviewer \(codex\) found 1 point[^]*\nF1 N1 src\/r\.js:1: name what the input is\n/)
 
   write('src/r.js', 'export const r = userInput\n')
 
   const settled = stop(`${FINISHED}\nF1 fixed: the constant now says whose input it holds\n`)
 
-  assert.match(
-    settled.systemMessage ?? '',
-    /1 check\(s\) passed on 1 changed file\(s\)\. Reviewed by codex: 1 finding\(s\), 1 answered fixed\./,
-  )
+  assert.match(settled.systemMessage ?? '', /1 check passed on 1 changed file\. Reviewed by codex: 1 finding, 1 answered fixed\./)
   assert.deepEqual(kinds(), ['touch', 'check', 'review', 'touch', 'check', 'answer', 'settle'])
 })
 
@@ -527,7 +524,7 @@ test('twelve tool calls whose hooks run at the same time all reach the unit', as
   for (const path of files) writeFiles(repo.top, { [path]: 'export {}\n' })
   await Promise.all(files.map((path) => hookAsync('PostToolUse', callOf(path))))
 
-  assert.match(stop().systemMessage ?? '', /2 check\(s\) passed on 12 changed file\(s\)\./)
+  assert.match(stop().systemMessage ?? '', /2 checks passed on 12 changed files\./)
 })
 
 test('a linked worktree has its own sessions and shares the journal with its repository', () => {

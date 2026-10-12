@@ -1,7 +1,9 @@
 import { realpathSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { PlaceText, type Card, type CardFilter, type CardState } from '@weaver/memory'
+import { Counted } from '../../output/counted.ts'
 import type { Output } from '../../output/output.ts'
+import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import type { Command } from '../line/command.ts'
 
@@ -16,14 +18,25 @@ const EVERY_STATE: readonly CardState[] = ['raw', 'open', 'closed', 'merged']
 export class CardsCommand implements Command {
   readonly name = 'cards'
   readonly usage = 'cards [<number>] [--all] [--file <path>] [--label <family:value>]'
-  readonly summary = 'List the cards that wait for you, newest first, or print one as Markdown.'
+  readonly summary = 'List the cards that wait for you, or print one'
   readonly ownerOnly = false
+  readonly help = {
+    group: 'Cards',
+    description: 'List the cards that wait for you, newest first, or print one as Markdown.',
+    words: [
+      ['[<number>]', 'Print this card as Markdown'],
+      ['--all', 'List the closed and the merged cards too'],
+      ['--file <path>', 'Only the cards about this file'],
+      ['--label <family:value>', 'Only the cards that carry this label'],
+    ],
+    examples: ['weaver cards', 'weaver cards 12', 'weaver cards --all --file src/auth/token.ts'],
+  } as const
   private readonly cwd: string
-  private readonly output: Output
+  private readonly screen: Screen
 
   constructor(cwd: string, output: Output) {
     this.cwd = cwd
-    this.output = output
+    this.screen = new Screen(output)
   }
 
   run(args: readonly string[]): number {
@@ -35,7 +48,7 @@ export class CardsCommand implements Command {
 
     if (asked !== null) return this.list(asked)
 
-    this.output.say(`weaver ${this.usage}`)
+    this.screen.misuse(this.name, this.usage)
 
     return 2
   }
@@ -64,7 +77,7 @@ export class CardsCommand implements Command {
 
       if (card === null) throw new Error(`no card has the number ${String(number)}`)
 
-      this.output.say(card.markdown())
+      this.screen.line(card.markdown())
 
       return 0
     } finally {
@@ -86,14 +99,27 @@ export class CardsCommand implements Command {
       const cards = (registry?.list(filter) ?? []).toReversed()
 
       if (cards.length === 0) {
-        this.output.say(Object.keys(filter).length === 0 ? 'Nothing waits for you.' : 'No card matches.')
+        this.screen.line(Object.keys(filter).length === 0 ? 'Nothing waits for you.' : 'No card matches.')
 
         return 0
       }
 
-      this.output.say(`${String(cards.length)} card(s)${all ? '' : ' wait for you'}:`)
-      for (const card of cards) this.output.say(`  ${this.line(card, project)}`)
-      this.output.say('Read one with weaver cards <number>, and close it with weaver close <number> fixed|wontfix|issue [reason].')
+      const rows = cards.map((card) => this.row(card, project))
+      const widths = [0, 1].map((column) => Math.max(...rows.map((row) => (row[column] ?? '').length)))
+      const waiting = new Counted(cards.length, 'card waits', 'cards wait').text
+
+      this.screen.line(this.screen.bold(all ? new Counted(cards.length, 'card').text : `${waiting} for you`))
+
+      for (const [number = '', standing = '', what = '', ...under] of rows) {
+        const start = `  ${number.padEnd(widths[0] ?? 0)}  ${standing.padEnd(widths[1] ?? 0)}  `
+
+        this.screen.line()
+        this.screen.line(`${start}${what}`)
+        for (const line of under) this.screen.line(`${' '.repeat(start.length)}${this.screen.dim(line)}`)
+      }
+
+      this.screen.line()
+      this.screen.hint('Read one with weaver cards <number>, and close it with weaver close <number> fixed|wontfix|issue [reason].')
 
       return 0
     } finally {
@@ -101,12 +127,15 @@ export class CardsCommand implements Command {
     }
   }
 
-  // A line that changed since is a hint to look again, never a closing: the thing may have moved, or be fixed.
-  private line(card: Card, project: Project): string {
+  // The number of a card, how it stands and what it is about, then what goes under it: where it is, and the places
+  // whose line changed since. A line that changed is a hint to look again, never a closing: the thing may have moved,
+  // or be fixed.
+  private row(card: Card, project: Project): string[] {
+    const [first, ...others] = card.places
+    const where = first === undefined ? [] : [`${PlaceText.write(first)}${others.length === 0 ? '' : ` +${String(others.length)}`}`]
     const changed = card.isWaiting ? card.changedPlaces((file) => project.read(file)) : []
+    const since = changed.length === 0 ? [] : [`changed since: ${changed.map((place) => PlaceText.write(place)).join(', ')}`]
 
-    return changed.length === 0
-      ? card.oneLine()
-      : `${card.oneLine()}  (changed since: ${changed.map((place) => PlaceText.write(place)).join(', ')})`
+    return [`#${String(card.number)}`, card.standing, card.title, ...where, ...since]
   }
 }

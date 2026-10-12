@@ -1,3 +1,4 @@
+import { counted } from '../lib/text/counted.ts'
 import { DeclarationFolder } from '../declaration/reading/declaration-folder.ts'
 import type { UnitDiff } from '../unit-of-work/diff/unit-diff.ts'
 import type { EventBody } from '../unit-of-work/journal/journal-event.ts'
@@ -76,7 +77,7 @@ export class UnitVerdict {
   private behind(outcome: CheckOutcome): string {
     const { concerned, rules, id } = outcome
 
-    return concerned.length > 0 ? `${concerned.join(' ')} the check ${id}` : `the check ${id}, behind ${String(rules.length)} rule(s),`
+    return concerned.length > 0 ? `${concerned.join(' ')} the check ${id}` : `the check ${id}, behind ${counted(rules.length, 'rule')},`
   }
 
   event(): EventBody {

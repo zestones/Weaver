@@ -44,10 +44,10 @@ const declareFiler = (...words: string[]): void => {
 const receivedWords = (): string[] => JSON.parse(readFileSync(received, 'utf8')) as string[]
 
 test('close takes a card off the list, as fixed or as wontfix, and keeps the reason', async () => {
-  assert.deepEqual(await weaver(top, ['close', '1', 'fixed']), { status: 0, lines: ['Card #1 closed as fixed.'] })
+  assert.deepEqual(await weaver(top, ['close', '1', 'fixed']), { status: 0, lines: ['✓ Card #1 closed as fixed.'] })
   assert.deepEqual(await weaver(top, ['close', '2', 'wontfix', 'compared', 'on', 'purpose']), {
     status: 0,
-    lines: ['Card #2 closed as wontfix.'],
+    lines: ['✓ Card #2 closed as wontfix.'],
   })
 
   const { state, closing } = cardOf(top, 2).record
@@ -61,21 +61,21 @@ test('close takes a card off the list, as fixed or as wontfix, and keeps the rea
 test('every error of the registry is shown as it says, and the card stays as it was', async () => {
   assert.deepEqual(await weaver(top, ['close', '1', 'wontfix']), {
     status: 1,
-    lines: ['weaver: closing card #1 as wontfix needs a reason'],
+    lines: ['X Closing card #1 as wontfix needs a reason'],
   })
   assert.equal(cardOf(top, 1).state, 'open')
-  assert.deepEqual(await weaver(top, ['close', '9', 'fixed']), { status: 1, lines: ['weaver: no card has the number 9'] })
+  assert.deepEqual(await weaver(top, ['close', '9', 'fixed']), { status: 1, lines: ['X No card has the number 9'] })
 
   await weaver(top, ['close', '1', 'fixed'])
   declareFiler('{title}')
 
-  assert.deepEqual(await weaver(top, ['close', '1', 'issue']), { status: 1, lines: ['weaver: card #1 is already closed as fixed'] })
+  assert.deepEqual(await weaver(top, ['close', '1', 'issue']), { status: 1, lines: ['X Card #1 is already closed as fixed'] })
   assert.equal(existsSync(received), false, 'a card that cannot be closed is not filed')
   assert.equal(cardOf(top, 1).record.closing?.as, 'fixed')
 })
 
 test('close says how it is written when a word is missing or unknown', async () => {
-  const usage = ['weaver close <number> fixed|wontfix|issue [reason]']
+  const usage = ['Usage: weaver close <number> fixed|wontfix|issue [reason]', 'Run weaver help close for what each word means.']
 
   assert.deepEqual(await weaver(top, ['close']), { status: 2, lines: usage })
   assert.deepEqual(await weaver(top, ['close', '1']), { status: 2, lines: usage })
@@ -88,7 +88,7 @@ test('closing as an issue runs the command of the project with the title, the ca
 
   assert.deepEqual(await weaver(top, ['close', '1', 'issue', 'for', 'the', 'next', 'release']), {
     status: 0,
-    lines: ['Card #1 closed as issue: https://issues.example/42'],
+    lines: ['✓ Card #1 closed as issue: https://issues.example/42'],
   })
 
   const [, title, , labels, body = ''] = receivedWords()
@@ -107,7 +107,7 @@ test('closing as an issue runs the command of the project with the title, the ca
 test('a card without labels is filed without the option that names them', async () => {
   declareFiler('--title', '{title}', '{labels}', '--label', '{labels}', '--labels={labels}', '{body}', '--quiet')
 
-  assert.deepEqual(await weaver(top, ['close', '2', 'issue']), { status: 0, lines: ['Card #2 closed as issue.'] })
+  assert.deepEqual(await weaver(top, ['close', '2', 'issue']), { status: 0, lines: ['✓ Card #2 closed as issue.'] })
 
   const [flag, title, body, quiet, ...others] = receivedWords()
 
@@ -121,23 +121,20 @@ test('when the command fails, the card stays open and the owner reads why', asyn
 
   assert.deepEqual(await weaver(top, ['close', '1', 'issue']), {
     status: 1,
-    lines: ['weaver: the issue was not filed, and card #1 stays open: no network'],
+    lines: ['X The issue was not filed, and card #1 stays open: no network'],
   })
   assert.deepEqual([cardOf(top, 1).state, cardOf(top, 1).record.closing], ['open', null])
 
   writeConfig(top, { settings: SETTINGS, issues: { command: ['/nowhere/file-issue', '{title}'] } })
 
-  assert.match(
-    (await weaver(top, ['close', '1', 'issue'])).lines[0] ?? '',
-    /^weaver: the issue was not filed, and card #1 stays open: .*ENOENT/,
-  )
+  assert.match((await weaver(top, ['close', '1', 'issue'])).lines[0] ?? '', /^X The issue was not filed, and card #1 stays open: .*ENOENT/)
   assert.equal(cardOf(top, 1).state, 'open')
 })
 
 test('without a declared command, closing as an issue only records it, and says so', async () => {
   assert.deepEqual(await weaver(top, ['close', '1', 'issue', 'filed', 'by', 'hand']), {
     status: 0,
-    lines: ['Card #1 closed as issue, which is only recorded: .weaver/project/issues.json names no command that files one.'],
+    lines: ['✓ Card #1 closed as issue, which is only recorded: .weaver/project/issues.json names no command that files one.'],
   })
   assert.deepEqual(
     [cardOf(top, 1).record.closing?.as, cardOf(top, 1).record.closing?.reason, cardOf(top, 1).record.closing?.issue],
@@ -151,6 +148,6 @@ test('a declaration that cannot be read files nothing and closes nothing', async
   const { status, lines } = await weaver(top, ['close', '1', 'issue'])
 
   assert.equal(status, 1)
-  assert.match(lines[0] ?? '', /^weaver: \.weaver is not a valid project declaration: settings\.json: chekcs is not a known field$/)
+  assert.match(lines[0] ?? '', /^X \.weaver is not a valid project declaration: settings\.json: chekcs is not a known field$/)
   assert.equal(cardOf(top, 1).state, 'open')
 })

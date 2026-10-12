@@ -44,7 +44,7 @@ export class Card {
     const [first, ...others] = this.places
     const place = first === undefined ? [] : [`${PlaceText.write(first)}${others.length === 0 ? '' : ` +${String(others.length)}`}`]
 
-    return [`#${String(this.number)} ${this.standing()}`, ...place, this.title].join('  ')
+    return [`#${String(this.number)} ${this.standing}`, ...place, this.title].join('  ')
   }
 
   markdown(): string {
@@ -67,7 +67,8 @@ export class Card {
     })
   }
 
-  private standing(): string {
+  // How it stands, in a word or two: its state, how it was closed, or the card it was merged into.
+  get standing(): string {
     const { state, closing, mergedInto, seenSinceClosing } = this.record
 
     if (state === 'merged') return `merged into #${String(mergedInto)}`

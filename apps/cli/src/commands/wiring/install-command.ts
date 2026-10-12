@@ -2,6 +2,7 @@ import { dirname } from 'node:path'
 import type { EngineLink } from '../../link/engine-link.ts'
 import { OwnRelease } from '../../link/own-release.ts'
 import type { Output } from '../../output/output.ts'
+import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
 import type { Command } from '../line/command.ts'
@@ -9,15 +10,21 @@ import type { Command } from '../line/command.ts'
 export class InstallCommand implements Command {
   readonly name = 'install'
   readonly usage = 'install [claude] [codex]'
-  readonly summary = 'Put Weaver on this project: the hooks of the agent runtimes, and a starter configuration if there is none.'
+  readonly summary = 'Put Weaver on this project'
   readonly ownerOnly = true
+  readonly help = {
+    group: 'Set up',
+    description: 'Put Weaver on this project: the hooks of the agent runtimes, and a starter configuration if there is none.',
+    words: [['[claude] [codex]', 'The agent runtimes to wire; both when none is named']],
+    examples: ['weaver install', 'weaver install claude'],
+  } as const
   private readonly cwd: string
-  private readonly output: Output
+  private readonly screen: Screen
   private readonly link: EngineLink
 
   constructor(cwd: string, output: Output, link: EngineLink) {
     this.cwd = cwd
-    this.output = output
+    this.screen = new Screen(output)
     this.link = link
   }
 
@@ -26,7 +33,7 @@ export class InstallCommand implements Command {
     const runtimes = new RuntimeCatalog().settings(project.top, this.link, args)
 
     if (!this.link.isAlive()) {
-      this.output.say(`The hook does not start (${this.link.hook}). Build Weaver first with pnpm build, then run this again.`)
+      this.screen.error(`The hook does not start (${this.link.hook}).`, 'Build Weaver first with pnpm build, then run this again.')
 
       return 1
     }
@@ -36,31 +43,35 @@ export class InstallCommand implements Command {
     if (migrations.isBehind || migrations.isAhead) {
       const which = migrations.isBehind ? 'an earlier format than this Weaver reads' : 'a later format than this Weaver reads'
 
-      this.output.say(`${project.configName}/ is in ${which}: run weaver update, which brings this project and Weaver to the same one.`)
+      this.screen.error(
+        `${project.configName}/ is in ${which}.`,
+        'Run weaver update, which brings this project and Weaver to the same one.',
+      )
 
       return 1
     }
 
     for (const runtime of runtimes) {
       runtime.install()
-      this.output.say(`${runtime.label}: hooks written to ${runtime.file}`)
+      this.screen.done(`${runtime.label}: hooks written to ${runtime.file}`)
 
       const shared = this.shared(project, runtime.file)
 
-      if (shared !== null) this.output.say(`  ${shared}`)
+      if (shared !== null) this.screen.alert(shared, 1)
     }
 
-    this.output.say(
-      project.createConfig(this.link)
-        ? `${project.configName}/ created: declare your guards and your checks in ${project.configName}/project/.`
-        : `${project.configName}/ kept as it is.`,
-    )
+    if (project.createConfig(this.link)) {
+      this.screen.done(`${project.configName}/ created: declare your guards and your checks in ${project.configName}/project/.`)
+    } else {
+      this.screen.note(`${project.configName}/ kept as it is.`)
+    }
 
     for (const skill of project.skills()) {
-      if (skill.create()) this.output.say(`${skill.path} created: ${skill.purpose} Adapt it to your project.`)
+      if (skill.create()) this.screen.done(`${skill.path} created: ${skill.purpose} Adapt it to your project.`)
     }
 
-    this.output.say(this.wired())
+    this.screen.line()
+    this.screen.hint(this.wired())
 
     return 0
   }

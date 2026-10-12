@@ -106,8 +106,8 @@ test('a check that fails without holding the task is listed for the owner under 
 
   const { systemMessage = '' } = await finishWith(session, stubChecks([several, one]))
 
-  assert.match(systemMessage, /2 item\(s\) to validate\./)
-  assert.match(reportOf(systemMessage), /\n- the check lint, behind 2 rule\(s\), reports: src\/a\.ts:1:1 error max-lines-per-function\n/)
+  assert.match(systemMessage, /2 items to validate\./)
+  assert.match(reportOf(systemMessage), /\n- the check lint, behind 2 rules, reports: src\/a\.ts:1:1 error max-lines-per-function\n/)
   assert.match(reportOf(systemMessage), /\n- F1 the check format reports: src\/a\.ts is not formatted\n/)
 })
 
@@ -124,7 +124,7 @@ test('after the refusals the project allows the agent may stop, with its unit st
   const third = await finishWith(session, checks, project)
 
   assert.equal(third.decision, undefined)
-  assert.match(third.systemMessage ?? '', /still fail after 2 refusal\(s\); the agent may stop/)
+  assert.match(third.systemMessage ?? '', /still fail after 2 refusals; the agent may stop/)
   assert.deepEqual(unitFiles(session), [A_FILE])
 
   prompt(session, 'try again')
@@ -153,7 +153,7 @@ test('a pass settles the unit: the next one starts empty, and a file changed dur
   })
   const output = await finishWith(session, checks)
 
-  assert.match(output.systemMessage ?? '', /1 check\(s\) passed on 2 changed file\(s\)\./)
+  assert.match(output.systemMessage ?? '', /1 check passed on 2 changed files\./)
   assert.equal(stateOf(session)?.unit.number, 2)
   assert.deepEqual(unitFiles(session), [B_FILE])
   assert.deepEqual(stateOf(session)?.unit.intents, [])
@@ -204,7 +204,7 @@ test('what waits for the owner is counted, listed in the report and never blocks
   const output = await finishWith(session, stubChecks([PASSING, markers]), project)
   const report = reportOf(output.systemMessage ?? '')
 
-  assert.match(output.systemMessage ?? '', /2 item\(s\) to validate\./)
+  assert.match(output.systemMessage ?? '', /2 items to validate\./)
   assert.match(
     report,
     /## To validate\n\n- S1 src\/a\.ts:1: eslint-disable added\n- weaver:declaration \.weaver: the unit changed the project's declaration/,

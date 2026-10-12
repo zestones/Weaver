@@ -125,6 +125,18 @@ The folders of a package are layers, read from the top: a file imports from its 
 
 Write only the comments a reader could not do without: a reason the code cannot show and that someone would otherwise undo, such as a workaround, a deliberate omission or a rule of the domain. Do not document a class, a method or a field whose name already says it.
 
+### What the command line prints
+
+A command of `apps/cli` never writes a line by itself. It says what it has to say to a `Screen` (`output/screen.ts`): a heading, something done, a problem, a note, a hint, a table, an error. The screen draws it, and is the one place that holds the marks, the colours and the indentation: changing the look of every command is a change there.
+
+The conventions are those of the [Command Line Interface Guidelines](https://clig.dev/) and of the design guide of GitHub's command line:
+
+- The answer of a command goes to the standard output, and what went wrong to the error stream, through `Screen.error` and `Screen.misuse`. A command returns 0, 1 when it failed, and 2 when it was given words it cannot use.
+- A sentence starts with a capital and says what happened; a count takes its plural from `Counted`, never `(s)`.
+- A state is a mark at the start of the line, so that it reads without colour. Colour only repeats it, and `Paint` leaves it out for a pipe, for `NO_COLOR`, for a dumb terminal and for `--no-color`.
+- A command declares its `help`: the part of the help it is listed in, its description, the words of its usage line, and examples. `weaver help` is built from these, so a command that is added is documented by being written.
+- A test reads what a command prints through `weaver()` in `test/fixtures/project.ts`, which records both streams without colour: what a test asserts is what an agent reads.
+
 ### What holds these rules
 
 | Rule                                                                              | Held by                                          |

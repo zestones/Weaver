@@ -93,7 +93,7 @@ test('a review that runs longer than the end of a turn waits for goes on by itse
   const delivered = await finish(slow, project)
 
   assert.equal(delivered.decision, 'block')
-  assert.match(delivered.reason ?? '', /the reviewer \(codex\) found 1 point\(s\)/)
+  assert.match(delivered.reason ?? '', /the reviewer \(codex\) found 1 point/)
   assert.deepEqual(standings(), ['running', 'sent-back'])
   assert.equal((await finish(slow, project, saying('F1 not fixed: clearer as one function'))).decision, undefined)
   assert.deepEqual(unitFiles(session), [])
@@ -141,7 +141,7 @@ test('the owner has a review that failed tried again with #review, whatever the 
   assert.equal(answered.decision, undefined)
   assert.match(
     answered.systemMessage ?? '',
-    /No file changed in this turn\. Reviewed by codex: 1 finding\(s\), 0 answered fixed\. 1 item\(s\) to validate\./,
+    /No file changed in this turn\. Reviewed by codex: 1 finding, 0 answered fixed\. 1 item to validate\./,
   )
   assert.deepEqual(standings(), ['failed', 'sent-back'])
 })

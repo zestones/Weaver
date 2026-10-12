@@ -33,8 +33,9 @@ test('uninstall removes the files it had created, and leaves the rules and the r
   assert.equal(existsSync(join(top, CONFIG)), true)
   assert.equal(existsSync(join(top, '.git/weaver')), true)
   assert.deepEqual(lines, [
-    `Claude Code: hooks removed from ${CLAUDE}`,
-    `Codex: hooks removed from ${CODEX}`,
+    `✓ Claude Code: hooks removed from ${CLAUDE}`,
+    `✓ Codex: hooks removed from ${CODEX}`,
+    '',
     ".weaver/ and .git/weaver/ are left: they hold your rules and Weaver's records.",
   ])
 })
@@ -52,6 +53,6 @@ test('uninstall takes only Weaver’s hooks out of a file the owner also uses', 
 test('uninstall on a project that was never wired says so and changes nothing', async () => {
   writeJson(top, CLAUDE, { permissions: {} })
 
-  assert.deepEqual((await weaver(top, ['uninstall'])).lines.slice(0, 2), ['Claude Code: no hook to remove', 'Codex: no hook to remove'])
+  assert.deepEqual((await weaver(top, ['uninstall'])).lines.slice(0, 2), ['- Claude Code: no hook to remove', '- Codex: no hook to remove'])
   assert.deepEqual(readJson(top, CLAUDE), { permissions: {} })
 })

@@ -188,20 +188,24 @@ To stay up to date there is one command, `weaver update`, which you run in a sup
 
 Releases stay side by side, and a project runs the one that wired it until `weaver update` is run there: `weaver doctor` says when a project is behind. A release that changes the format of `.weaver/` comes with the migration from the format before; `version`, in `settings.json`, is the number of that format.
 
-| Command                                        | What it does                                                                                           |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `weaver install [claude] [codex]`              | Puts Weaver on the project: the hooks, and a starter configuration if there is none.                   |
-| `weaver uninstall [claude] [codex]`            | Removes the hooks, and leaves everything else as it is.                                                |
-| `weaver update [--dry-run] [--offline]`        | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks. |
-| `weaver doctor`                                | Checks the configuration, the hook, and each agent runtime.                                            |
-| `weaver maintenance on\|off [<session>]`       | Lifts the guards of the project for one session of an agent, or puts them back.                        |
-| `weaver stats [--since <day>\|<n>d] [--json]`  | Counts what Weaver kept of its work in the project: times, verdicts, warnings, reviews, cards.         |
-| `weaver version`                               | Says which version of Weaver this is.                                                                  |
-| `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.                                  |
-| `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`.                                |
-| `weaver cards reopen\|retitle\|label\|rewrite` | Corrects a card, or opens it again.                                                                    |
-| `weaver cards tie\|untie\|separate`            | Ties two cards that may be about the same thing, or undoes a merge.                                    |
-| `weaver close <number> fixed\|wontfix\|issue`  | Closes a card, with a reason.                                                                          |
+| Command                                        | What it does                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `weaver install [claude] [codex]`              | Puts Weaver on the project: the hooks, and a starter configuration if there is none.                                           |
+| `weaver uninstall [claude] [codex]`            | Removes the hooks, and leaves everything else as it is.                                                                        |
+| `weaver update [--dry-run] [--offline]`        | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks.                         |
+| `weaver doctor`                                | Checks the configuration, the hook, and each agent runtime.                                                                    |
+| `weaver maintenance [on\|off] [<session>]`     | Lifts the guards of the project for one session of an agent, or puts them back; alone, says which sessions are in maintenance. |
+| `weaver stats [--since <day>\|<n>d] [--json]`  | Counts what Weaver kept of its work in the project: times, verdicts, warnings, reviews, cards.                                 |
+| `weaver version`                               | Says which version of Weaver this is.                                                                                          |
+| `weaver flag <place>...`                       | Flags something yourself, the five fields read on the standard input.                                                          |
+| `weaver cards [<number>]`                      | Lists the cards that wait, or prints one. `--all`, `--file`, `--label`.                                                        |
+| `weaver cards reopen\|retitle\|label\|rewrite` | Corrects a card, or opens it again.                                                                                            |
+| `weaver cards tie\|untie\|separate`            | Ties two cards that may be about the same thing, or undoes a merge.                                                            |
+| `weaver close <number> fixed\|wontfix\|issue`  | Closes a card, with a reason.                                                                                                  |
+
+`weaver help` lists the commands by what they are for, and `weaver help <command>`, or `--help` anywhere on a line, says how one is used, with examples. A mistyped command is answered with the one that was probably meant.
+
+What a command prints follows the [Command Line Interface Guidelines](https://clig.dev/) and the design guide of GitHub's command line. The answer goes to the standard output and what went wrong to the error stream, with an exit status of 0 for a success, 1 for a failure and 2 for a command that was mistyped. A line that states how something stands starts with a mark, `✓` done, `X` a problem, `!` something to look at, `-` neither, so that the state is read without colour. Colour is only added for a person at a terminal: not in a pipe, not when `NO_COLOR` is set, not with `--no-color`. An agent and a script read the same text as you do.
 
 ## What it keeps of its own work
 

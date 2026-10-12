@@ -1,3 +1,4 @@
+import { counted } from '../../../lib/text/counted.ts'
 import type { PartName } from '../../schema/declaration-document.ts'
 import type { Change, Operation, PartDocuments } from './operation.ts'
 
@@ -24,7 +25,7 @@ export class RenamedField implements Operation {
 
     return entries.length === 0
       ? null
-      : { part: this.part, text: `\`${this.from}\` is now \`${this.to}\`, in ${String(entries.length)} place(s)` }
+      : { part: this.part, text: `\`${this.from}\` is now \`${this.to}\`, in ${counted(entries.length, 'place')}` }
   }
 
   private carries(entry: unknown): boolean {

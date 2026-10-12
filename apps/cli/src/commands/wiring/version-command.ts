@@ -5,8 +5,9 @@ import type { Command } from '../line/command.ts'
 export class VersionCommand implements Command {
   readonly name = 'version'
   readonly usage = 'version'
-  readonly summary = 'Say which version of Weaver this is.'
+  readonly summary = 'Show the version of Weaver'
   readonly ownerOnly = false
+  readonly help = { group: 'Set up', description: 'Say which version of Weaver this is.', words: [], examples: ['weaver version'] } as const
   private readonly output: Output
 
   constructor(output: Output) {

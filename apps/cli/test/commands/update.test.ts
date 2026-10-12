@@ -171,13 +171,13 @@ test('with the latest release, update brings the project up to date itself: its 
 
   assert.equal(first.status, 0, first.lines.join('\n'))
   assert.deepEqual(first.lines, [
-    'Weaver v9.9.9 is the latest release.',
-    '.weaver/ brought up to date:',
+    '✓ Weaver v9.9.9 is the latest release.',
+    '✓ .weaver/ brought up to date:',
     '  0002-check-commands: The commands of a check are named for what they do, and a check may warn right after a call.',
-    '    project/checks.json: `fix` is now `repair`, in 1 place(s)',
-    '    project/checks.json: `verify` is now `judge`, in 1 place(s)',
+    '    project/checks.json: `fix` is now `repair`, in 1 place',
+    '    project/checks.json: `verify` is now `judge`, in 1 place',
     '    settings.json: checks.warnTimeoutSeconds added, at 30: the seconds the checks that warn are given after one call',
-    'Claude Code: hooks written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
+    '✓ Claude Code: hooks written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
   ])
   assert.deepEqual(DeclarationFolder.in(top).load()?.checks[0]?.repair, ['npx', 'prettier', '--write', '{files}'])
   assert.deepEqual(
@@ -186,8 +186,8 @@ test('with the latest release, update brings the project up to date itself: its 
     'a runtime that was not wired is not plugged in by an update',
   )
   assert.deepEqual((await weaver(top, ['update'], { channel: channel('9.9.9') })).lines, [
-    'Weaver v9.9.9 is the latest release.',
-    'This project is up to date with Weaver v9.9.9.',
+    '✓ Weaver v9.9.9 is the latest release.',
+    '✓ This project is up to date with Weaver v9.9.9.',
   ])
 })
 
@@ -198,10 +198,10 @@ test('a dry run says what an update would do and writes nothing, in the project 
   const here = await weaver(top, ['update', '--dry-run'], { channel: channel('9.9.9') })
 
   assert.equal(here.status, 0)
-  assert.equal(here.lines[1], '.weaver/ would be brought up to date:')
+  assert.equal(here.lines[1], '- .weaver/ would be brought up to date:')
   assert.equal(
     here.lines.at(-2),
-    'Claude Code: hooks would be written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
+    '- Claude Code: hooks would be written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
   )
   assert.equal(here.lines.at(-1), 'Dry run: nothing was written.')
   assert.deepEqual(readJson(top, '.weaver/settings.json'), FIRST_SETTINGS)
@@ -210,8 +210,8 @@ test('a dry run says what an update would do and writes nothing, in the project 
   const later = channel('0.1.0')
 
   assert.deepEqual((await weaver(top, ['update', '--dry-run'], { channel: later })).lines, [
-    'Weaver v9.9.9 is published, and this is v0.1.0: it would be installed.',
-    'What it changes in this project is its own to say: once it is installed, weaver update --dry-run shows it.',
+    '- Weaver v9.9.9 is published, and this is v0.1.0: it would be installed.',
+    '  What it changes in this project is its own to say: once it is installed, weaver update --dry-run shows it.',
   ])
   assert.equal(sourceOf(later).fetched, 0)
   assert.equal(existsSync(home), false)
@@ -223,20 +223,20 @@ test('update looks for no release when it is told so, when GitHub does not answe
   const offline = channel('0.1.0')
 
   assert.deepEqual((await weaver(top, ['update', '--offline'], { channel: offline })).lines, [
-    'This project is up to date with Weaver v0.1.0.',
+    '✓ This project is up to date with Weaver v0.1.0.',
   ])
   assert.equal(sourceOf(offline).asked, 0)
 
   assert.deepEqual((await weaver(top, ['update'], { channel: channel('0.1.0', { reachable: false }) })).lines, [
-    'No release was looked for: the releases of zestones/Weaver could not be read: no network. Weaver stays at v0.1.0.',
-    'This project is up to date with Weaver v0.1.0.',
+    '! No release was looked for: the releases of zestones/Weaver could not be read: no network. Weaver stays at v0.1.0.',
+    '✓ This project is up to date with Weaver v0.1.0.',
   ])
 
   const checkout = channel('0.0.0-dev')
 
   assert.deepEqual((await weaver(top, ['update'], { channel: checkout })).lines, [
-    'Weaver runs from a checkout, which git updates: no release is looked for.',
-    'This project is up to date with Weaver v0.0.0-dev.',
+    '- Weaver runs from a checkout, which git updates: no release is looked for.',
+    '✓ This project is up to date with Weaver v0.0.0-dev.',
   ])
   assert.equal(sourceOf(checkout).asked, 0)
 })
@@ -245,31 +245,31 @@ test('update says so where there is no supervised project, and refuses a configu
   const nowhere = await weaver(top, ['update'], { channel: channel('9.9.9') })
 
   assert.equal(nowhere.status, 0)
-  assert.equal(nowhere.lines.at(-1), 'No supervised project here: weaver install puts Weaver on a project.')
+  assert.equal(nowhere.lines.at(-1), '- No supervised project here: weaver install puts Weaver on a project.')
 
   writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: 3 })
 
   const ahead = await weaver(top, ['update'], { channel: channel('9.9.9') })
 
   assert.equal(ahead.status, 1)
-  assert.equal(ahead.lines.at(-1), '.weaver/ is in a later format than Weaver v9.9.9 reads, and no later release was installed.')
+  assert.equal(ahead.lines.at(-1), 'X .weaver/ is in a later format than Weaver v9.9.9 reads, and no later release was installed.')
 })
 
 test('update is the owner’s, knows its two options, and stops on a release that lacks a file', async () => {
   const agent = await weaver(top, ['update'], { channel: channel('0.1.0'), under: 'claude' })
 
   assert.equal(agent.status, 1)
-  assert.match(agent.lines[0] ?? '', /^weaver update is the owner's/)
+  assert.match(agent.lines[0] ?? '', /^X weaver update is the owner's/)
 
   const unknown = await weaver(top, ['update', '--force'], { channel: channel('0.1.0') })
 
   assert.equal(unknown.status, 2)
-  assert.match(unknown.lines[0] ?? '', /^weaver update does not know --force/)
+  assert.match(unknown.lines[0] ?? '', /^X weaver update does not know --force\.$/)
 
   const lacking = await weaver(top, ['update'], { channel: channel('0.1.0', { names: [ARCHIVE, 'SHA256SUMS'] }) })
 
   assert.equal(lacking.status, 1)
-  assert.deepEqual(lacking.lines, ['weaver: the release v9.9.9 has no install.sh'])
+  assert.deepEqual(lacking.lines, ['X The release v9.9.9 has no install.sh'])
   assert.equal(existsSync(join(home, TAG)), false)
 })
 

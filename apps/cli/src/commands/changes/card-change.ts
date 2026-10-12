@@ -1,7 +1,8 @@
 import type { CardRegistry } from '@weaver/memory'
 import type { Output } from '../../output/output.ts'
+import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
-import type { Command } from '../line/command.ts'
+import type { Command, CommandHelp } from '../line/command.ts'
 
 // What a command does to the registry once its words are read, giving what to say when it is done.
 export type RegistryChange = (registry: CardRegistry) => string
@@ -12,15 +13,16 @@ export abstract class CardChange implements Command {
   abstract readonly name: string
   abstract readonly usage: string
   abstract readonly summary: string
+  abstract readonly help: CommandHelp
   readonly ownerOnly = true
   // How many numbers of cards the command starts with.
   protected readonly cards: number = 1
   private readonly cwd: string
-  private readonly output: Output
+  private readonly screen: Screen
 
   constructor(cwd: string, output: Output) {
     this.cwd = cwd
-    this.output = output
+    this.screen = new Screen(output)
   }
 
   run(args: readonly string[]): number {
@@ -29,7 +31,7 @@ export abstract class CardChange implements Command {
     const change = numbers.length === this.cards ? this.change(numbers, args.slice(this.cards), project) : null
 
     if (change === null) {
-      this.output.say(`weaver ${this.usage}`)
+      this.screen.misuse(this.name, this.usage)
 
       return 2
     }
@@ -37,7 +39,7 @@ export abstract class CardChange implements Command {
     const registry = project.registry()
 
     try {
-      this.output.say(change(registry))
+      this.screen.done(change(registry))
     } finally {
       registry.close()
     }

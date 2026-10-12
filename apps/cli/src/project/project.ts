@@ -12,6 +12,7 @@ import {
 } from '@weaver/engine'
 import { CardRegistry } from '@weaver/memory'
 import type { EngineLink } from '../link/engine-link.ts'
+import { Counted } from '../output/counted.ts'
 import { CardSkill } from '../skills/card-skill.ts'
 import { FinishSkill } from '../skills/finish-skill.ts'
 import type { ProjectSkill } from '../skills/project-skill.ts'
@@ -66,7 +67,7 @@ export class Project {
 
     return [
       ...applied.flatMap((migration) => [`${migration.label}: ${migration.summary}`, ...migration.changes.map((change) => `  ${change}`)]),
-      ...(files === 0 ? [] : [`the \`$schema\` lines point at the schemas of this Weaver, in ${String(files)} file(s)`]),
+      ...(files === 0 ? [] : [`the \`$schema\` lines point at the schemas of this Weaver, in ${new Counted(files, 'file').text}`]),
     ]
   }
 

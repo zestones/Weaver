@@ -1,3 +1,4 @@
+import { counted } from '../../lib/text/counted.ts'
 import type { WriterLauncher } from '@weaver/memory'
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
@@ -160,7 +161,7 @@ export class EndOfTurn implements Moment {
       return this.ended(turn, 'checks', Answer.blocking(report.refusal(reportPath)))
     }
 
-    const given = `[weaver] The checks still fail after ${String(declaration.checkLimits.maxRefusals)} refusal(s); the agent may stop. Report: ${reportPath}`
+    const given = `[weaver] The checks still fail after ${counted(declaration.checkLimits.maxRefusals, 'refusal')}; the agent may stop. Report: ${reportPath}`
 
     return this.ended(turn, null, this.over(session, Answer.saying(given)))
   }

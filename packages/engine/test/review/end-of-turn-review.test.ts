@@ -77,7 +77,7 @@ test('once the checks pass, the reviewer is given the rules of the review that a
   assert.match(asked, /\n {4}1 \+ export const a = 2\n/, 'each line of the diff carries its number in the new file')
   assert.match(asked, /## What the owner asked for\n\n1\. change it/)
   assert.deepEqual([reviewer.assignments[0]?.runtime, reviewer.assignments[0]?.reason], ['codex', 'the runtime the project names'])
-  assert.match(output.systemMessage ?? '', /1 check\(s\) passed on 1 changed file\(s\)\. Reviewed by codex: no finding\./)
+  assert.match(output.systemMessage ?? '', /1 check passed on 1 changed file\. Reviewed by codex: no finding\./)
   assert.deepEqual(unitFiles(session), [], 'a clean review ends the unit')
   assert.deepEqual(standings(), ['clean'])
 })
@@ -87,7 +87,7 @@ test('findings send the author back, and each one needs its answer: fixed with a
   const sentBack = await finish(reviewer)
 
   assert.equal(sentBack.decision, 'block')
-  assert.match(sentBack.reason ?? '', /the reviewer \(codex\) found 1 point\(s\) on this unit of work \(refusal 1 of 1\)/)
+  assert.match(sentBack.reason ?? '', /the reviewer \(codex\) found 1 point on this unit of work \(refusal 1 of 1\)/)
   assert.match(sentBack.reason ?? '', /a finding never holds your change by itself, but each one needs your answer\./)
   assert.match(sentBack.reason ?? '', /one line each: `F1 fixed: <what you changed>` or `F1 not fixed: <why>`/)
   assert.match(
@@ -97,7 +97,7 @@ test('findings send the author back, and each one needs its answer: fixed with a
   assert.deepEqual(unitFiles(session), [A_FILE])
   assert.match(
     reportOf(sentBack.reason ?? ''),
-    /## Review\n\n- by codex \(the runtime the project names\) in 42 s, \$0\.0312, review round 1, 1 refusal\(s\) allowed\n- One point\.\n- sent back to the agent, which answers each finding:\n {2}- F1 N1 src\/a\.ts:1:/,
+    /## Review\n\n- by codex \(the runtime the project names\) in 42 s, \$0\.0312, review round 1, 1 refusal allowed\n- One point\.\n- sent back to the agent, which answers each finding:\n {2}- F1 N1 src\/a\.ts:1:/,
   )
 
   const silent = await finish(reviewer)
@@ -114,7 +114,7 @@ test('findings send the author back, and each one needs its answer: fixed with a
   const settled = await finish(reviewer, reviewed(), saying('F1 fixed: split the function in two'))
 
   assert.equal(settled.decision, undefined)
-  assert.match(settled.systemMessage ?? '', /Reviewed by codex: 1 finding\(s\), 1 answered fixed\. Report/)
+  assert.match(settled.systemMessage ?? '', /Reviewed by codex: 1 finding, 1 answered fixed\. Report/)
   assert.match(
     reportOf(settled.systemMessage ?? ''),
     /- answered by the agent:\n {2}- F1 N1 src\/a\.ts:1: [^\n]*\n[^]*Answered fixed: split the function in two/,
@@ -174,7 +174,7 @@ test('a finding the author leaves goes to the owner with its reason, and changes
   const left = await finish(reviewer, reviewed(), saying('- F1 not fixed: the owner asked for one function here'))
 
   assert.equal(left.decision, undefined)
-  assert.match(left.systemMessage ?? '', /Reviewed by codex: 1 finding\(s\), 0 answered fixed\. 1 item\(s\) to validate\./)
+  assert.match(left.systemMessage ?? '', /Reviewed by codex: 1 finding, 0 answered fixed\. 1 item to validate\./)
   assert.match(
     reportOf(left.systemMessage ?? ''),
     /## To validate\n\n- \w{7}\/F1 N1 src\/a\.ts:1: two levels of abstraction in one function \(not fixed by the agent: the owner asked for one function here\)/,
@@ -221,7 +221,7 @@ test('work that goes beyond the findings is new work, reviewed on its own, with 
     /## What an earlier review found\n\n[^\n]*\n\n- F1 N1 src\/a\.ts:1: two levels of abstraction in one function \(answered not fixed: it is clearer as one function\)/,
   )
   assert.equal(handed.decision, undefined, 'one review may send the author back, for one request')
-  assert.match(handed.systemMessage ?? '', /Reviewed by codex: 1 finding\(s\) left to you\. 1 item\(s\) to validate\./)
+  assert.match(handed.systemMessage ?? '', /Reviewed by codex: 1 finding left to you\. 1 item to validate\./)
   assert.match(reportOf(handed.systemMessage ?? ''), /\(found by the last review, which the agent has not seen\)/)
   assert.deepEqual(standings(), ['sent-back', 'sent-back', 'for-owner'])
 })
@@ -242,7 +242,7 @@ test('a review that cannot be read holds nobody: the unit ends, and the owner is
   assert.equal(output.decision, undefined)
   assert.match(
     output.systemMessage ?? '',
-    /The review by codex did not give its findings: write #review in a request to have it tried again\. 1 item\(s\) to validate\./,
+    /The review by codex did not give its findings: write #review in a request to have it tried again\. 1 item to validate\./,
   )
   assert.match(reportOf(output.systemMessage ?? ''), /- weaver:review the review by codex did not give its findings: no answer after 900 s/)
   assert.match(reportOf(output.systemMessage ?? ''), /## Rules for a reviewer, which no review judged\n\n- N1:/)
@@ -266,15 +266,15 @@ test('what the reviewer suspects, ran, and reported outside the change is for th
   const report = reportOf(output.systemMessage ?? '')
 
   assert.equal(output.decision, undefined)
-  assert.match(output.systemMessage ?? '', /Reviewed by codex: no finding\. 1 suspicion\(s\) for you\. 1 item\(s\) to validate\./)
+  assert.match(output.systemMessage ?? '', /Reviewed by codex: no finding\. 1 suspicion for you\. 1 item to validate\./)
   assert.match(
     report,
     /- \w{7}\/S1 weaver:suspicion src\/a\.ts: the value may be read before it is set \(suspected by the reviewer, not verified\)/,
   )
-  assert.match(report, /- what the reviewer ran:\n {2}- `npm test`: 12 passed\n {2}- `node <<'JS' \[2 more line\(s\)\]`: printed 1/)
+  assert.match(report, /- what the reviewer ran:\n {2}- `npm test`: 12 passed\n {2}- `node <<'JS' \[2 more lines\]`: printed 1/)
   assert.match(
     report,
-    /- reported by the reviewer and not shown to the agent:\n {2}- N1 src\/b\.ts:3: the unit did not change this file\n {2}- 2 more finding\(s\), past the limit/,
+    /- reported by the reviewer and not shown to the agent:\n {2}- N1 src\/b\.ts:3: the unit did not change this file\n {2}- 2 more findings, past the limit/,
   )
 })
 

@@ -209,7 +209,7 @@ test('the owner is told which flags were made in a turn, once, whatever the turn
 
   assert.match(
     (await finishWith(session, stubChecks([PASSING]))).systemMessage ?? '',
-    /^\[weaver\] Flagged in this turn: #4 \(weaver cards\)\. \[weaver\] 1 check\(s\) passed on 1 changed file\(s\)\. Report: \S+$/,
+    /^\[weaver\] Flagged in this turn: #4 \(weaver cards\)\. \[weaver\] 1 check passed on 1 changed file\. Report: \S+$/,
   )
   assert.deepEqual(unitFiles(session), [])
 })

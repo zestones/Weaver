@@ -76,8 +76,8 @@ test('files of an earlier format are brought to the one this Weaver reads, one m
       label: '0002-check-commands',
       summary: 'The commands of a check are named for what they do, and a check may warn right after a call.',
       changes: [
-        'project/checks.json: `fix` is now `repair`, in 1 place(s)',
-        'project/checks.json: `verify` is now `judge`, in 2 place(s)',
+        'project/checks.json: `fix` is now `repair`, in 1 place',
+        'project/checks.json: `verify` is now `judge`, in 2 places',
         'settings.json: checks.warnTimeoutSeconds added, at 30: the seconds the checks that warn are given after one call',
       ],
     },
@@ -156,7 +156,7 @@ test('a renamed field keeps its place in each entry that carries it, and an adde
 
   assert.deepEqual(new RenamedField('checks', 'fix', 'repair').apply(documents), {
     part: 'checks',
-    text: '`fix` is now `repair`, in 1 place(s)',
+    text: '`fix` is now `repair`, in 1 place',
   })
   assert.deepEqual(Object.keys(documents.checks.lint), ['repair', 'cwd'])
   assert.equal(new RenamedField('checks', 'fix', 'repair').apply(documents), null, 'nothing is left to rename')

@@ -1,0 +1,51 @@
+// What tells a stream that draws from one that is only read.
+interface Stream {
+  readonly isTTY?: boolean
+}
+
+const ESCAPE = '\u001B['
+
+// The styles a line may carry. Off, each gives the text back as it is: what a program reads or a file keeps holds no
+// escape code. Only the eight colours every terminal knows are used, and never to carry a meaning alone.
+export class Paint {
+  private readonly on: boolean
+
+  constructor(on: boolean) {
+    this.on = on
+  }
+
+  // Colour is for a person at a terminal: not for a pipe, not when NO_COLOR is set, not for a terminal that draws none,
+  // and not when the owner asked for none.
+  static for(stream: Stream, env: NodeJS.ProcessEnv, refused: boolean): Paint {
+    return new Paint(stream.isTTY === true && !refused && (env.NO_COLOR ?? '') === '' && env.TERM !== 'dumb')
+  }
+
+  bold(text: string): string {
+    return this.styled(1, 22, text)
+  }
+
+  // Grey, for what comes second: a hint, a path, a heading of a table.
+  dim(text: string): string {
+    return this.styled(90, 39, text)
+  }
+
+  green(text: string): string {
+    return this.styled(32, 39, text)
+  }
+
+  red(text: string): string {
+    return this.styled(31, 39, text)
+  }
+
+  yellow(text: string): string {
+    return this.styled(33, 39, text)
+  }
+
+  cyan(text: string): string {
+    return this.styled(36, 39, text)
+  }
+
+  private styled(open: number, close: number, text: string): string {
+    return this.on && text !== '' ? `${ESCAPE}${String(open)}m${text}${ESCAPE}${String(close)}m` : text
+  }
+}

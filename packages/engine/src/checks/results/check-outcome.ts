@@ -1,3 +1,4 @@
+import { counted } from '../../lib/text/counted.ts'
 import type { Finding } from '../../declaration/rules/finding.ts'
 import type { CheckRun } from '../../unit-of-work/journal/journal-event.ts'
 
@@ -94,7 +95,7 @@ export class CheckOutcome {
     const lines = this.output.trim().split('\n')
     const shown = lines.slice(0, EXCERPT_LINES)
 
-    return lines.length > EXCERPT_LINES ? [...shown, `… ${String(lines.length - EXCERPT_LINES)} more line(s) in the report`] : shown
+    return lines.length > EXCERPT_LINES ? [...shown, `… ${counted(lines.length - EXCERPT_LINES, 'more line')} in the report`] : shown
   }
 
   private line(finding: Finding): string {

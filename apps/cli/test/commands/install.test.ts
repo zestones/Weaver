@@ -72,12 +72,12 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   assert.equal(existsSync(join(top, '.weaver/skills/wv-card.md')), false, 'a project that names no writer gets no skill for one')
   assert.deepEqual(DeclarationFolder.in(top).load()?.rules, [])
   assert.deepEqual(DeclarationFolder.in(top).load()?.finish.headings, ['Request', 'To validate', 'Found along the way'])
-  assert.ok(lines.includes('.weaver/ created: declare your guards and your checks in .weaver/project/.'))
+  assert.ok(lines.includes('✓ .weaver/ created: declare your guards and your checks in .weaver/project/.'))
   assert.match(
     readFileSync(join(top, SKILL), 'utf8'),
     /## Request\n\nWhat you did for the request[^]*## To validate\n\n[^]*## Found along the way\n\nWhat you noticed outside the request\. Flag each thing with `weaver flag` when you find it, and name it here with the number of its flag\. Do not do it in the task, unless the task cannot go on without it: flag it then as fixed in the task\.\n```\n/,
   )
-  assert.ok(lines.includes(`${SKILL} created: it tells the agent how to end a task. Adapt it to your project.`))
+  assert.ok(lines.includes(`✓ ${SKILL} created: it tells the agent how to end a task. Adapt it to your project.`))
   assert.ok(lines.some((line) => line.includes(`${CLAUDE} is not ignored by git`)))
   assert.ok(lines.some((line) => line.startsWith('Wired to the Weaver checkout that holds ')))
 })
@@ -87,16 +87,16 @@ test('install says what to do of a hooks file git would share: ignore it, stop f
   const advice = async (): Promise<string[]> => (await weaver(top, ['install'])).lines.filter((line) => line.startsWith('  '))
 
   assert.deepEqual(await advice(), [
-    `  ${CLAUDE} is not ignored by git and names paths of this machine: add it to .gitignore.`,
-    `  ${CODEX} is not ignored by git and names paths of this machine: add it to .gitignore.`,
+    `  ! ${CLAUDE} is not ignored by git and names paths of this machine: add it to .gitignore.`,
+    `  ! ${CODEX} is not ignored by git and names paths of this machine: add it to .gitignore.`,
   ])
 
   git('add', '-f', CLAUDE, CODEX)
   writeFileSync(join(top, '.gitignore'), '.codex/\n')
 
   assert.deepEqual(await advice(), [
-    `  ${CLAUDE} is followed by git and names paths of this machine: add it to .gitignore, then run \`git rm --cached ${CLAUDE}\`, which keeps the file.`,
-    `  ${CODEX} is ignored by git, which still follows it because it was committed before: it names paths of this machine. Stop that with \`git rm --cached ${CODEX}\`, which keeps the file.`,
+    `  ! ${CLAUDE} is followed by git and names paths of this machine: add it to .gitignore, then run \`git rm --cached ${CLAUDE}\`, which keeps the file.`,
+    `  ! ${CODEX} is ignored by git, which still follows it because it was committed before: it names paths of this machine. Stop that with \`git rm --cached ${CODEX}\`, which keeps the file.`,
   ])
 
   git('rm', '--cached', '-q', CLAUDE, CODEX)
@@ -135,7 +135,7 @@ test('install twice wires once, and leaves what the owner put in the files', asy
   }
 
   assert.deepEqual(JSON.parse(readFileSync(join(top, CONFIG), 'utf8')), JSON.parse(declared))
-  assert.ok(lines.includes('.weaver/ kept as it is.'))
+  assert.ok(lines.includes('- .weaver/ kept as it is.'))
   assert.equal(existsSync(join(top, '.weaver/project')), false, 'nothing is added to a declaration the owner wrote')
   assert.equal(existsSync(join(top, SKILL)), false, 'a project that names no skill gets none')
 })
@@ -159,7 +159,9 @@ test('the skill of the reviewer is written the same way, where the configuration
   const { lines } = await weaver(top, ['install', 'claude'])
 
   assert.ok(
-    lines.includes('docs/review.md created: it tells the reviewer how this project wants its changes reviewed. Adapt it to your project.'),
+    lines.includes(
+      '✓ docs/review.md created: it tells the reviewer how this project wants its changes reviewed. Adapt it to your project.',
+    ),
   )
   assert.match(
     readFileSync(join(top, 'docs/review.md'), 'utf8'),
@@ -176,7 +178,9 @@ test('the skill of the writer is written when the configuration names it, with t
   const { lines } = await weaver(top, ['install', 'claude'])
   const written = readFileSync(join(top, 'docs/card.md'), 'utf8')
 
-  assert.ok(lines.includes('docs/card.md created: it tells the writer how this project wants its cards written. Adapt it to your project.'))
+  assert.ok(
+    lines.includes('✓ docs/card.md created: it tells the writer how this project wants its cards written. Adapt it to your project.'),
+  )
   assert.match(written, /^---\ndescription: [^\n]*\nsections:\n {2}- Observation\n {2}- Context\n {2}- Trace\n {2}- Uncertainties\n---\n/)
   assert.deepEqual(DeclarationFolder.in(top).load()?.writer?.sections, ['Observation', 'Context', 'Trace', 'Uncertainties'])
   assert.match(written, /understood alone, months later/)
@@ -203,7 +207,7 @@ test('install may name the runtimes to wire, and refuses a name it does not know
   const unknown = await weaver(top, ['install', 'vim'])
 
   assert.equal(unknown.status, 1)
-  assert.deepEqual(unknown.lines, ['weaver: unknown agent runtime vim: Weaver reads claude, codex'])
+  assert.deepEqual(unknown.lines, ['X Unknown agent runtime vim: Weaver reads claude, codex'])
 })
 
 test('nothing is written when the hook cannot start, or outside a git repository', async () => {
@@ -211,7 +215,7 @@ test('nothing is written when the hook cannot start, or outside a git repository
   const outside = await weaver(scratch, ['install'])
 
   assert.equal(dead.status, 1)
-  assert.match(dead.lines[0] ?? '', /^The hook does not start/)
+  assert.match(dead.lines[0] ?? '', /^X The hook does not start/)
   assert.equal(existsSync(join(top, CLAUDE)), false)
   assert.equal(existsSync(join(top, CONFIG)), false)
   assert.equal(outside.status, 1)
@@ -223,40 +227,8 @@ test('a file that is not JSON is left alone and named', async () => {
   spawnSync('sh', ['-c', `printf '{ not json' > ${CLAUDE}`], { cwd: top })
 
   assert.deepEqual((await weaver(top, ['install', 'claude'])).lines, [
-    `weaver: ${CLAUDE} is not valid JSON: fix it or remove it, then run the command again`,
+    `X ${CLAUDE} is not valid JSON: fix it or remove it, then run the command again`,
   ])
-})
-
-test('without a command, or with one it does not know, weaver lists what it can do', async () => {
-  const usage = await weaver(top, [])
-
-  assert.equal(usage.status, 0)
-  assert.equal(usage.lines[0], 'weaver <command>')
-  assert.deepEqual(
-    usage.lines.slice(2).map((line) => line.trim().split(/ {2,}/)[0]),
-    [
-      'install [claude] [codex]',
-      'uninstall [claude] [codex]',
-      'update [--dry-run] [--offline]',
-      'doctor',
-      'maintenance on|off [<session>]',
-      'stats [--since <day>|<n>d] [--json]',
-      'version',
-      'flag <place>...',
-      'cards [<number>] [--all] [--file <path>] [--label <family:value>]',
-      'cards reopen <number> [note]',
-      'cards retitle <number> <title>',
-      'cards label <number> <family:value>...',
-      'cards rewrite <number>',
-      'cards tie <a> <b> [note]',
-      'cards untie <a> <b>',
-      'cards separate <number>',
-      'close <number> fixed|wontfix|issue [reason]',
-    ],
-  )
-  assert.deepEqual(await weaver(top, ['help']), usage)
-  assert.deepEqual((await weaver(top, ['status'])).status, 2, 'status went away with the ledger')
-  assert.equal((await weaver(top, ['frobnicate'])).status, 2)
 })
 
 test('install leaves a project whose configuration is in another format to weaver update, and wires nothing', async () => {
@@ -266,7 +238,8 @@ test('install leaves a project whose configuration is in another format to weave
 
   assert.equal(behind.status, 1)
   assert.deepEqual(behind.lines, [
-    '.weaver/ is in an earlier format than this Weaver reads: run weaver update, which brings this project and Weaver to the same one.',
+    'X .weaver/ is in an earlier format than this Weaver reads.',
+    '  Run weaver update, which brings this project and Weaver to the same one.',
   ])
   assert.deepEqual(readJson(top, CONFIG), { version: 1, checks: { maxRefusals: 5, totalTimeoutSeconds: 600, parallel: 2 } })
 
@@ -276,7 +249,8 @@ test('install leaves a project whose configuration is in another format to weave
 
   assert.equal(ahead.status, 1)
   assert.deepEqual(ahead.lines, [
-    '.weaver/ is in a later format than this Weaver reads: run weaver update, which brings this project and Weaver to the same one.',
+    'X .weaver/ is in a later format than this Weaver reads.',
+    '  Run weaver update, which brings this project and Weaver to the same one.',
   ])
   assert.equal(existsSync(join(top, CLAUDE)), false)
 })

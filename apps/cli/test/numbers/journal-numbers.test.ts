@@ -8,7 +8,7 @@ import { Distribution } from '../../src/numbers/distribution.ts'
 import { JournalNumbers } from '../../src/numbers/journal-numbers.ts'
 import { Period } from '../../src/numbers/period.ts'
 import { StatsPage } from '../../src/numbers/stats-page.ts'
-import { makeProject } from '../fixtures/project.ts'
+import { drawn, makeProject } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-numbers-'))
 const BASE = { v: 2, at: '2026-10-12T10:00:00.000Z', weaver: '0.3.0', session: 'one', agent: 'claude' } as const
@@ -101,9 +101,8 @@ test('guards, maintenance, errors and sessions are counted as they were kept', (
 })
 
 test('the page shows the reviews and their findings, and leaves out the tables that would be empty', () => {
-  const text = new StatsPage({ since: null, journal: new JournalNumbers(EVENTS).figures, cards: null }, '/somewhere/events')
-    .lines()
-    .join('\n')
+  const page = new StatsPage({ since: null, journal: new JournalNumbers(EVENTS).figures, cards: null }, '/somewhere/events')
+  const text = drawn((screen) => page.print(screen)).join('\n')
 
   assert.match(
     text,

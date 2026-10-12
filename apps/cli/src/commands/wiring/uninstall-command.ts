@@ -1,5 +1,6 @@
 import type { EngineLink } from '../../link/engine-link.ts'
 import type { Output } from '../../output/output.ts'
+import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
 import type { Command } from '../line/command.ts'
@@ -7,15 +8,21 @@ import type { Command } from '../line/command.ts'
 export class UninstallCommand implements Command {
   readonly name = 'uninstall'
   readonly usage = 'uninstall [claude] [codex]'
-  readonly summary = 'Unplug Weaver from this project: its hooks are removed, everything else is left as it is.'
+  readonly summary = 'Remove the hooks of Weaver from this project'
   readonly ownerOnly = true
+  readonly help = {
+    group: 'Set up',
+    description: 'Unplug Weaver from this project: its hooks are removed, everything else is left as it is.',
+    words: [['[claude] [codex]', 'The agent runtimes to unplug; both when none is named']],
+    examples: ['weaver uninstall', 'weaver uninstall codex'],
+  } as const
   private readonly cwd: string
-  private readonly output: Output
+  private readonly screen: Screen
   private readonly link: EngineLink
 
   constructor(cwd: string, output: Output, link: EngineLink) {
     this.cwd = cwd
-    this.output = output
+    this.screen = new Screen(output)
     this.link = link
   }
 
@@ -23,10 +30,12 @@ export class UninstallCommand implements Command {
     const project = Project.locate(this.cwd)
 
     for (const runtime of new RuntimeCatalog().settings(project.top, this.link, args)) {
-      this.output.say(runtime.uninstall() ? `${runtime.label}: hooks removed from ${runtime.file}` : `${runtime.label}: no hook to remove`)
+      if (runtime.uninstall()) this.screen.done(`${runtime.label}: hooks removed from ${runtime.file}`)
+      else this.screen.note(`${runtime.label}: no hook to remove`)
     }
 
-    this.output.say(`${project.configName}/ and .git/weaver/ are left: they hold your rules and Weaver's records.`)
+    this.screen.line()
+    this.screen.hint(`${project.configName}/ and .git/weaver/ are left: they hold your rules and Weaver's records.`)
 
     return 0
   }

@@ -1,3 +1,4 @@
+import type { Screen } from '../output/screen.ts'
 import { TextTable } from '../output/text-table.ts'
 import type { CardFigures } from './card-numbers.ts'
 import type { DistributionNumbers } from './distribution.ts'
@@ -15,6 +16,9 @@ export interface ProjectFigures {
 
 const LABEL_WIDTH = 24
 const NOT_MEASURED = '-'
+
+// What the page is made of: a line, or a table under its title.
+type Block = string | { readonly title: string; readonly table: TextTable }
 const SECOND_MS = 1000
 const MINUTE_MS = 60 * SECOND_MS
 const HOUR_MS = 60 * MINUTE_MS
@@ -29,7 +33,18 @@ export class StatsPage {
     this.journalDir = journalDir
   }
 
-  lines(): string[] {
+  print(screen: Screen): void {
+    for (const block of this.blocks()) {
+      if (typeof block === 'string') {
+        screen.line(block)
+      } else {
+        screen.heading(block.title)
+        screen.table(block.table)
+      }
+    }
+  }
+
+  private blocks(): Block[] {
     const { journal, since } = this.figures
 
     if (journal.lines === 0) {
@@ -55,7 +70,7 @@ export class StatsPage {
     ]
   }
 
-  private activity(): string[] {
+  private activity(): Block[] {
     const { sessions, requests, calls, turns } = this.figures.journal
     const held = `held by the checks ${String(turns.heldByChecks)}, by a review ${String(turns.heldByReview)}, by the reminder ${String(turns.heldByReminder)}`
 
@@ -67,7 +82,7 @@ export class StatsPage {
     ]
   }
 
-  private verdicts(): string[] {
+  private verdicts(): Block[] {
     const { verdicts, units } = this.figures.journal
 
     const settled = this.row(
@@ -89,7 +104,7 @@ export class StatsPage {
     ]
   }
 
-  private checks(): string[] {
+  private checks(): Block[] {
     const table = new TextTable([
       'check',
       'ran',
@@ -123,7 +138,7 @@ export class StatsPage {
     return this.section('Checks at the end of a task', table)
   }
 
-  private warnings(): string[] {
+  private warnings(): Block[] {
     const { warnings } = this.figures.journal
     const table = new TextTable(['check', 'ran', 'warned', 'out of time', 'median', 'nine in ten', 'longest'])
 
@@ -133,7 +148,7 @@ export class StatsPage {
     return this.section(`Warnings right after a call: ${String(warnings.calls)} calls, ${this.spread(warnings.ms)}`, table)
   }
 
-  private hooks(): string[] {
+  private hooks(): Block[] {
     const table = new TextTable(['event', 'runs', 'median', 'nine in ten', 'longest', 'in all'])
 
     for (const [event, ms] of Object.entries(this.figures.journal.hooks))
@@ -142,7 +157,7 @@ export class StatsPage {
     return this.section('Runs of the hook', table)
   }
 
-  private guards(): string[] {
+  private guards(): Block[] {
     const { guards, maintenance } = this.figures.journal
     const table = new TextTable(['guard', 'refused', 'let through in maintenance'])
 
@@ -155,7 +170,7 @@ export class StatsPage {
     ]
   }
 
-  private reviews(): string[] {
+  private reviews(): Block[] {
     const { byReviewer, answers, byRule } = this.figures.journal.reviews
     const ended = 'how they ended'
     const reviewers = new TextTable(
@@ -187,7 +202,7 @@ export class StatsPage {
     ]
   }
 
-  private memory(): string[] {
+  private memory(): Block[] {
     const { flags } = this.figures.journal
     const { cards } = this.figures
     const made = this.row('Flags', `made ${String(flags.made)}, already known ${String(flags.alreadyKnown)}`)
@@ -208,8 +223,8 @@ export class StatsPage {
   }
 
   // Nothing is said of what never happened: an empty table would only be its headings.
-  private section(title: string, table: TextTable): string[] {
-    return table.isEmpty ? [] : ['', title, ...table.lines('  ')]
+  private section(title: string, table: TextTable): Block[] {
+    return table.isEmpty ? [] : [{ title, table }]
   }
 
   private row(label: string, text: string): string {

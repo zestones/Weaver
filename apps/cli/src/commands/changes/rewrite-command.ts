@@ -10,7 +10,13 @@ interface Section {
 export class RewriteCommand extends CardChange {
   override readonly name = 'cards rewrite'
   override readonly usage = 'cards rewrite <number>'
-  override readonly summary = 'Replace the sections of a card with the Markdown read on the standard input, cut at its "## " headings.'
+  override readonly summary = 'Replace the sections of a card'
+  override readonly help = {
+    group: 'Cards',
+    description: 'Replace the sections of a card with the Markdown read on the standard input, cut at its "## " headings.',
+    words: [['<number>', 'The number of the card, as weaver cards shows it']],
+    examples: ['weaver cards rewrite 12 < card.md'],
+  } as const
   private readonly input: Input
 
   constructor(cwd: string, output: Output, input: Input) {

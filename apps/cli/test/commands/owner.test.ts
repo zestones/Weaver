@@ -48,7 +48,7 @@ test('what decides or changes is the owner’s: under an agent it does not run, 
         {
           status: 1,
           lines: [
-            `weaver ${String(name)} is the owner's: it decides or changes something, so it runs from a terminal of their own, and not under ${agent}.`,
+            `X weaver ${String(name)} is the owner's: it decides or changes something, so it runs from a terminal of their own, and not under ${agent}.`,
           ],
         },
         words.join(' '),
@@ -65,9 +65,9 @@ test('what decides or changes is the owner’s: under an agent it does not run, 
 })
 
 test('an agent may read: the list, a card, and the doctor', async () => {
-  assert.equal((await weaver(top, ['cards'], { under: 'claude' })).lines[0], '2 card(s) wait for you:')
-  assert.equal((await weaver(top, ['cards', '--all'], { under: 'codex' })).lines[0], '4 card(s):')
+  assert.equal((await weaver(top, ['cards'], { under: 'claude' })).lines[0], '2 cards wait for you')
+  assert.equal((await weaver(top, ['cards', '--all'], { under: 'codex' })).lines[0], '4 cards')
   assert.equal((await weaver(top, ['cards', '1'], { under: 'codex' })).lines.join('\n'), cardOf(top, 1).markdown())
-  assert.ok((await weaver(top, ['doctor'], { under: 'claude' })).lines.includes('ok      the registry: 2 card(s) wait for you'))
+  assert.ok((await weaver(top, ['doctor'], { under: 'claude' })).lines.includes('  ✓ The registry: 2 cards wait for you'))
   assert.equal((await weaver(top, [], { under: 'claude' })).status, 0)
 })
