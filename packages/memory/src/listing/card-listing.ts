@@ -1,9 +1,11 @@
-import type { Card } from '../cards/card.ts'
+import type { Closing } from '../cards/card-record.ts'
+import { Card } from '../cards/card.ts'
 import { LabelFamilies } from '../cards/label-families.ts'
 import { PlaceText } from '../flags/place-text.ts'
 
-// level: the gravest first, by the family of labels the project grades its cards with; newest: the last made first.
-export type CardOrder = 'level' | 'newest'
+// level: the gravest first, by the family of labels the project grades its cards with. closing: by how they were
+// closed, the last closed first in each way. newest: the last made first.
+export type CardOrder = 'level' | 'closing' | 'newest'
 
 // What a list of cards is narrowed to. Each part left out narrows nothing.
 export interface Narrowing {
@@ -13,6 +15,8 @@ export interface Narrowing {
   readonly since?: string | null
   // Only the cards someone concluded on.
   readonly answered?: boolean
+  // Only the cards closed in one of these ways.
+  readonly closedAs?: readonly Closing[]
   // Words that what the card says must all hold, in any letter case.
   readonly words?: string
 }
@@ -29,7 +33,7 @@ export class CardListing {
     this.scale = scale
   }
 
-  narrowed({ labels = {}, since = null, answered = false, words = '' }: Narrowing): CardListing {
+  narrowed({ labels = {}, since = null, answered = false, closedAs = [], words = '' }: Narrowing): CardListing {
     const wanted = Object.entries(labels).filter(([, values]) => values.length > 0)
     const looked = words
       .toLowerCase()
@@ -40,6 +44,7 @@ export class CardListing {
         wanted.every(([family, values]) => card.valuesOf(family).some((value) => values.includes(value))) &&
         (since === null || card.record.provenance.at >= since) &&
         (!answered || card.conclusion !== null) &&
+        (closedAs.length === 0 || closedAs.some((closing) => closing === card.record.closing?.as)) &&
         (looked.length === 0 || this.holds(card, looked)),
     )
 
@@ -48,8 +53,12 @@ export class CardListing {
 
   ordered(order: CardOrder): Card[] {
     const newest = this.cards.toSorted((a, b) => b.number - a.number)
+    const closedAt = (card: Card): string => card.record.closing?.at ?? ''
 
-    return order === 'newest' ? newest : newest.toSorted((a, b) => this.rankOf(a) - this.rankOf(b))
+    if (order === 'newest') return newest
+    if (order === 'level') return newest.toSorted((a, b) => this.rankOf(a) - this.rankOf(b))
+
+    return newest.toSorted((a, b) => this.closingRankOf(a) - this.closingRankOf(b) || closedAt(b).localeCompare(closedAt(a)))
   }
 
   // How many of the cards carry each value of a family.
@@ -68,8 +77,16 @@ export class CardListing {
     return ranks.length === 0 ? this.scale.length : Math.min(...ranks)
   }
 
+  // Where a card stands among the ways a card closes, in the order the owner is offered them; after every way for
+  // a card that is not closed.
+  closingRankOf(card: Card): number {
+    const closing = card.record.closing?.as
+
+    return closing === undefined ? Card.CLOSINGS.length : Card.CLOSINGS.indexOf(closing)
+  }
+
   private holds(card: Card, words: readonly string[]): boolean {
-    const { flag, review, written, notes } = card.record
+    const { flag, review, written, notes, closing } = card.record
     const said = [
       `#${String(card.number)}`,
       card.title,
@@ -79,6 +96,8 @@ export class CardListing {
       review?.message ?? '',
       ...(written?.sections ?? []).map((section) => section.text),
       ...notes.map((note) => note.text),
+      // How a card was closed is part of what it says: the way, the reason given, and the issue it became.
+      ...(closing === null ? [] : [closing.as, closing.reason ?? '', closing.issue ?? '']),
     ]
       .join('\n')
       .toLowerCase()

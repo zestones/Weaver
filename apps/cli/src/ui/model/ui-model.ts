@@ -61,7 +61,8 @@ export class UiModel {
   static readonly TABS = TABS
 
   view: View = 'open'
-  order: CardOrder
+  // Whether the cards stand under headings: their level, or how they were closed in the view of the closed ones.
+  headed = true
   labels: Readonly<Record<string, readonly string[]>> = {}
   since: Since = 'ever'
   words = new TypedText()
@@ -93,7 +94,6 @@ export class UiModel {
     this.paint = paint
     this.now = now
     this.all = desk.cards()
-    this.order = desk.scale.length === 0 ? 'newest' : 'level'
     this.settle()
   }
 
@@ -184,12 +184,30 @@ export class UiModel {
 
   // The rows of the list that fit in its pane.
   get window(): ListWindow {
-    return new ListWindow(this.listed, this.grouped ? (card) => this.rankOf(card) : null, this.chosen, this.first, this.listHeight)
+    return new ListWindow(this.listed, this.headingOf, this.chosen, this.first, this.listHeight)
   }
 
-  // Whether the cards stand under the name of their level.
+  // The order the cards are in. The closed ones are told apart by how they were closed, which is what the owner
+  // looks for among them; the others by their level, in a project that grades its cards.
+  get order(): CardOrder {
+    if (!this.headed) return 'newest'
+    if (this.view === 'closed') return 'closing'
+
+    return this.scale.length === 0 ? 'newest' : 'level'
+  }
+
+  // Whether the cards stand under headings.
   get grouped(): boolean {
-    return this.order === 'level' && this.scale.length > 0
+    return this.order !== 'newest'
+  }
+
+  // The heading a card stands under, as a place among the headings; null when the cards have none.
+  private get headingOf(): ((card: Card) => number) | null {
+    const listing = new CardListing([], this.scale)
+
+    if (this.order === 'newest') return null
+
+    return this.order === 'closing' ? (card) => listing.closingRankOf(card) : (card) => listing.rankOf(card)
   }
 
   // How wide what is written in the detail may be.
@@ -277,7 +295,7 @@ export class UiModel {
     if (input === 'q') this.finished = true
     else if (input === '?') this.box = new HelpForm()
     else if (input === '/') this.searching = true
-    else if (input === 's' && this.scale.length > 0) this.order = this.order === 'level' ? 'newest' : 'level'
+    else if (input === 's') this.headed = !this.headed
     else if (input === 'f') this.box = FilterForm.for(this.catalog, this.listingOf(this.view), this.labels, this.since)
     else if (tab !== undefined && card !== null) this.show(tab)
     else if (card === null) return
@@ -374,7 +392,7 @@ export class UiModel {
 
     this.cursor = kept === -1 ? Math.min(this.cursor, Math.max(0, cards.length - 1)) : kept
     this.chosen = cards[this.cursor]?.number ?? null
-    this.first = ListWindow.startFor(cards, this.grouped ? (card) => this.rankOf(card) : null, this.cursor, this.first, this.listHeight)
+    this.first = ListWindow.startFor(cards, this.headingOf, this.cursor, this.first, this.listHeight)
 
     if (this.chosen !== before) this.scroll = 0
     if (this.chosen === null) this.focus = 'list'

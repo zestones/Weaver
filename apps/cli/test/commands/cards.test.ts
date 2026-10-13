@@ -8,7 +8,7 @@ import { makeProject, SETTINGS, weaver, writeConfig } from '../fixtures/project.
 
 const HINT = 'Read one with weaver cards <number>, and close it with weaver close <number> fixed|wontfix|issue|invalid [reason].'
 const USAGE = [
-  'Usage: weaver cards [<number>] [--all] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--sort newest|level]',
+  'Usage: weaver cards [<number>] [--all] [--closed [fixed|wontfix|issue|invalid]] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--search <words>] [--sort newest|level]',
   'Run weaver help cards for what each word means.',
 ]
 const OTHER_FLAG = [
@@ -84,7 +84,7 @@ test('cards lists the cards that wait, one line each, newest first; --all adds t
   assert.equal(all.lines[0], '4 cards')
   assert.deepEqual(cardsOf(all.lines), [
     '#4 merged into #1 | the cache is never emptied. | src/cache.ts',
-    '#3 closed (wontfix) | the cache is never emptied.',
+    '#3 closed (wontfix) | the cache is never emptied. | reason: the cache lives as long as the process',
     '#2 open | The response is cast to User without being parsed. | src/api/user.ts:7',
     '#1 raw | no call of refresh() exists under src/. | src/auth/token.ts:42',
   ])
@@ -146,6 +146,39 @@ test('the list is narrowed by several labels, by date and to what someone conclu
   for (const words of [['--label', 'api'], ['--since', 'yesterday'], ['--sort', 'gravity'], ['--sort']]) {
     assert.deepEqual(await weaver(top, ['cards', ...words]), { status: 2, lines: USAGE }, words.join(' '))
   }
+})
+
+test('the closed cards are listed alone, all of them or those closed one way, each with why and the issue it became', async () => {
+  flag(top)
+  flag(top, { text: OTHER_FLAG, places: [] })
+  finding(top)
+  inRegistry(top, (registry) => {
+    registry.closeCard(1, 'wontfix', 'the token\nlives an hour')
+    registry.closeCard(2, 'issue', null, 'https://issues.example/42')
+  })
+
+  const closed = await weaver(top, ['cards', '--closed'])
+
+  assert.equal(closed.lines[0], '2 cards')
+  assert.deepEqual(cardsOf(closed.lines), [
+    '#2 closed (issue) | the cache is never emptied. | issue: https://issues.example/42',
+    '#1 closed (wontfix) | no call of refresh() exists under src/. | src/auth/token.ts:42 | reason: the token lives an hour',
+  ])
+  assert.deepEqual(cardsOf((await weaver(top, ['cards', '--closed', 'wontfix'])).lines), [
+    '#1 closed (wontfix) | no call of refresh() exists under src/. | src/auth/token.ts:42 | reason: the token lives an hour',
+  ])
+  assert.deepEqual((await weaver(top, ['cards', '--closed', 'fixed'])).lines, ['No card matches.'])
+  assert.deepEqual(
+    cardsOf((await weaver(top, ['cards', '--closed', '--search', 'lives an HOUR'])).lines).map((line) => line.slice(0, 2)),
+    ['#1'],
+    'the reason a card was closed for is searched too',
+  )
+  assert.deepEqual(cardsOf((await weaver(top, ['cards', '--search', 'cast to user'])).lines), [
+    '#3 open | The response is cast to User without being parsed. | src/api/user.ts:7',
+  ])
+  assert.deepEqual((await weaver(top, ['cards', '--search', 'nothing says this'])).lines, ['No card matches.'])
+  assert.deepEqual(await weaver(top, ['cards', '--search']), { status: 2, lines: USAGE })
+  assert.deepEqual(await weaver(top, ['cards', '--closed', 'sometime']), { status: 2, lines: USAGE })
 })
 
 test('a card that waits and points at a line that no longer reads as it did says so on its line', async () => {
@@ -240,7 +273,7 @@ test('an agent that reads a card is told how to write on it what it finds, and t
 })
 
 test('words that cards does not know are answered with how it is written', async () => {
-  assert.deepEqual(await weaver(top, ['cards', '--closed']), { status: 2, lines: USAGE })
+  assert.deepEqual(await weaver(top, ['cards', '--waiting']), { status: 2, lines: USAGE })
   assert.deepEqual(await weaver(top, ['cards', '--file']), { status: 2, lines: USAGE })
   assert.deepEqual(await weaver(top, ['cards', 'reopened', '1']), { status: 2, lines: USAGE })
 })

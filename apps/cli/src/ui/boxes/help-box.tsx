@@ -12,9 +12,9 @@ const KEYS: readonly (readonly [string, readonly (readonly [string, string])[]])
       ['↑ ↓  j k', 'the card above, the card under'],
       ['← →', 'the view before, the view after'],
       ['enter', 'go into the card, to scroll it'],
-      ['/', 'search what the cards say'],
+      ['/', 'search what the cards say, and why they were closed'],
       ['f', 'narrow the list by labels and by date'],
-      ['s', 'put the cards in order by level, or newest first'],
+      ['s', 'cards under their level or how they closed, or newest first'],
     ],
   ],
   [

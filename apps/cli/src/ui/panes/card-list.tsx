@@ -3,6 +3,7 @@ import { Box, Text } from 'ink'
 import type { ReactNode } from 'react'
 import type { ListRow } from '../model/list-window.ts'
 import type { UiModel } from '../model/ui-model.ts'
+import { ClosedAs } from '../parts/closed-as.ts'
 import { Framed } from '../parts/framed.tsx'
 import { Level } from '../parts/level.ts'
 import { Pill } from '../parts/pill.tsx'
@@ -33,8 +34,11 @@ function CardRow({ model, card, chosen, numbers }: RowProps): ReactNode {
   const labels = model.families.includes(LabelFamilies.AREA)
     ? card.valuesOf(LabelFamilies.AREA)
     : Object.entries(card.record.written?.labels ?? {}).flatMap(([family, values]) =>
-        model.grouped && family === LabelFamilies.LEVEL ? [] : values,
+        model.order === 'level' && family === LabelFamilies.LEVEL ? [] : values,
       )
+  const closing = card.record.closing
+  // Under how they were closed, the cards say when: how they stand is their heading.
+  const underClosing = model.order === 'closing' && closing !== null
 
   return (
     <Box flexDirection='column' paddingX={1} backgroundColor={chosen ? THEME.raised : THEME.panel}>
@@ -48,14 +52,14 @@ function CardRow({ model, card, chosen, numbers }: RowProps): ReactNode {
       </Box>
       <Box gap={1} height={1} paddingLeft={numbers + 1}>
         {concluded === null ? null : <Pill tone={CONCLUDED[concluded.as].tone}>{`${CONCLUDED[concluded.as].mark} ${concluded.as}`}</Pill>}
-        {card.isWaiting ? null : <Pill tone='quiet'>{card.standing}</Pill>}
+        {card.isWaiting || underClosing ? null : <Pill tone='quiet'>{card.standing}</Pill>}
         <Box flexGrow={1} flexShrink={1} overflow='hidden' height={1}>
           <Text color={THEME.muted} wrap='truncate-end'>
             {labels.join(', ')}
           </Text>
         </Box>
         <Box flexShrink={0}>
-          <Text color={THEME.muted}>{model.ageOf(card)}</Text>
+          <Text color={THEME.muted}>{underClosing ? model.agoOf(closing.at) : model.ageOf(card)}</Text>
         </Box>
       </Box>
     </Box>
@@ -66,12 +70,12 @@ function Row({ model, row, numbers }: { readonly model: UiModel; readonly row: L
   if (row.kind === 'card') return <CardRow model={model} card={row.card} chosen={row.chosen} numbers={numbers} />
   if (row.kind === 'more') return <Text color={THEME.muted}>{` ${row.above ? '↑' : '↓'} ${String(row.count)} more`}</Text>
 
-  const level = new Level(model.scale, row.rank)
+  const level = model.order === 'closing' ? new ClosedAs(row.rank) : new Level(model.scale, row.rank)
   const count = String(row.count)
   const rule = Math.max(0, model.listWidth - AROUND_ROW - level.name.length - count.length - 2)
 
-  // The name of a level, how many cards it holds, and a rule to the edge of the pane: it reads as the heading of
-  // the cards under it.
+  // The name of a level or of a way of closing, how many cards it holds, and a rule to the edge of the pane: it
+  // reads as the heading of the cards under it.
   return (
     <Box gap={1} paddingX={1} height={1}>
       <Text bold color={TONES[level.tone].ink}>
@@ -108,7 +112,9 @@ export function CardList({ model }: Props): ReactNode {
         </Text>
         <Text color={THEME.muted}>{String(cards.length)}</Text>
         <Box flexGrow={1} />
-        <Text color={THEME.muted}>{model.grouped ? 'by level ↓' : 'newest first'}</Text>
+        <Text color={THEME.muted}>
+          {model.order === 'level' ? 'by level ↓' : model.order === 'closing' ? 'by closing ↓' : 'newest first'}
+        </Text>
       </Box>
       <Box height={1} />
       {cards.length === 0 ? (

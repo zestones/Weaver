@@ -56,3 +56,31 @@ test('the values of a family are counted over the cards of the list', () => {
   assert.deepEqual(listing.narrowed({ labels: { area: ['client'] } }).counts('level'), { high: 1 })
   assert.deepEqual(listing.counts('nothing'), {})
 })
+
+test('closed cards are put in order by how they were closed, the last closed first in each way, and narrowed to a way', () => {
+  const closedOf = (number: number, as: 'fixed' | 'wontfix' | 'issue' | 'invalid', at: string, reason: string | null = null): Card =>
+    new Card({
+      ...cardOf(number, {}).record,
+      state: 'closed',
+      closing: { as, reason, issue: as === 'issue' ? 'https://issues.example/42' : null, at },
+    })
+  const closed = new CardListing([
+    closedOf(1, 'wontfix', '2026-10-12T08:00:00.000Z', 'the token lives an hour'),
+    closedOf(2, 'fixed', '2026-10-12T09:00:00.000Z'),
+    closedOf(3, 'issue', '2026-10-12T10:00:00.000Z'),
+    closedOf(4, 'fixed', '2026-10-13T09:00:00.000Z'),
+    closedOf(5, 'invalid', '2026-10-13T10:00:00.000Z'),
+    cardOf(6, {}),
+  ])
+
+  assert.deepEqual(numbers(closed.ordered('closing')), [4, 2, 1, 3, 5, 6], 'a card that is not closed comes after the closed ones')
+  assert.deepEqual(
+    closed.ordered('closing').map((card) => closed.closingRankOf(card)),
+    [0, 0, 1, 2, 3, 4],
+  )
+  assert.deepEqual(numbers(closed.narrowed({ closedAs: ['wontfix', 'issue'] }).ordered('newest')), [3, 1])
+  assert.deepEqual(numbers(closed.narrowed({ closedAs: [] }).cards).length, 6)
+  assert.deepEqual(numbers(closed.narrowed({ words: 'lives an hour' }).cards), [1], 'the reason of a closing is part of what a card says')
+  assert.deepEqual(numbers(closed.narrowed({ words: 'issues.example/42' }).cards), [3], 'and so is the issue it became')
+  assert.deepEqual(numbers(closed.narrowed({ words: 'invalid' }).cards), [5])
+})

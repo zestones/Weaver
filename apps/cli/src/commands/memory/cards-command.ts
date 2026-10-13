@@ -1,6 +1,16 @@
 import { realpathSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
-import { Card, CardListing, LabelFamilies, NoteText, PlaceText, type CardFilter, type CardOrder, type CardState } from '@weaver/memory'
+import {
+  Card,
+  CardListing,
+  LabelFamilies,
+  NoteText,
+  PlaceText,
+  type CardFilter,
+  type CardOrder,
+  type CardState,
+  type Closing,
+} from '@weaver/memory'
 import type { Caller } from '../../caller/caller.ts'
 import { Period } from '../../numbers/period.ts'
 import { Counted } from '../../output/counted.ts'
@@ -11,11 +21,16 @@ import type { Command } from '../line/command.ts'
 
 interface Asked {
   readonly all: boolean
+  // Only the closed cards; with a way of closing, only those closed that way.
+  readonly closed: boolean
+  readonly closedAs: Closing | null
   readonly file: string | null
   // Each as `family:value`.
   readonly labels: readonly string[]
   readonly since: Date | null
   readonly answered: boolean
+  // Words that what a card says must hold.
+  readonly words: string
   readonly order: CardOrder
 }
 
@@ -24,8 +39,7 @@ const ORDERS: readonly CardOrder[] = ['newest', 'level']
 
 export class CardsCommand implements Command {
   readonly name = 'cards'
-  readonly usage =
-    'cards [<number>] [--all] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--sort newest|level]'
+  readonly usage = `cards [<number>] [--all] [--closed [${Card.CLOSINGS.join('|')}]] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--search <words>] [--sort newest|level]`
   readonly summary = 'List the cards that wait for you, or show one'
   readonly ownerOnly = false
   readonly help = {
@@ -34,10 +48,12 @@ export class CardsCommand implements Command {
     words: [
       ['[<number>]', 'Show this card'],
       ['--all', 'List the closed and the merged cards too'],
+      [`--closed [${Card.CLOSINGS.join('|')}]`, 'Only the closed cards; with a way of closing, only those closed that way'],
       ['--file <path>', 'Only the cards about this file'],
       ['--label <family:value>', 'Only the cards that carry this label; given several times, one of the values of each family named'],
       ['--since <day>|<n>d', 'Only the cards made since a day, as 2026-10-01, or in the last days, as 7d'],
       ['--answered', 'Only the cards someone concluded on'],
+      ['--search <words>', 'Only the cards that say these words: in their text, their notes, or the reason they were closed for'],
       ['--sort newest|level', 'The newest first, or the gravest first by the level the project grades its cards with'],
     ],
     examples: [
@@ -45,6 +61,7 @@ export class CardsCommand implements Command {
       'weaver cards 12',
       'weaver cards --all --file src/auth/token.ts',
       'weaver cards --label level:high --label area:api --sort level',
+      'weaver cards --closed wontfix',
     ],
   } as const
   private readonly cwd: string
@@ -73,14 +90,31 @@ export class CardsCommand implements Command {
 
   private asked(args: readonly string[]): Asked | null {
     const words = [...args]
-    let asked: Asked = { all: false, file: null, labels: [], since: null, answered: false, order: 'newest' }
+    let asked: Asked = {
+      all: false,
+      closed: false,
+      closedAs: null,
+      file: null,
+      labels: [],
+      since: null,
+      answered: false,
+      words: '',
+      order: 'newest',
+    }
 
     while (words.length > 0) {
       const word = words.shift()
       const value = words[0] ?? ''
 
+      const closing = Card.CLOSINGS.find((known) => known === value)
+
       if (word === '--all') asked = { ...asked, all: true }
       else if (word === '--answered') asked = { ...asked, answered: true }
+      else if (word === '--closed') {
+        // The way of closing may follow, or not: `--closed` alone is every closed card.
+        if (closing !== undefined) words.shift()
+        asked = { ...asked, closed: true, closedAs: closing ?? null }
+      } else if (word === '--search' && words.length > 0) asked = { ...asked, words: words.shift() ?? '' }
       else if (word === '--file' && words.length > 0) asked = { ...asked, file: words.shift() ?? null }
       else if (word === '--label' && /^[^:]+:[^:]+$/.test(value)) asked = { ...asked, labels: [...asked.labels, words.shift() ?? ''] }
       else if (word === '--since' && Period.from(value) !== null)
@@ -125,21 +159,27 @@ export class CardsCommand implements Command {
     ]
   }
 
-  private list({ all, file, labels, since, answered, order }: Asked): number {
+  private list({ all, closed, closedAs, file, labels, since, answered, words, order }: Asked): number {
     const project = Project.locate(this.cwd)
     const filter: CardFilter = {
-      ...(all ? { states: EVERY_STATE } : {}),
+      ...(closed ? { states: ['closed'] } : all ? { states: EVERY_STATE } : {}),
       // The registry names a file from the top of the repository, and the owner from where they stand.
       ...(file === null ? {} : { file: relative(project.top, resolve(realpathSync(this.cwd), file)) }),
     }
-    const narrowed = Object.keys(filter).length > 0 || labels.length > 0 || since !== null || answered
+    const narrowed = Object.keys(filter).length > 0 || labels.length > 0 || since !== null || answered || words !== ''
     const registry = project.recordedRegistry()
 
     try {
       // The level a project grades its cards with is read only when the cards are put in that order.
       const scale = order === 'level' ? Object.keys(project.readableDeclaration()?.labels[LabelFamilies.LEVEL] ?? {}) : []
       const cards = new CardListing(registry?.list(filter) ?? [], scale)
-        .narrowed({ labels: this.wanted(labels), since: since?.toISOString() ?? null, answered })
+        .narrowed({
+          labels: this.wanted(labels),
+          since: since?.toISOString() ?? null,
+          answered,
+          closedAs: closedAs === null ? [] : [closedAs],
+          words,
+        })
         .ordered(order)
 
       if (cards.length === 0) {
@@ -158,7 +198,7 @@ export class CardsCommand implements Command {
       const widths = (columns[0] ?? []).map((_, column) => Math.max(...columns.map((cells) => (cells[column] ?? '').length)))
       const waiting = new Counted(cards.length, 'card waits', 'cards wait').text
 
-      this.screen.line(this.screen.bold(all ? new Counted(cards.length, 'card').text : `${waiting} for you`))
+      this.screen.line(this.screen.bold(all || closed ? new Counted(cards.length, 'card').text : `${waiting} for you`))
 
       for (const [index, [what = '', ...under]] of rows.entries()) {
         const start = `  ${(columns[index] ?? []).map((cell, column) => cell.padEnd(widths[column] ?? 0)).join('  ')}  `
@@ -190,14 +230,21 @@ export class CardsCommand implements Command {
     return wanted
   }
 
-  // What a card is about, then what goes under it: where it is, and the places whose line changed since. A line
-  // that changed is a hint to look again, never a closing: the thing may have moved, or be fixed.
+  // What a card is about, then what goes under it: where it is, the places whose line changed since, and for a
+  // closed card why it was closed and the issue it became. A line that changed is a hint to look again, never a
+  // closing: the thing may have moved, or be fixed.
   private row(card: Card, project: Project): string[] {
     const [first, ...others] = card.places
     const where = first === undefined ? [] : [`${PlaceText.write(first)}${others.length === 0 ? '' : ` +${String(others.length)}`}`]
     const changed = card.isWaiting ? card.changedPlaces((file) => project.read(file)) : []
     const since = changed.length === 0 ? [] : [`changed since: ${changed.map((place) => PlaceText.write(place)).join(', ')}`]
 
-    return [card.title, ...where, ...since]
+    const { reason = null, issue = null } = card.record.closing ?? {}
+    const closed = [
+      ...(reason === null ? [] : [`reason: ${reason.replaceAll(/\s+/g, ' ').trim()}`]),
+      ...(issue === null ? [] : [`issue: ${issue.trim()}`]),
+    ]
+
+    return [card.title, ...where, ...since, ...closed]
   }
 }

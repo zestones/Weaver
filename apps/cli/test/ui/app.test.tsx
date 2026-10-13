@@ -14,6 +14,8 @@ const SIZE = { columns: 100, rows: 30 }
 const DOWN = '\u001B[B'
 const ENTER = '\r'
 const ESCAPE = '\u001B'
+const RIGHT = '\u001B[C'
+const LEFT = '\u001B[D'
 // Ink draws a key after the turn it was read in.
 const drawn = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 60))
 
@@ -75,6 +77,11 @@ test('the screen shows the views, the list under its levels, the selected card a
       'what was done is said where the keys are, until the next key',
     )
     assert.match(frame(), /Open 3 /)
+
+    await typed(RIGHT, RIGHT)
+    assert.match(frame(), /▊ {2}Cards 2 +by closing ↓ {2}▎/, 'the closed cards stand under how they were closed')
+    assert.match(frame(), /▊ {2}WONTFIX 2 ─+ {2}▎/)
+    await typed(LEFT, LEFT)
 
     await typed('?')
     assert.match(frame(), /Keys +esc/)

@@ -101,6 +101,28 @@ test('the list is narrowed in the filter box, by labels and by date, and searche
   assert.deepEqual([model.words.text, numbers(model).length], ['', 4])
 })
 
+test('the closed cards stand under how they were closed, the last closed first, and are found by the reason given', () => {
+  press(model, 'c', 'enter', 'c', 'v', 'tab', 'type:refresh() is called by the scheduler', 'enter', 'right', 'right')
+
+  assert.deepEqual([model.view, model.order, model.grouped], ['closed', 'closing', true])
+  assert.deepEqual([cardOf(top, 4).standing, cardOf(top, 1).standing], ['closed (fixed)', 'closed (invalid)'])
+  assert.deepEqual(
+    rows(model),
+    ['rank 0: 1', '#4*', 'rank 1: 1', '#5', 'rank 3: 1', '#1'],
+    'fixed, wontfix, then invalid: no card became an issue',
+  )
+
+  press(model, '/', 'type:scheduler', 'enter')
+  assert.deepEqual(numbers(model), [1], 'the reason a card was closed for is part of what the search reads')
+  press(model, '/', 'esc', '/', 'type:WONTFIX', 'enter')
+  assert.deepEqual(numbers(model), [5], 'and so is the way it was closed')
+
+  press(model, '/', 'esc', 's')
+  assert.deepEqual([model.order, numbers(model), rows(model)], ['newest', [5, 4, 1], ['#5*', '#4', '#1']])
+  press(model, 's', 'left', 'left')
+  assert.deepEqual([model.view, model.order], ['open', 'level'], 'the cards that wait stand under their level')
+})
+
 test('a card is closed in its box: what someone concluded gives how, and the reason the owner keeps or corrects', () => {
   press(model, 'c')
 
