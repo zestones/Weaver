@@ -21,13 +21,14 @@ export class BeforeCall implements Moment {
     if (call === null) return Answer.silent()
 
     const flag = FlagCall.in(call)
+    const notes = NoteCall.among(call)
 
-    // A flag is answered here in place of its command, so no guard has a call to judge.
-    if (flag !== null) return Answer.refusing(this.flagged(turn, flag))
-
-    const note = NoteCall.in(call)
-
-    if (note !== null) return Answer.refusing(this.noted(turn, note))
+    // A flag and a note are answered here in place of their command, so no guard has a call to judge.
+    if (flag !== null || notes.length > 0) {
+      return Answer.refusing(
+        [...(flag === null ? [] : [this.flagged(turn, flag)]), ...notes.map((note) => this.noted(turn, note))].join('\n'),
+      )
+    }
 
     const session = turn.session()
     const refusal = new ProjectGuards(turn.declaration, turn.repo).refusal(call)

@@ -68,6 +68,38 @@ test('a note says its text on its line too, concludes nothing when it gives no w
   assert.deepEqual(notesOf(), [{ unit: 1, card: 1, conclusion: null }])
 })
 
+test('a call that writes on several cards, and flags too, is answered for each: nothing an agent said in it is lost', () => {
+  refusalOf(session, bashCall(flagCommand([A_FILE], FLAG_BODY.replace('refresh()', 'renew()'))))
+
+  const command = [
+    `weaver note 1 confirmed <<'EOF'\n${REPORT}EOF`,
+    'echo "exit $?"',
+    `weaver note 2 refuted <<'EOF'\nrenew() is called by the scheduler.\nEOF`,
+    flagCommand([A_FILE], FLAG_BODY.replace('refresh()', 'rotate()')),
+  ].join('\n')
+
+  assert.equal(
+    refusalOf(session, bashCall(command)),
+    [
+      '[weaver] Flag 3 recorded for the owner. This command is answered here and never runs: that is expected. Go on with your task.',
+      WRITTEN(1),
+      WRITTEN(2),
+    ].join('\n'),
+  )
+  assert.deepEqual(
+    cardsOf(session.repo).map((card) => [card.number, card.standing, card.record.notes.map((written) => written.text)]),
+    [
+      [1, 'raw (confirmed)', [REPORT.trim()]],
+      [2, 'raw (refuted)', ['renew() is called by the scheduler.']],
+      [3, 'raw', []],
+    ],
+  )
+  assert.deepEqual(notesOf(), [
+    { unit: 1, card: 1, conclusion: 'confirmed' },
+    { unit: 1, card: 2, conclusion: 'refuted' },
+  ])
+})
+
 test('a call the hook sees twice writes one note', () => {
   const call = note('1 fixed')
 

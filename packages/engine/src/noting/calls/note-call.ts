@@ -15,9 +15,10 @@ export class NoteCall {
     this.body = weaver.heredoc
   }
 
-  static in(call: ToolCall): NoteCall | null {
-    const weaver = WeaverCommand.among(call.commands()).find(({ words }) => words[0] === COMMAND)
-
-    return weaver === undefined ? null : new NoteCall(weaver)
+  // Every note of a call: an agent that looked into several cards writes on each in one call.
+  static among(call: ToolCall): NoteCall[] {
+    return WeaverCommand.among(call.commands())
+      .filter(({ words }) => words[0] === COMMAND)
+      .map((weaver) => new NoteCall(weaver))
   }
 }
