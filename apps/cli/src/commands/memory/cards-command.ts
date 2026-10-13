@@ -1,7 +1,8 @@
 import { realpathSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
-import { Card, NoteText, PlaceText, type CardFilter, type CardState } from '@weaver/memory'
+import { Card, CardListing, LabelFamilies, NoteText, PlaceText, type CardFilter, type CardOrder, type CardState } from '@weaver/memory'
 import type { Caller } from '../../caller/caller.ts'
+import { Period } from '../../numbers/period.ts'
 import { Counted } from '../../output/counted.ts'
 import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
@@ -11,14 +12,20 @@ import type { Command } from '../line/command.ts'
 interface Asked {
   readonly all: boolean
   readonly file: string | null
-  readonly label: string | null
+  // Each as `family:value`.
+  readonly labels: readonly string[]
+  readonly since: Date | null
+  readonly answered: boolean
+  readonly order: CardOrder
 }
 
 const EVERY_STATE: readonly CardState[] = ['raw', 'open', 'closed', 'merged']
+const ORDERS: readonly CardOrder[] = ['newest', 'level']
 
 export class CardsCommand implements Command {
   readonly name = 'cards'
-  readonly usage = 'cards [<number>] [--all] [--file <path>] [--label <family:value>]'
+  readonly usage =
+    'cards [<number>] [--all] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--sort newest|level]'
   readonly summary = 'List the cards that wait for you, or show one'
   readonly ownerOnly = false
   readonly help = {
@@ -28,9 +35,17 @@ export class CardsCommand implements Command {
       ['[<number>]', 'Show this card'],
       ['--all', 'List the closed and the merged cards too'],
       ['--file <path>', 'Only the cards about this file'],
-      ['--label <family:value>', 'Only the cards that carry this label'],
+      ['--label <family:value>', 'Only the cards that carry this label; given several times, one of the values of each family named'],
+      ['--since <day>|<n>d', 'Only the cards made since a day, as 2026-10-01, or in the last days, as 7d'],
+      ['--answered', 'Only the cards someone concluded on'],
+      ['--sort newest|level', 'The newest first, or the gravest first by the level the project grades its cards with'],
     ],
-    examples: ['weaver cards', 'weaver cards 12', 'weaver cards --all --file src/auth/token.ts'],
+    examples: [
+      'weaver cards',
+      'weaver cards 12',
+      'weaver cards --all --file src/auth/token.ts',
+      'weaver cards --label level:high --label area:api --sort level',
+    ],
   } as const
   private readonly cwd: string
   private readonly screen: Screen
@@ -58,14 +73,20 @@ export class CardsCommand implements Command {
 
   private asked(args: readonly string[]): Asked | null {
     const words = [...args]
-    let asked: Asked = { all: false, file: null, label: null }
+    let asked: Asked = { all: false, file: null, labels: [], since: null, answered: false, order: 'newest' }
 
     while (words.length > 0) {
       const word = words.shift()
+      const value = words[0] ?? ''
 
       if (word === '--all') asked = { ...asked, all: true }
+      else if (word === '--answered') asked = { ...asked, answered: true }
       else if (word === '--file' && words.length > 0) asked = { ...asked, file: words.shift() ?? null }
-      else if (word === '--label' && words.length > 0) asked = { ...asked, label: words.shift() ?? null }
+      else if (word === '--label' && /^[^:]+:[^:]+$/.test(value)) asked = { ...asked, labels: [...asked.labels, words.shift() ?? ''] }
+      else if (word === '--since' && Period.from(value) !== null)
+        asked = { ...asked, since: Period.from(words.shift() ?? '')?.since ?? null }
+      else if (word === '--sort' && ORDERS.some((order) => order === value))
+        asked = { ...asked, order: words.shift() === 'level' ? 'level' : 'newest' }
       else return null
     }
 
@@ -104,33 +125,43 @@ export class CardsCommand implements Command {
     ]
   }
 
-  private list({ all, file, label }: Asked): number {
+  private list({ all, file, labels, since, answered, order }: Asked): number {
     const project = Project.locate(this.cwd)
     const filter: CardFilter = {
       ...(all ? { states: EVERY_STATE } : {}),
       // The registry names a file from the top of the repository, and the owner from where they stand.
       ...(file === null ? {} : { file: relative(project.top, resolve(realpathSync(this.cwd), file)) }),
-      ...(label === null ? {} : { label }),
     }
+    const narrowed = Object.keys(filter).length > 0 || labels.length > 0 || since !== null || answered
     const registry = project.recordedRegistry()
 
     try {
-      const cards = (registry?.list(filter) ?? []).toReversed()
+      // The level a project grades its cards with is read only when the cards are put in that order.
+      const scale = order === 'level' ? Object.keys(project.readableDeclaration()?.labels[LabelFamilies.LEVEL] ?? {}) : []
+      const cards = new CardListing(registry?.list(filter) ?? [], scale)
+        .narrowed({ labels: this.wanted(labels), since: since?.toISOString() ?? null, answered })
+        .ordered(order)
 
       if (cards.length === 0) {
-        this.screen.line(Object.keys(filter).length === 0 ? 'Nothing waits for you.' : 'No card matches.')
+        this.screen.line(narrowed ? 'No card matches.' : 'Nothing waits for you.')
 
         return 0
       }
 
       const rows = cards.map((card) => this.row(card, project))
-      const widths = [0, 1].map((column) => Math.max(...rows.map((row) => (row[column] ?? '').length)))
+      // Put in order by level, each card says its level before what it is about.
+      const columns = cards.map((card) => [
+        `#${String(card.number)}`,
+        card.standing,
+        ...(scale.length === 0 ? [] : [card.valuesOf(LabelFamilies.LEVEL).join(', ') || '-']),
+      ])
+      const widths = (columns[0] ?? []).map((_, column) => Math.max(...columns.map((cells) => (cells[column] ?? '').length)))
       const waiting = new Counted(cards.length, 'card waits', 'cards wait').text
 
       this.screen.line(this.screen.bold(all ? new Counted(cards.length, 'card').text : `${waiting} for you`))
 
-      for (const [number = '', standing = '', what = '', ...under] of rows) {
-        const start = `  ${number.padEnd(widths[0] ?? 0)}  ${standing.padEnd(widths[1] ?? 0)}  `
+      for (const [index, [what = '', ...under]] of rows.entries()) {
+        const start = `  ${(columns[index] ?? []).map((cell, column) => cell.padEnd(widths[column] ?? 0)).join('  ')}  `
 
         this.screen.line()
         this.screen.line(`${start}${what}`)
@@ -146,15 +177,27 @@ export class CardsCommand implements Command {
     }
   }
 
-  // The number of a card, how it stands and what it is about, then what goes under it: where it is, and the places
-  // whose line changed since. A line that changed is a hint to look again, never a closing: the thing may have moved,
-  // or be fixed.
+  // The labels asked for, family by family: one of the values of each family is enough for a card to be listed.
+  private wanted(labels: readonly string[]): Record<string, string[]> {
+    const wanted: Record<string, string[]> = {}
+
+    for (const label of labels) {
+      const [family = '', value = ''] = label.split(':')
+
+      wanted[family] = [...(wanted[family] ?? []), value]
+    }
+
+    return wanted
+  }
+
+  // What a card is about, then what goes under it: where it is, and the places whose line changed since. A line
+  // that changed is a hint to look again, never a closing: the thing may have moved, or be fixed.
   private row(card: Card, project: Project): string[] {
     const [first, ...others] = card.places
     const where = first === undefined ? [] : [`${PlaceText.write(first)}${others.length === 0 ? '' : ` +${String(others.length)}`}`]
     const changed = card.isWaiting ? card.changedPlaces((file) => project.read(file)) : []
     const since = changed.length === 0 ? [] : [`changed since: ${changed.map((place) => PlaceText.write(place)).join(', ')}`]
 
-    return [`#${String(card.number)}`, card.standing, card.title, ...where, ...since]
+    return [card.title, ...where, ...since]
   }
 }

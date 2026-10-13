@@ -3,12 +3,12 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
-import { cardOf, contextOf, finding, flag, inRegistry, write } from '../fixtures/cards.ts'
-import { makeProject, weaver } from '../fixtures/project.ts'
+import { cardOf, contextOf, finding, flag, inRegistry, note, write } from '../fixtures/cards.ts'
+import { makeProject, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
 
 const HINT = 'Read one with weaver cards <number>, and close it with weaver close <number> fixed|wontfix|issue|invalid [reason].'
 const USAGE = [
-  'Usage: weaver cards [<number>] [--all] [--file <path>] [--label <family:value>]',
+  'Usage: weaver cards [<number>] [--all] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--sort newest|level]',
   'Run weaver help cards for what each word means.',
 ]
 const OTHER_FLAG = [
@@ -107,6 +107,45 @@ test('the list is narrowed to a file, named from where the owner stands, and to 
     '#1 open | Nothing refreshes the token | src/auth/token.ts:42',
   ])
   assert.deepEqual((await weaver(top, ['cards', '--label', 'area:api', '--file', 'src/auth/token.ts'])).lines, ['No card matches.'])
+})
+
+test('the list is narrowed by several labels, by date and to what someone concluded on, and put in order by level', async () => {
+  writeConfig(top, {
+    settings: SETTINGS,
+    labels: { level: { high: 'Breaks a function.', low: 'Changes nothing.' }, area: { api: 'The API.', auth: 'Who signs in.' } },
+  })
+  flag(top)
+  write(top, 1, { labels: { level: ['low'], area: ['auth'] } })
+  flag(top, { text: OTHER_FLAG, places: [] })
+  write(top, 2, { title: 'The cache is never emptied', labels: { level: ['high'], area: ['api'] } })
+  finding(top)
+  note(top, 2)
+
+  const listed = async (...words: string[]): Promise<string[]> => cardsOf((await weaver(top, ['cards', ...words])).lines)
+
+  assert.deepEqual(await listed('--label', 'area:api', '--label', 'area:auth'), [
+    '#2 open (confirmed) | The cache is never emptied',
+    '#1 open | Nothing refreshes the token | src/auth/token.ts:42',
+  ])
+  assert.deepEqual(await listed('--label', 'area:api', '--label', 'area:auth', '--label', 'level:low'), [
+    '#1 open | Nothing refreshes the token | src/auth/token.ts:42',
+  ])
+  assert.deepEqual(await listed('--answered'), ['#2 open (confirmed) | The cache is never emptied'])
+  assert.deepEqual((await listed('--since', '2026-10-01')).length, 3)
+  assert.deepEqual((await weaver(top, ['cards', '--since', '2999-01-01'])).lines, ['No card matches.'])
+  assert.deepEqual(
+    (await weaver(top, ['cards', '--sort', 'level'])).lines.filter((line) => line.startsWith('  #')),
+    [
+      '  #2  open (confirmed)  high  The cache is never emptied',
+      '  #1  open              low   Nothing refreshes the token',
+      '  #3  open              -     The response is cast to User without being parsed.',
+    ],
+  )
+  assert.deepEqual(await listed('--sort', 'newest'), await listed())
+
+  for (const words of [['--label', 'api'], ['--since', 'yesterday'], ['--sort', 'gravity'], ['--sort']]) {
+    assert.deepEqual(await weaver(top, ['cards', ...words]), { status: 2, lines: USAGE }, words.join(' '))
+  }
 })
 
 test('a card that waits and points at a line that no longer reads as it did says so on its line', async () => {

@@ -53,7 +53,7 @@ test('retitle corrects the title of a card the writer wrote', async () => {
 })
 
 test('label replaces the labels of a card with labels the project declares', async () => {
-  const usage = ['Usage: weaver cards label <number> <family:value>...', 'Run weaver help cards label for what each word means.']
+  const usage = ['Usage: weaver cards label <number> [--set] <family:value>...', 'Run weaver help cards label for what each word means.']
 
   writeConfig(top, {
     settings: SETTINGS,
@@ -71,6 +71,20 @@ test('label replaces the labels of a card with labels the project declares', asy
   })
   assert.deepEqual(cardOf(top, 1).labels(), ['type:debt', 'type:bug', 'area:auth'])
   assert.deepEqual(await weaver(top, ['cards', 'label', '2', 'type:bug']), { status: 1, lines: [NOT_WRITTEN] })
+  assert.deepEqual(await weaver(top, ['cards', 'label', '1', '--set', 'area:auth']), {
+    status: 0,
+    lines: ['✓ Card #1 is now labelled type:debt, type:bug, area:auth.'],
+  })
+  assert.deepEqual(await weaver(top, ['cards', 'label', '1', '--set', 'type:bug']), {
+    status: 0,
+    lines: ['✓ Card #1 is now labelled type:bug, area:auth.'],
+  })
+  assert.deepEqual(
+    cardOf(top, 1).record.written?.labels,
+    { type: ['bug'], area: ['auth'] },
+    'the families named are replaced, the others kept',
+  )
+  assert.deepEqual(await weaver(top, ['cards', 'label', '1', '--set']), { status: 2, lines: usage })
   assert.deepEqual(await weaver(top, ['cards', 'label', '1']), { status: 2, lines: usage })
   assert.deepEqual(await weaver(top, ['cards', 'label', '1', 'bug']), { status: 2, lines: usage })
 })
