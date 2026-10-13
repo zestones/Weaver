@@ -198,7 +198,7 @@ export class CardPage {
         ...(conclusion === null ? [] : [conclusion]),
       ]),
       '',
-      ...this.markdown.lines(text),
+      ...this.markdown.typed(text),
     ])
 
     return notes.length === 0 ? [] : [...this.titled('Notes'), ...notes]

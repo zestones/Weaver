@@ -11,7 +11,7 @@ const BODY = 'Seen: a\nExpected: b\nFound: c\nChecked: d\nDid: left as it is.\n'
 function flagIn(command: string, tool = 'Bash'): FlagCall | null {
   const { call } = claude.read(new Payload({ cwd: TOP, tool_name: tool, tool_input: { command, file_path: '/repo/a.ts' } }))
 
-  return call === null ? null : FlagCall.in(call)
+  return call === null ? null : (FlagCall.among(call)[0] ?? null)
 }
 
 test('a flag is the command that runs weaver with flag as its first word, by its name, by a path or through node', () => {
@@ -26,6 +26,23 @@ test('a flag is the command that runs weaver with flag as its first word, by its
 
     assert.deepEqual([flag?.places, flag?.body, flag?.cwd], [['src/a.ts:12', 'src/b.ts'], BODY, TOP], program)
   }
+
+  const { call } = claude.read(
+    new Payload({
+      cwd: TOP,
+      tool_name: 'Bash',
+      tool_input: { command: `weaver flag src/a.ts <<'EOF'\n${BODY}EOF\ncd src && weaver flag b.ts <<'EOF'\n${BODY}EOF` },
+    }),
+  )
+
+  assert.deepEqual(
+    call === null ? [] : FlagCall.among(call).map(({ places, cwd }) => [places, cwd]),
+    [
+      [['src/a.ts'], TOP],
+      [['b.ts'], `${TOP}/src`],
+    ],
+    'a call holds every flag it makes',
+  )
 
   for (const command of [
     'weaver cards',

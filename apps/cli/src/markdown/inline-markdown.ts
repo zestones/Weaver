@@ -4,6 +4,7 @@ import type { Atom } from './atom.ts'
 
 type Style = (word: string) => string
 type Add = (raw: string, style: Style) => void
+type Break = () => void
 
 // What a parser of Markdown found inside a line, as atoms: each word drawn by itself, so that a line may be broken
 // between any two of them without a style running over the break.
@@ -15,8 +16,8 @@ export class InlineMarkdown {
   }
 
   atoms(tokens: readonly Token[], overall: Style = (word) => word): Atom[] {
-    return this.gathered((add) => {
-      this.walk(tokens, overall, add)
+    return this.gathered((add, newLine) => {
+      this.walk(tokens, overall, add, newLine)
     })
   }
 
@@ -31,50 +32,60 @@ export class InlineMarkdown {
     })
   }
 
-  private gathered(fill: (add: Add) => void): Atom[] {
+  private gathered(fill: (add: Add, newLine: Break) => void): Atom[] {
     const atoms: Atom[] = []
     // Whether the next piece touches the atom before it: a full stop after a word in code belongs to that word.
     let glued = false
+    // Whether a line break came since the last atom: the next one opens a line.
+    let broken = false
 
-    fill((raw, style) => {
-      for (const part of raw.split(/(\s+)/)) {
-        if (part === '') continue
+    fill(
+      (raw, style) => {
+        for (const part of raw.split(/(\s+)/)) {
+          if (part === '') continue
 
-        if (/^\s+$/.test(part)) {
-          glued = false
-          continue
+          if (/^\s+$/.test(part)) {
+            glued = false
+            continue
+          }
+
+          const last = atoms.at(-1)
+
+          if (glued && last !== undefined)
+            atoms[atoms.length - 1] = { ...last, text: `${last.text}${style(part)}`, width: last.width + part.length }
+          else atoms.push({ text: style(part), width: part.length, startsLine: broken })
+
+          glued = true
+          broken = false
         }
-
-        const last = atoms.at(-1)
-
-        if (glued && last !== undefined) atoms[atoms.length - 1] = { text: `${last.text}${style(part)}`, width: last.width + part.length }
-        else atoms.push({ text: style(part), width: part.length })
-
-        glued = true
-      }
-    })
+      },
+      () => {
+        glued = false
+        broken = true
+      },
+    )
 
     return atoms
   }
 
   // A mark inside another keeps both: a word of code in a strong sentence is strong and in the colour of code.
-  private walk(tokens: readonly Token[], style: Style, add: Add): void {
+  private walk(tokens: readonly Token[], style: Style, add: Add, newLine: Break): void {
     for (const token of tokens) {
       if (token.type === 'codespan') add((token as Tokens.Codespan).text, (word) => style(this.paint.cyan(word)))
-      else if (token.type === 'strong') this.walk((token as Tokens.Strong).tokens, (word) => style(this.paint.bold(word)), add)
-      else if (token.type === 'em') this.walk((token as Tokens.Em).tokens, (word) => style(this.paint.italic(word)), add)
-      else if (token.type === 'del') this.walk((token as Tokens.Del).tokens, (word) => style(this.paint.dim(word)), add)
-      else if (token.type === 'link') this.link(token as Tokens.Link, style, add)
-      else if (token.type === 'br') add(' ', style)
+      else if (token.type === 'strong') this.walk((token as Tokens.Strong).tokens, (word) => style(this.paint.bold(word)), add, newLine)
+      else if (token.type === 'em') this.walk((token as Tokens.Em).tokens, (word) => style(this.paint.italic(word)), add, newLine)
+      else if (token.type === 'del') this.walk((token as Tokens.Del).tokens, (word) => style(this.paint.dim(word)), add, newLine)
+      else if (token.type === 'link') this.link(token as Tokens.Link, style, add, newLine)
+      else if (token.type === 'br') newLine()
       else if (token.type === 'text' && (token as Tokens.Text).tokens !== undefined)
-        this.walk((token as Tokens.Text).tokens ?? [], style, add)
+        this.walk((token as Tokens.Text).tokens ?? [], style, add, newLine)
       else add(this.textOf(token), style)
     }
   }
 
   // The words of a link, then where it leads, which a terminal cannot hide behind them.
-  private link(link: Tokens.Link, style: Style, add: Add): void {
-    this.walk(link.tokens, style, add)
+  private link(link: Tokens.Link, style: Style, add: Add, newLine: Break): void {
+    this.walk(link.tokens, style, add, newLine)
     if (link.href !== link.text) add(` (${link.href})`, (word) => this.paint.dim(word))
   }
 

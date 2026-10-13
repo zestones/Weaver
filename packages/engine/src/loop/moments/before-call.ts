@@ -20,14 +20,15 @@ export class BeforeCall implements Moment {
 
     if (call === null) return Answer.silent()
 
-    const flag = FlagCall.in(call)
+    const flags = FlagCall.among(call)
     const notes = NoteCall.among(call)
 
-    // A flag and a note are answered here in place of their command, so no guard has a call to judge.
-    if (flag !== null || notes.length > 0) {
-      return Answer.refusing(
-        [...(flag === null ? [] : [this.flagged(turn, flag)]), ...notes.map((note) => this.noted(turn, note))].join('\n'),
-      )
+    // A flag and a note are answered here in place of their command, so no guard has a call to judge. A call may
+    // hold several of them: each is recorded and answered, so that nothing an agent said in it is lost.
+    if (flags.length > 0 || notes.length > 0) {
+      const answers = [...flags.map((flag, index) => this.flagged(turn, flag, index)), ...notes.map((note) => this.noted(turn, note))]
+
+      return Answer.refusing(answers.join('\n'))
     }
 
     const session = turn.session()
@@ -56,10 +57,10 @@ export class BeforeCall implements Moment {
   }
 
   // A hook that fails lets its call through: the command would then run, and the agent would take its flag for made.
-  private flagged(turn: Turn, flag: FlagCall): string {
+  private flagged(turn: Turn, flag: FlagCall, index: number): string {
     try {
       const session = turn.session()
-      const answer = this.recorded(turn, flag, session)
+      const answer = this.recorded(turn, flag, index, session)
 
       if (answer.card !== null) session?.flagged(answer.card.number, answer.known)
 
@@ -71,15 +72,17 @@ export class BeforeCall implements Moment {
     }
   }
 
-  // The author is never declared by the agent: the runtime says who calls.
-  private recorded(turn: Turn, flag: FlagCall, session: Session | null): FlagAnswer {
+  // The author is never declared by the agent: the runtime says who calls. A call seen twice records each of its
+  // flags once: the first is known by the id of the call, the ones after it by that id and their rank.
+  private recorded(turn: Turn, flag: FlagCall, index: number, session: Session | null): FlagAnswer {
     const { event, repo } = turn
     const unit = session?.unit() ?? null
     const lines = session === null || unit === null ? null : new UnitLines(session, unit)
+    const callId = event.callId === null || index === 0 ? event.callId : `${event.callId}#${String(index + 1)}`
 
     return this.inRegistry(turn, (registry) =>
       new FlagRecorder(repo, registry).record(
-        { callId: event.callId, places: flag.places, body: flag.body ?? '', cwd: flag.cwd ?? event.cwd },
+        { callId, places: flag.places, body: flag.body ?? '', cwd: flag.cwd ?? event.cwd },
         { ...this.author(turn, session), written: (file) => lines?.of(file) ?? null },
       ),
     )

@@ -18,9 +18,10 @@ export class FlagCall {
     this.cwd = weaver.command.cwd
   }
 
-  static in(call: ToolCall): FlagCall | null {
-    const weaver = WeaverCommand.among(call.commands()).find(({ words }) => words[0] === COMMAND)
-
-    return weaver === undefined ? null : new FlagCall(weaver)
+  // Every flag of a call: an agent that found several things may flag them in one call.
+  static among(call: ToolCall): FlagCall[] {
+    return WeaverCommand.among(call.commands())
+      .filter(({ words }) => words[0] === COMMAND)
+      .map((weaver) => new FlagCall(weaver))
   }
 }

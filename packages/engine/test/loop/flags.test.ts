@@ -106,6 +106,38 @@ test('a call the hook sees twice records one flag, and a flag that cannot be use
   assert.equal(flagsOf().length, 2)
 })
 
+test('a call that holds several flags records each of them, once however many times the hook sees the call', () => {
+  const second = FLAG_BODY.replace('refresh()', 'renew()')
+  const call = { ...bashCall(`${flagCommand([`${A_FILE}:1`])}\necho "exit $?"\n${flagCommand([], second)}`), tool_use_id: 'two-flags' }
+  const both = [RECORDED(1), RECORDED(2)].join('\n')
+
+  assert.equal(refusalOf(session, call), both)
+  assert.deepEqual(
+    cardsOf(session.repo).map((card) => [card.number, card.places.length, card.record.flag?.text]),
+    [
+      [1, 1, FLAG_BODY],
+      [2, 0, second],
+    ],
+  )
+  assert.equal(
+    refusalOf(session, call),
+    [
+      '[weaver] This flag is already recorded as 1. Go on with your task.',
+      '[weaver] This flag is already recorded as 2. Go on with your task.',
+    ].join('\n'),
+  )
+  assert.equal(cardsOf(session.repo).length, 2)
+  assert.deepEqual(
+    flagsOf().map(({ card, known }) => [card, known]),
+    [
+      [1, false],
+      [2, false],
+      [1, true],
+      [2, true],
+    ],
+  )
+})
+
 test('a flag never reaches the guards, which judge every other command of Weaver', () => {
   const project = declaration({ guards: { own: { statement: 'Weaver is not run here.', runs: ['weaver'] } } })
 
@@ -181,9 +213,10 @@ test('what an agent is told says when to flag, how, that the refusal is expected
   assert.match(text, /Weaver takes the call before it runs and answers in its place/)
   assert.match(text, /That message is the answer, not a failure, so do not run the command again\./)
   assert.match(text, /make it in a task that only reads too/)
+  assert.match(text, /When the owner names a card, read it with `weaver cards <number>`; `weaver cards` lists the ones that wait\.$/)
   assert.match(
     text,
-    /Do not fix what you flag in the task, unless the task cannot go on without it: flag it then with `Did: fixed in the task`\.$/,
+    /Do not fix what you flag in the task, unless the task cannot go on without it: flag it then with `Did: fixed in the task`\.\n/,
   )
 })
 

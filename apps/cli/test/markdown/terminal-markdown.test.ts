@@ -114,6 +114,53 @@ test('a quote, a rule and a table are drawn, and what the page does not know is 
   assert.equal(Math.max(...drawn('word '.repeat(80), 500).map((line) => line.length)), 99, 'a page is never wider than prose reads well')
 })
 
+test('a line break asked for is a line break, and a text typed line by line keeps every one of its lines', () => {
+  const typed = (markdown: string, width = 40): string[] => new TerminalMarkdown(plain, width).typed(markdown)
+  const note = [
+    'Ran: the test of the token, which fails after an hour.',
+    'Read: `src/token.ts`.',
+    '',
+    '- a first point',
+    '  that goes on',
+    '- another',
+    '',
+    '> [!NOTE]',
+    '> Not run',
+    '> on Windows.',
+    '',
+    '| check | time |',
+    '|---|---|',
+    '| lint | 79 s |',
+  ].join('\n')
+
+  assert.deepEqual(drawn('a first line  \nand a second\\\nand a third\nthat goes on'), [
+    'a first line',
+    'and a second',
+    'and a third that goes on',
+  ])
+  assert.deepEqual(typed(note), [
+    'Ran: the test of the token, which fails',
+    'after an hour.',
+    'Read: src/token.ts.',
+    '',
+    '  • a first point',
+    '    that goes on',
+    '  • another',
+    '',
+    '  │ Note',
+    '  │ Not run',
+    '  │ on Windows.',
+    '',
+    '  check  time',
+    '  lint   79 s',
+  ])
+  assert.deepEqual(
+    drawn(note).slice(0, 2),
+    ['Ran: the test of the token, which fails after an hour. Read:', 'src/token.ts.'],
+    'a document runs its lines on',
+  )
+})
+
 test('a quote that names its kind is a callout: the kind is its title', () => {
   assert.deepEqual(drawn('> [!NOTE]\n> The lines date from an earlier commit,\n> not from this work.', 40), [
     '  │ Note',

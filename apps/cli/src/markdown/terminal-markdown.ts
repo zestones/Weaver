@@ -24,20 +24,33 @@ export class TerminalMarkdown {
   private readonly code: DrawnCode
   private readonly wrapped: WrappedLines
   private readonly edge: number
+  private readonly lineByLine: boolean
 
   // `edge` is the width of the terminal. Prose is folded on a page no wider than reads well; code, whose lines are
-  // as long as they are, runs to the edge.
-  constructor(paint: Paint, edge: number, page = Math.min(edge, TEXT_WIDTH)) {
+  // as long as they are, runs to the edge. `lineByLine` is for a text typed line by line: see `typed`.
+  constructor(paint: Paint, edge: number, page = Math.min(edge, TEXT_WIDTH), lineByLine = false) {
     this.paint = paint
     this.inline = new InlineMarkdown(paint)
     this.edge = Math.max(NARROWEST, edge)
     this.width = Math.max(NARROWEST, page)
     this.code = new DrawnCode(paint, this.edge)
     this.wrapped = new WrappedLines(this.width)
+    this.lineByLine = lineByLine
   }
 
   lines(markdown: string): string[] {
-    return this.blocks(lexer(markdown), INDENT)
+    return this.blocks(this.read(markdown), INDENT)
+  }
+
+  // A text someone typed line by line, such as a note: each of its lines stays a line, as GitHub shows a comment.
+  // Read as a document, the lines of a paragraph would run on one after the other.
+  typed(markdown: string): string[] {
+    return new TerminalMarkdown(this.paint, this.edge, this.width, true).lines(markdown)
+  }
+
+  // The parser takes its options as they are given, without its defaults: left out, `gfm` would turn the tables off.
+  private read(markdown: string): Token[] {
+    return lexer(markdown, { gfm: true, breaks: this.lineByLine })
   }
 
   // One blank line sets two blocks apart, however many the document leaves, and none starts or ends it.
@@ -91,7 +104,10 @@ export class TerminalMarkdown {
     const title = `${kind.charAt(0)}${kind.slice(1).toLowerCase()}`
     const loud = kind === 'WARNING' || kind === 'CAUTION'
 
-    return [`${bar}${loud ? this.paint.yellow(title) : this.paint.bold(title)}`, ...this.under(bar, lexer(quote.text.slice(mark.length)))]
+    return [
+      `${bar}${loud ? this.paint.yellow(title) : this.paint.bold(title)}`,
+      ...this.under(bar, this.read(quote.text.slice(mark.length))),
+    ]
   }
 
   private fenced(code: Tokens.Code): string[] {
@@ -120,7 +136,7 @@ export class TerminalMarkdown {
   // Blocks drawn on a narrower page, each of their lines after a prefix: what a quote or an item holds.
   private under(prefix: string, tokens: readonly Token[], listIndent = INDENT): string[] {
     const taken = this.wrapped.visible(prefix)
-    const narrower = new TerminalMarkdown(this.paint, this.edge - taken, this.width - taken)
+    const narrower = new TerminalMarkdown(this.paint, this.edge - taken, this.width - taken, this.lineByLine)
 
     return narrower.blocks(tokens, listIndent).map((line) => `${prefix}${line}`.trimEnd())
   }

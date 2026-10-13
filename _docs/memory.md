@@ -66,7 +66,7 @@ The keywords are English, like the other words Weaver reads. The content is in t
 
 **What decides the fields.** A flag asks for what only the one who found it knows. It does not ask for a title, labels, duplicates, a severity, the git history or a proposed fix: the writer or Weaver find those, and every field more is a reason not to flag. A flag that was never made cannot be detected, so a short one with unknowns is worth more than a discovery that was dropped.
 
-**Who records it.** The hook that sees the call, which also answers in place of the command. The hook is given the session and the subagent with every call, so the author is never declared by the agent. It records the flag and refuses the call, with the acknowledgement and the number of the flag as the reason of the refusal: the agent reads it and goes on. The command itself never runs for an agent, so nothing has to be on its `PATH`, and the default sandbox of Codex, which cannot write under `.git/`, is no obstacle. The owner flags with the same command from a terminal, where no hook is involved.
+**Who records it.** The hook that sees the call, which also answers in place of the command. The hook is given the session and the subagent with every call, so the author is never declared by the agent. It records the flag and refuses the call, with the acknowledgement and the number of the flag as the reason of the refusal: the agent reads it and goes on. The command itself never runs for an agent, so nothing has to be on its `PATH`, and the default sandbox of Codex, which cannot write under `.git/`, is no obstacle. The owner flags with the same command from a terminal, where no hook is involved. A call that holds several flags, or several notes, is answered for each of them.
 
 **What was proved on real sessions**, on 2026-10-11, with Claude Code and Codex running at the same time in one folder:
 
@@ -149,7 +149,7 @@ An issue is therefore a card that proved true and cannot be handled now. Its lif
 
 **What is written on a card.** `weaver note <number>`, with what the note concludes of the card if it concludes, then its text, on the line or in a heredoc. For an agent, the hook answers in place of the command, as for a flag: it knows the session, the unit of work and the request. For the owner, the command writes it. A note that the hook sees twice is written once.
 
-**How an agent knows.** The card as an agent reads it, `weaver cards <number>` under a runtime, ends with the command to write on it, its number filled in. The owner does not read that part, and it is not in the issue a card becomes. Nothing is added to the briefing of every request: what an agent is told decides whether it uses a command, and this one is told at the moment it is needed.
+**How an agent knows.** With every request, beside what it is told about flags, an agent is told that a card is read with `weaver cards <number>`. The card as an agent reads it then ends with the command to write on it, its number filled in: what an agent is told decides whether it uses a command, and this one is told at the moment it is needed. The owner does not read that part, and it is not in the issue a card becomes.
 
 **How a card stands.** The last conclusion written on an open card is shown with its state, in the list and on its page: `open (confirmed)`. A flag that says `Did: fixed in the task` is the first conclusion of its card, so a card born fixed reads `open (fixed)` and waits for the owner all the same: two of the first three said that something was left. A card that is opened again is to be looked into again, and what was concluded before no longer stands. Nothing is decided by a conclusion: the owner closes.
 
@@ -201,6 +201,13 @@ On 2026-10-11, with real sessions of Claude Code in the clone of Adaptive and of
 - **Codex loads the hooks of a project only when the project is trusted** in the owner's `~/.codex/config.toml`. The clone of Adaptive is not: Codex ran there unsupervised, was told nothing, and its `weaver flag` ran for real. Trusting a project is the owner's to do. Codex also runs a hook only once the owner has approved it as it is written, and asks again when it changes. `weaver doctor` asks Codex itself whether it runs the hooks of the project, and says so when it does not.
 - **The sandbox of Codex puts the runtime at the first process.** The check of who runs a command now looks there too: before, a `weaver flag` run by an unsupervised Codex took itself for the owner's.
 - **A label came back with its family in front** (`type:bug` as the value) and was dropped. The writer is now told what a family and a value are, and both forms are taken.
+
+On 2026-10-13, for the life of a card, with real sessions of Claude Code in a small project that held three cards.
+
+- **An agent writes on a card by itself.** Asked to verify two cards, it read them, ran the code, and wrote `confirmed` on one and `refuted` on the other, with what it ran and what it only read. It took the answer of the hook for what it is, and named its notes in its final message. What it saw beside the card, it flagged.
+- **It wrote both notes in one shell call**, the first time. The hook answered the first only, and the second was lost without a word. Every flag and every note of a call is answered since.
+- **Not told how a card is read, it looked for it**: a search of the repository, then `weaver --help`, two calls before `weaver cards 3`. The briefing of every request names the command since.
+- **A note typed line by line was drawn as one paragraph.** A note keeps its lines on the page of its card since, as an issue of GitHub shows them.
 
 ## Still open
 

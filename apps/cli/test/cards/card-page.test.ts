@@ -214,7 +214,11 @@ test('what was written on a card since is drawn after its flag: who, when and wh
         conclusion: 'confirmed',
         text: 'Ran the test with a token of one second:\n\n```text\n401 Unauthorized\n```',
       },
-      { provenance: { ...PROVENANCE, author: 'owner', role: 'owner', at: said }, conclusion: null, text: 'To fix with the session store.' },
+      {
+        provenance: { ...PROVENANCE, author: 'owner', role: 'owner', at: said },
+        conclusion: null,
+        text: 'To fix with the session store.\nNot before the next release.',
+      },
     ],
   })
 
@@ -231,6 +235,7 @@ test('what was written on a card since is drawn after its flag: who, when and wh
     `the owner · ${new LocalMoment(said).text}`,
     '',
     'To fix with the session store.',
+    'Not before the next release.',
     '',
   ])
   assert.ok(noted.indexOf(`Flag ${'─'.repeat(67)}`) < noted.indexOf(`Notes ${'─'.repeat(66)}`))

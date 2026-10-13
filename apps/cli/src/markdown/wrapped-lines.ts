@@ -18,7 +18,7 @@ export class WrappedLines {
     let empty = true
 
     for (const atom of atoms) {
-      if (!empty && used + 1 + atom.width > this.width) {
+      if (!empty && (atom.startsLine === true || used + 1 + atom.width > this.width)) {
         lines.push(line)
         line = rest
         used = this.visible(rest)

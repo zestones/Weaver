@@ -2,4 +2,6 @@
 export interface Atom {
   readonly text: string
   readonly width: number
+  // true for the atom that comes after a line break: it opens a line.
+  readonly startsLine?: boolean
 }
