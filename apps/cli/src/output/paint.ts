@@ -62,6 +62,27 @@ export class Paint {
     return this.styled(36, 39, text)
   }
 
+  // A word of code inside a sentence.
+  code(text: string): string {
+    return this.cyan(text)
+  }
+
+  // Whether code is set on a ground of its own. The eight colours give none that suits every terminal: code stands
+  // behind a bar instead.
+  get grounds(): boolean {
+    return false
+  }
+
+  // A line of code on its ground, when there is one.
+  inset(text: string): string {
+    return text
+  }
+
+  // The line of code that matters, on a ground lighter than the others.
+  raised(text: string): string {
+    return text
+  }
+
   private styled(open: number, close: number, text: string): string {
     return this.on && text !== '' ? `${ESCAPE}${String(open)}m${text}${ESCAPE}${String(close)}m` : text
   }

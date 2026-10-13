@@ -29,6 +29,7 @@ test('without a command, weaver says what it is, how it is typed and what it can
   assert.deepEqual(listedUnder(lines, 'SUPERVISION'), ['maintenance', 'stats'])
   assert.deepEqual(listedUnder(lines, 'CARDS'), [
     'cards',
+    'ui',
     'flag',
     'note',
     'close',

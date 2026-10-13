@@ -21,6 +21,7 @@ const OWNERS: readonly (readonly string[])[] = [
   ['cards', 'tie', '1', '2'],
   ['cards', 'untie', '1', '3'],
   ['cards', 'separate', '4'],
+  ['ui'],
 ]
 
 afterAll(() => {

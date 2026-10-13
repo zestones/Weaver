@@ -20,6 +20,7 @@ import { FlagCommand } from '../memory/flag-command.ts'
 import { NoteCommand } from '../memory/note-command.ts'
 import { StatsCommand } from '../numbers/stats-command.ts'
 import { MaintenanceCommand } from '../sessions/maintenance-command.ts'
+import { UiCommand } from '../ui/ui-command.ts'
 import { DoctorCommand } from '../wiring/doctor-command.ts'
 import { InstallCommand } from '../wiring/install-command.ts'
 import { UninstallCommand } from '../wiring/uninstall-command.ts'
@@ -132,6 +133,7 @@ export class CommandLine {
       new MaintenanceCommand(this.cwd, this.output),
       new StatsCommand(this.cwd, this.output),
       new CardsCommand(this.cwd, this.output, this.caller),
+      new UiCommand(this.cwd, this.output),
       new FlagCommand(this.cwd, this.output, this.input, this.caller),
       new NoteCommand(this.cwd, this.output, this.input, this.caller),
       new CloseCommand(this.cwd, this.output),

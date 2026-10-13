@@ -26,7 +26,7 @@ export class InlineMarkdown {
   typed(text: string, overall: Style = (word) => word): Atom[] {
     return this.gathered((add) => {
       for (const token of Lexer.lexInline(text)) {
-        if (token.type === 'codespan') add((token as Tokens.Codespan).text, (word) => overall(this.paint.cyan(word)))
+        if (token.type === 'codespan') add((token as Tokens.Codespan).text, (word) => overall(this.paint.code(word)))
         else add(token.raw, overall)
       }
     })
@@ -71,7 +71,7 @@ export class InlineMarkdown {
   // A mark inside another keeps both: a word of code in a strong sentence is strong and in the colour of code.
   private walk(tokens: readonly Token[], style: Style, add: Add, newLine: Break): void {
     for (const token of tokens) {
-      if (token.type === 'codespan') add((token as Tokens.Codespan).text, (word) => style(this.paint.cyan(word)))
+      if (token.type === 'codespan') add((token as Tokens.Codespan).text, (word) => style(this.paint.code(word)))
       else if (token.type === 'strong') this.walk((token as Tokens.Strong).tokens, (word) => style(this.paint.bold(word)), add, newLine)
       else if (token.type === 'em') this.walk((token as Tokens.Em).tokens, (word) => style(this.paint.italic(word)), add, newLine)
       else if (token.type === 'del') this.walk((token as Tokens.Del).tokens, (word) => style(this.paint.dim(word)), add, newLine)
