@@ -85,3 +85,40 @@ Work that is understood and deliberately postponed. Each entry says what it is, 
 **What would make it urgent.** A second project to put Weaver on, or a first person other than its owner who tries it.
 
 **Where to start.** `weaver install` already writes skills as templates, from the classes of `apps/cli/src/skills/`: this one would be a fourth, read before the project declares anything rather than named by its settings. The schemas of `declaration/schema/` say what each file of `.weaver/` may hold, and `weaver doctor` checks the result. Once the hooks are wired, `.weaver/` is the owner's: the skill writes it before `weaver install`, or in a session the owner put in maintenance.
+
+## The life of a card
+
+**What.** Say what happens to a card between the day it is written and the day it is closed: who touches it, at which moment, and why. Today the registry covers its birth and its death. A card is flagged or left by a review, written up, then waits as `open` until the owner closes it as `fixed`, `wontfix` or `issue`. Nothing is kept of what happens in between: a card the owner has read ten times looks like one nobody opened.
+
+**Why it matters.** The commands that are missing, a note, an investigation, a way to say that a card was looked at, are the sign that the use of a card was not thought through. Added one by one, they would not say what they are for. The first job of this life is that cards end. The registry of the source harness created 1,080 items and closed 233, of which 231 on two days, when an agent proposed the closings in a batch. How a card gets closed without costing the owner five minutes weighs more than any state added to it.
+
+**Why it waits.** The owner asked on 2026-10-13 for time to think about it. It is settled with the owner, with real cards at hand: the first project Weaver runs on holds eleven.
+
+**What would make it urgent.** A pile that grows faster than it is sorted. An interface to browse the cards, which cannot be drawn before this is settled: its screens are the moments of a card.
+
+**Where to start.** From the moments of a card rather than from its states: a diagram of states soon becomes a workflow of eight statuses for one person. The moments, each with who acts and why:
+
+- **The sorting.** The owner reads the card for the first time. Is it true, is it serious, is it for now? Nothing keeps the answer.
+- **The doubt.** The owner wants an agent to check. Where does what it finds go? The record has room for a closing that an agent proposes and the owner accepts, and nothing writes it.
+- **The decision.** Fix it, open an issue, or leave it. `wontfix` covers both "this is wanted" and "not now", which the [memory](memory.md) lists as open.
+- **The correction.** Who makes it? When it is an agent in another session, does the card know it is being worked on, and who closes it?
+- **Afterwards.** Once it is an issue, does its life go on where the issues are? Once closed, does it warn an agent that changes that code again? That is the recall against regressions, above.
+- **The expiry.** The code moved, or is gone. Who cleans up?
+
+Follow three or four real cards to their end and note, at each step, what the owner wanted to do and could not: the gaps are the commands. Three questions only the owner can answer open the discussion:
+
+1. Reading a card for the first time, what is worth keeping: seen, true, to dig into, something else?
+2. Who fixes in practice: an agent asked to fix a card in a new session?
+3. Once it is an issue, is the card finished?
+
+## An interface in the terminal for the cards
+
+**What.** A screen in the terminal where the owner goes through the cards: the list, a card read in full, and keys to label it, note something on it, close it or make an issue of it, without a command typed for each. Asking an agent about a card is not a chat rebuilt there: the interface starts Claude Code or Codex on the card, which are already the place to talk to an agent. It replaces the web workbench that was planned, a local server and a client in the browser, which the owner cancelled on 2026-10-13.
+
+**Why it matters.** The cards are meant to be sorted every day, and a command for each card and each action is too slow for that. The source harness answered with a web application. Its interface alone was about 300 files and 19,000 lines with eleven dependencies, as much as the rest of that harness, for one user. What weighed was the conversation with an agent and the screens to edit an item, not the browser: the same screens in a terminal would weigh as much.
+
+**Why it waits.** Its screens are the moments of a card, so the life of a card, above, comes first. The commands come second: the interface only calls what a command already does, so that an agent, a script and the owner at a prompt can do the same. A note on a card and an investigation have no command yet. The interface comes last.
+
+**What would make it urgent.** More cards than the owner sorts with the commands.
+
+**Where to start.** In TypeScript, with [Ink](https://github.com/vadimdemedes/ink), which draws React components in a terminal and is what Claude Code is built with. The owner chose it on 2026-10-13 over a program in Go beside Weaver: one language, one archive to release, and the registry and the page of a card (`apps/cli/src/cards/card-page.ts`) used as they are. The choice has a price, taken with it. Ink is written as function components and hooks: an exception to the rule of classes, to keep inside the package of the interface. It also brings about twenty packages and React, where the command line takes two today: like the parser of Markdown, they are loaded when the interface starts and not before.

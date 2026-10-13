@@ -1,6 +1,6 @@
 # Architecture and package boundaries
 
-Weaver is a local development workbench for coding agents. Its target architecture is a monorepo with packages organized around explicit responsibilities and applications that assemble those packages.
+Weaver supervises the coding agents that work in a repository. Its target architecture is a monorepo with packages organized around explicit responsibilities and applications that assemble those packages.
 
 This document records the proposed extraction structure. These packages and applications have not been implemented. Package boundaries must be checked against actual dependencies and observable behavior before their contracts are finalized.
 
@@ -10,8 +10,6 @@ This document records the proposed extraction structure. These packages and appl
 | --------------------------- | ----------------------------------------------------------- |
 | `apps/cli/`                 | Commands for the project owner.                             |
 | `apps/hooks/`               | Agent event entry points and enforcement of decisions.      |
-| `apps/workbench/server/`    | Local API, conversation orchestration and event delivery.   |
-| `apps/workbench/web/`       | Browser interface and user interactions.                    |
 | `packages/agent-sdk/`       | Agent runtime ports and provider adapters.                  |
 | `packages/project-context/` | Project instructions, sources and scope resolution.         |
 | `packages/action-control/`  | Action permission evaluation.                               |
@@ -20,6 +18,8 @@ This document records the proposed extraction structure. These packages and appl
 | `packages/memory/`          | Qualified project knowledge and explicit recall mechanisms. |
 | `packages/persistence/`     | Shared durability and storage primitives.                   |
 | `docs/`                     | Architecture, contracts and development documentation.      |
+
+This structure first held a web workbench, a local server under `apps/workbench/server/` and a client in the browser under `apps/workbench/web/`. The owner cancelled it on 2026-10-13 for an interface in the terminal: see [to do later](todo-later.md).
 
 Start with coordinated releases and private workspace packages. A package boundary does not require a separate service, process or independently published version.
 
@@ -83,7 +83,7 @@ Project permissions, development instructions and completion requirements are di
 | Configuration       | A selected value controlling supported behavior.   | Model, effort and resource budget.             |
 | Project requirement | A condition or restriction imposed by the project. | A review is required before completion.        |
 
-Each package defines and validates its own configuration. Applications assemble the effective configuration; the workbench presents it. Configuration resolution must retain the source of a value and explain unavailable or restricted capabilities.
+Each package defines and validates its own configuration. Applications assemble the effective configuration and present it. Configuration resolution must retain the source of a value and explain unavailable or restricted capabilities.
 
 Installation, project and session settings have explicit precedence and override rules. A session choice cannot weaken a project obligation. Availability, enabled state, selected configuration and authorization must remain distinguishable.
 

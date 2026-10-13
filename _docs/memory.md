@@ -133,7 +133,7 @@ A card follows a strict schema, in two parts.
 
 A card keeps its flag word for word: what the agent said and what the writer made of it can always be compared.
 
-**Who reads it, and where.** The owner said on 2026-10-11 how the two readers differ. `weaver cards` is what an agent runs in a chat, to read the registry for the owner or for its own work. A person will browse the cards, decide on them and ask for an investigation in the workbench. Until the workbench exists, the terminal is where the owner decides.
+**Who reads it, and where.** The owner said on 2026-10-11 how the two readers differ. `weaver cards` is what an agent runs in a chat, to read the registry for the owner or for its own work. A person will browse the cards, decide on them and ask for an investigation in an interface of their own. It was to be a web workbench, which the owner cancelled on 2026-10-13 for a screen in the terminal: see [to do later](todo-later.md). Until it exists, the commands are where the owner decides.
 
 ## Where it is kept
 
@@ -212,6 +212,6 @@ The first five steps are built. The owner asked for them in one go, so the trial
 3. **A real trial.** Done for the first question: agents flag, once they are told well. The second, whether a raw flag is enough for the owner to decide, is the owner's to answer.
 4. **The writer.** Done: `writer.json`, the skill `wv-card.md`, the start at the end of a turn, the card checked against its schema.
 5. **The complete card.** Done: the labels, the ties and the occurrences, correcting and reopening. The ledger of the reviews is gone, and what a review leaves is a card.
-6. **Afterwards.** The workbench, which the owner sees as the likely next step: it is where the cards are browsed every day. The recall against regressions, guards decided by a program and the comparison with the base wait in [to do later](todo-later.md), and so does the distribution of Weaver. Putting Weaver in place of the source harness on the real work is the owner's to decide.
+6. **Afterwards.** The life of a card, then an interface in the terminal where the cards are browsed every day: the web workbench first planned is cancelled. Both wait in [to do later](todo-later.md), with the recall against regressions, guards decided by a program and the comparison with the base, and so does the distribution of Weaver. Putting Weaver in place of the source harness on the real work is the owner's to decide.
 
 An agent needs no path to the command: the hook answers in its place.

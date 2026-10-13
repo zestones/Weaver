@@ -5,7 +5,7 @@ Weaver supervises the coding agents that work in a repository. It plugs into the
 Weaver knows no rule by itself. Everything it enforces is declared by the supervised project, in a `.weaver/` folder.
 
 > [!NOTE]
-> Weaver is installed from the [releases](https://github.com/zestones/Weaver/releases) of this repository and runs on the command line. Its web interface, the workbench, is not built. [What is not there yet](#what-is-not-there-yet) lists the rest.
+> Weaver is installed from the [releases](https://github.com/zestones/Weaver/releases) of this repository and runs on the command line. [What is not there yet](#what-is-not-there-yet) lists what it lacks.
 
 ## What it does
 
@@ -241,7 +241,7 @@ Orders of magnitude, not a benchmark: seen on one machine on 2026-10-11, a few r
 
 ## What is not there yet
 
-- **The workbench.** A web interface to browse the cards, decide on them and ask an agent to investigate. It is the likely next step.
+- **An interface to browse the cards.** A screen in the terminal to go through the cards, decide on them and start an agent on one. It waits for the life of a card to be settled. The web workbench first planned, a local server and a client in the browser, is cancelled.
 - **The recall.** Telling an agent what the cards and the git history know of the code it is about to change, so that it does not undo a correction or a decision.
 - **A comparison with the base.** A check that looks at the whole project reports what is wrong in the working tree, whoever wrote it. Two sessions in one folder can therefore hold each other back.
 - **Guards decided by a program.** A guard is a list of paths and commands today. What depends on a detail of the call, such as killing processes by a broad pattern, cannot be expressed.

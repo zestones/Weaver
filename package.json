@@ -1,7 +1,7 @@
 {
   "name": "weaver",
   "version": "1.0.0",
-  "description": "A local development workbench for coding agents",
+  "description": "Supervises the coding agents that work in a repository",
   "private": true,
   "scripts": {
     "build": "pnpm -r --workspace-concurrency=1 --if-present run build",
