@@ -119,7 +119,7 @@ A card follows a strict schema, in two parts.
 | Trace         | How the agent came across it.                 | `Found`                      |
 | Uncertainties | What was not verified.                        | `Checked`, the writer's look |
 
-**What the project declares.** Its labels, as families and values, with the same words as its labels on GitHub (`type`, `area`, `status` for Adaptive). The sections of the body, in the header of the skill, as the finish skill lists the headings of a final message.
+**What the project declares.** Its labels, as families and values, with the same words as its labels on GitHub (`type`, `area`, `status` for Adaptive). Three families are known by their name, when a project declares them. `level` is the scale the project grades its cards with: its values are read in the order they are declared, gravest first, the cards are put in that order, and a card has one. `type` says what kind of thing a card is, and a card has one. `area` says where a card is: a card may have several, and a list says them under each title. A project that names its families otherwise loses only what follows from the names. The sections of the body, in the header of the skill, as the finish skill lists the headings of a final message.
 
 **What a card is not.** It gives enough context to be understood alone, months later. It is neither an investigation nor a certainty. Reproducing the problem and finding its cause come afterwards, when the owner asks an agent to verify the card: what the agent finds is written on the card, and goes with it if it becomes an issue.
 
@@ -134,7 +134,7 @@ A card follows a strict schema, in two parts.
 
 A card keeps its flag word for word: what the agent said and what the writer made of it can always be compared.
 
-**Who reads it, and where.** The owner said on 2026-10-11 how the two readers differ. `weaver cards` is what an agent runs in a chat, to read the registry for the owner or for its own work. A person will browse the cards, decide on them and ask for an investigation in an interface of their own. It was to be a web workbench, which the owner cancelled on 2026-10-13 for a screen in the terminal: see [to do later](todo-later.md). Until it exists, the commands are where the owner decides.
+**Who reads it, and where.** The owner said on 2026-10-11 how the two readers differ. `weaver cards` is what an agent runs in a chat, to read the registry for the owner or for its own work. A person browses the cards and decides on them in an interface of their own. It was to be a web workbench, which the owner cancelled on 2026-10-13 for a screen in the terminal: `weaver ui`, described below.
 
 ## The life of a card
 
@@ -159,6 +159,20 @@ An issue is therefore a card that proved true and cannot be handled now. Its lif
 - A mark on a card an agent is working on. Nothing would remove it when a session dies. To take up again if the owner hands one card to two agents.
 - Closings proposed in a batch by an agent, for which the record has room. They were meant to empty the pile, which is no longer a goal.
 
+## The interface
+
+Built on 2026-10-13, at the owner's word, from a mock-up they chose: `weaver ui`.
+
+**What it is for.** The owner had typed some twenty commands in a day to close and to label cards, each with a number, and the labels of a card all over again to change one. The interface does what the commands do, on one screen: nothing new, and nothing a command cannot do, so that an agent and a script keep every means the owner has. Starting an agent from a card is not in it: the owner did not want it.
+
+**What it shows.** The cards of a view in a pane on the left, under the name of their level when they are in that order; the views and what narrows the list on a line at the top; the selected card in the middle, one side at a time: what was written of it, the flag it comes from, what was written on it since; the keys at the bottom. Four views: the cards that wait, those of them someone concluded on, the closed ones, every card. A box in front of the panes closes a card, changes its labels, writes a note on it or narrows the list.
+
+**What it takes from what an agent wrote.** A card someone concluded on closes as they concluded: `fixed` as fixed, `refuted` as invalid, with the first line of their note as the reason, which the owner keeps or corrects. It is what the closings proposed by an agent were meant for, without a state of their own.
+
+**Where its logic is.** Listing, narrowing and ordering the cards is `CardListing`, in the memory package, which `weaver cards` uses for the same words: `--label` several times, `--since`, `--answered`, `--sort`. Closing, noting and labelling go through one class of the command line, which the commands go through. What the screen shows and what each key does is a class with no screen in it, tested key by key; the components only draw it.
+
+**How it looks.** In the colours of the banner: its charcoal, down to black, for the grounds, its ivory for what is read, its gold for where the keys go. Colour says two things and no more, how grave a card is and what someone concluded of it. It needs a terminal that draws sixteen million colours, and falls back to the eight every terminal knows for what a card says.
+
 ## Where it is kept
 
 In a SQLite database under `.git/weaver/`. The Node.js version Weaver requires ships SQLite, full-text search included, so it adds no dependency. Several processes write to it at once without losing anything, cards are found by file, label or state, and the whole registry is one file to copy.
@@ -175,6 +189,7 @@ The registry lives on the owner's machine. Whether it must survive a change of m
 | The command that lists the cards                    | `weaver cards`, in place of `weaver status` |
 | The command that writes on one                      | `weaver note`                               |
 | The command that decides on one                     | `weaver close`                              |
+| The interface where the owner goes through them     | `weaver ui`                                 |
 | The skill that says how a card is written           | `.weaver/skills/wv-card.md`                 |
 | The labels of the project                           | `.weaver/project/labels.json`               |
 | Who writes: the runtime, its model, effort and time | `.weaver/llm/writer.json`                   |
@@ -237,7 +252,7 @@ Not decisions: facts to keep in mind when the code is written.
 
 ## Plan
 
-The first six steps are built. The owner asked for the first five in one go, so the trial of step 3 came after the writer instead of before it.
+The first seven steps are built. The owner asked for the first five in one go, so the trial of step 3 came after the writer instead of before it.
 
 1. **Prove the attribution.** Done: the hook records a flag, on real payloads of both runtimes kept as fixtures, with two sessions at once, a subagent and a chained command. The owner's commands are refused to an agent, by a guard and by the commands themselves.
 2. **The flag and a small registry.** Done: `weaver flag`, what it refuses, the lines it keeps; listing and closing.
@@ -245,6 +260,7 @@ The first six steps are built. The owner asked for the first five in one go, so 
 4. **The writer.** Done: `writer.json`, the skill `wv-card.md`, the start at the end of a turn, the card checked against its schema.
 5. **The complete card.** Done: the labels, the ties and the occurrences, correcting and reopening. The ledger of the reviews is gone, and what a review leaves is a card.
 6. **The life of a card.** Done: `weaver note`, the conclusion an open card stands with, the `invalid` closing, the notes in the issue a card becomes.
-7. **Afterwards.** An interface in the terminal where the cards are browsed: the web workbench first planned is cancelled. It waits in [to do later](todo-later.md), with the recall against regressions, guards decided by a program and the comparison with the base, and so does the distribution of Weaver. Putting Weaver in place of the source harness on the real work is the owner's to decide.
+7. **The interface.** Done: `weaver ui`, with the order and the filters it has given to `weaver cards` as well.
+8. **Afterwards.** What waits is in [to do later](todo-later.md): the recall against regressions, guards decided by a program and the comparison with the base, and so does the distribution of Weaver. Putting Weaver in place of the source harness on the real work is the owner's to decide.
 
 An agent needs no path to the command: the hook answers in its place.

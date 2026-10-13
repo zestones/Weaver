@@ -84,11 +84,14 @@ The command never runs. The hook takes the call, records the flag with who made 
 What a review leaves, a finding the author did not fix or a suspicion, becomes a card too, so there is one place to look.
 
 ```sh
+weaver ui                    # every card on one screen
 weaver cards                 # the cards that wait for you, newest first
 weaver cards 12              # one card
 weaver note 12 "to look at with the next release"
 weaver close 12 fixed        # or wontfix, issue or invalid, with a reason
 ```
+
+`weaver ui` is where you go through the cards: the list on the left, under the level the project grades its cards with, what narrows it at the top, and the card you are on in the middle, with its flag and its notes one key away. A key writes a note on the card, another changes its labels, another closes it, with the reason taken from what an agent wrote when it said the thing was fixed. It does what the commands do and nothing they cannot: a script, or an agent that reads, still has every one of them. Three families of labels are known by their name, when a project declares them: `level` grades the cards, its values gravest first, and a card has one; `type` says what kind of thing a card is, and a card has one; `area` says where it is, and the list says it under each title. It draws in the colours of Weaver, and so asks for a terminal that knows sixteen million colours.
 
 The cards are a backlog, not a pile to empty: a card may stay open as long as you like, read or not. When one is worth your time, ask an agent to verify it or to fix it. The agent reads the card with `weaver cards 12`, which tells it how to answer, and writes what it found on the card: `weaver note 12 confirmed` when what the card says is true, `refuted` when it is not, `unsure` when it could not tell, `fixed` when it fixed it. The hook takes that call as it takes a flag. The list then says how the card stands, `open (confirmed)`, and what was found stays with the card, in the issue it may become too. You write on a card with the same command, and a card whose flag proved not to be true closes as `invalid`.
 
@@ -105,7 +108,7 @@ A repository is supervised as soon as it has a `.weaver/settings.json`. The othe
 │   ├── guards.json      what is refused before a tool runs
 │   ├── checks.json      the programs that judge, each with the rules it stands behind
 │   ├── scripts.json     the scripts that write files, the folders nothing looks at
-│   ├── labels.json      the labels a card may carry
+│   ├── labels.json      the labels a card may carry; `level`, `area` and `type` are families Weaver knows by name
 │   └── issues.json      the command that opens an issue from a card
 ├── llm/
 │   ├── rules.json       the rules a reviewer judges
@@ -191,21 +194,22 @@ To stay up to date there is one command, `weaver update`, which you run in a sup
 
 Releases stay side by side, and a project runs the one that wired it until `weaver update` is run there: `weaver doctor` says when a project is behind. A release that changes the format of `.weaver/` comes with the migration from the format before; `version`, in `settings.json`, is the number of that format.
 
-| Command                                                           | What it does                                                                                                                   |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `weaver install [claude] [codex]`                                 | Puts Weaver on the project: the hooks, and a starter configuration if there is none.                                           |
-| `weaver uninstall [claude] [codex]`                               | Removes the hooks, and leaves everything else as it is.                                                                        |
-| `weaver update [--dry-run] [--offline]`                           | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks.                         |
-| `weaver doctor`                                                   | Checks the configuration, the hook, and each agent runtime.                                                                    |
-| `weaver maintenance [on\|off] [<session>]`                        | Lifts the guards of the project for one session of an agent, or puts them back; alone, says which sessions are in maintenance. |
-| `weaver stats [--since <day>\|<n>d] [--json]`                     | Counts what Weaver kept of its work in the project: times, verdicts, warnings, reviews, cards.                                 |
-| `weaver version`                                                  | Says which version of Weaver this is.                                                                                          |
-| `weaver flag <place>...`                                          | Flags something yourself, the five fields read on the standard input.                                                          |
-| `weaver note <number> [confirmed\|refuted\|unsure\|fixed] [text]` | Writes on a card what you found or did about it, and what you conclude of it if you do.                                        |
-| `weaver cards [<number>]`                                         | Lists the cards that wait, or shows one: drawn at a terminal, as Markdown for a program. `--all`, `--file`, `--label`.         |
-| `weaver cards reopen\|retitle\|label\|rewrite`                    | Corrects a card, or opens it again.                                                                                            |
-| `weaver cards tie\|untie\|separate`                               | Ties two cards that may be about the same thing, or undoes a merge.                                                            |
-| `weaver close <number> fixed\|wontfix\|issue\|invalid`            | Closes a card, with a reason: it was fixed, it will not be, it becomes an issue, or what it says is not true.                  |
+| Command                                                           | What it does                                                                                                                                              |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `weaver install [claude] [codex]`                                 | Puts Weaver on the project: the hooks, and a starter configuration if there is none.                                                                      |
+| `weaver uninstall [claude] [codex]`                               | Removes the hooks, and leaves everything else as it is.                                                                                                   |
+| `weaver update [--dry-run] [--offline]`                           | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks.                                                    |
+| `weaver doctor`                                                   | Checks the configuration, the hook, and each agent runtime.                                                                                               |
+| `weaver maintenance [on\|off] [<session>]`                        | Lifts the guards of the project for one session of an agent, or puts them back; alone, says which sessions are in maintenance.                            |
+| `weaver stats [--since <day>\|<n>d] [--json]`                     | Counts what Weaver kept of its work in the project: times, verdicts, warnings, reviews, cards.                                                            |
+| `weaver version`                                                  | Says which version of Weaver this is.                                                                                                                     |
+| `weaver flag <place>...`                                          | Flags something yourself, the five fields read on the standard input.                                                                                     |
+| `weaver note <number> [confirmed\|refuted\|unsure\|fixed] [text]` | Writes on a card what you found or did about it, and what you conclude of it if you do.                                                                   |
+| `weaver ui`                                                       | Goes through the cards on one screen: the list, the card you are on, and a key to write on it, to change its labels or to close it.                       |
+| `weaver cards [<number>]`                                         | Lists the cards that wait, or shows one: drawn at a terminal, as Markdown for a program. `--all`, `--file`, `--label`, `--since`, `--answered`, `--sort`. |
+| `weaver cards reopen\|retitle\|label\|rewrite`                    | Corrects a card, or opens it again. `label --set` changes the labels of the families named and keeps the others.                                          |
+| `weaver cards tie\|untie\|separate`                               | Ties two cards that may be about the same thing, or undoes a merge.                                                                                       |
+| `weaver close <number> fixed\|wontfix\|issue\|invalid`            | Closes a card, with a reason: it was fixed, it will not be, it becomes an issue, or what it says is not true.                                             |
 
 `weaver help` lists the commands by what they are for, and `weaver help <command>`, or `--help` anywhere on a line, says how one is used, with examples. A mistyped command is answered with the one that was probably meant.
 
@@ -245,7 +249,7 @@ Orders of magnitude, not a benchmark: seen on one machine on 2026-10-11, a few r
 
 ## What is not there yet
 
-- **An interface to browse the cards.** A screen in the terminal to go through the cards, decide on them and start an agent on one. Today each of these is a command. The web workbench first planned, a local server and a client in the browser, is cancelled.
+- **Starting an agent from a card.** The interface reads, notes, labels and closes. Asking an agent to verify or to fix a card is still said to the agent, in its own conversation.
 - **The recall.** Telling an agent what the cards and the git history know of the code it is about to change, so that it does not undo a correction or a decision.
 - **A comparison with the base.** A check that looks at the whole project reports what is wrong in the working tree, whoever wrote it. Two sessions in one folder can therefore hold each other back.
 - **Guards decided by a program.** A guard is a list of paths and commands today. What depends on a detail of the call, such as killing processes by a broad pattern, cannot be expressed.

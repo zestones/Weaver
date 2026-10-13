@@ -19,7 +19,7 @@ This document records the proposed extraction structure. These packages and appl
 | `packages/persistence/`     | Shared durability and storage primitives.                   |
 | `docs/`                     | Architecture, contracts and development documentation.      |
 
-This structure first held a web workbench, a local server under `apps/workbench/server/` and a client in the browser under `apps/workbench/web/`. The owner cancelled it on 2026-10-13 for an interface in the terminal: see [to do later](todo-later.md).
+This structure first held a web workbench, a local server under `apps/workbench/server/` and a client in the browser under `apps/workbench/web/`. The owner cancelled it on 2026-10-13 for an interface in the terminal, `weaver ui`, which lives in `apps/cli` beside the commands it stands for.
 
 Start with coordinated releases and private workspace packages. A package boundary does not require a separate service, process or independently published version.
 

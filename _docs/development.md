@@ -117,6 +117,8 @@ A package's `lib/` folder is the exception. It holds pure transformations and pl
 
 Shapes written to disk or read from another program, such as a saved state or a line of a journal, are interfaces without methods. The classes that give them behavior are built from them.
 
+The interface of `weaver ui`, under `apps/cli/src/ui/`, is the second exception. It is drawn with [Ink](https://github.com/vadimdemedes/ink), which is React in a terminal, and a component of React is a function: the `.tsx` files hold components, one that is exported in each, with the small ones only it uses beside it. Nothing else is a function there. What the screen shows and what each key does is `model/ui-model.ts`, a class; each box is a class under `forms/`; and what is done to a card goes through `cards/card-desk.ts`, which the commands go through too. A component draws what the model holds and hands it the keys: it decides nothing. Ink and React are loaded by `weaver ui` alone, as the parser of Markdown is loaded to draw a card.
+
 ### Folders
 
 A folder holds sub-folders or files, never both. `src/index.ts`, the entry of a package, is the one file allowed beside folders. As soon as files form a family, such as a base class and its subclasses, they get a sub-folder of their own.
