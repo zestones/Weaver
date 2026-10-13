@@ -3,6 +3,7 @@ import {
   CardRegistry,
   FlagText,
   type Card,
+  type CardNote,
   type NewFlag,
   type NewReviewCard,
   type PlaceContext,
@@ -104,6 +105,18 @@ export function finding(top: string, content: Partial<ReviewContent> = {}, given
       ...given,
     }),
   ).number
+}
+
+// What an agent wrote on a card after looking into it.
+export function note(top: string, number: number, given: Partial<CardNote> = {}): void {
+  inRegistry(top, (registry) =>
+    registry.note(number, {
+      provenance: { ...PROVENANCE, session: 'session-2', requests: ['verify card 1'], at: '2026-10-12T09:30:00.000Z' },
+      conclusion: 'confirmed',
+      text: 'Ran the test with a token of one second:\n\n```text\n401 Unauthorized\n```',
+      ...given,
+    }),
+  )
 }
 
 // What the writer made of a flag.

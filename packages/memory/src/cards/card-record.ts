@@ -3,7 +3,10 @@ import type { FlagRecord, Place } from '../flags/flag-record.ts'
 export type CardOrigin = 'flag' | 'finding' | 'suspicion' | 'owner'
 // raw: a flag no writer has written up. merged: the same thing as another card, kept as its occurrence.
 export type CardState = 'raw' | 'open' | 'closed' | 'merged'
-export type Closing = 'fixed' | 'wontfix' | 'issue'
+// invalid: what the card says proved not to be true.
+export type Closing = 'fixed' | 'wontfix' | 'issue' | 'invalid'
+// What the one who looked into a card concludes of it: what it says is true, is not, could not be told, or is fixed.
+export type Conclusion = 'confirmed' | 'refuted' | 'unsure' | 'fixed'
 
 export interface Provenance {
   // 'claude', 'codex' or 'owner'.
@@ -69,6 +72,14 @@ export interface Occurrence {
   readonly note: string
 }
 
+// What is written on a card once it exists: by an agent the owner asked to verify or to fix it, or by the owner.
+export interface CardNote {
+  readonly provenance: Provenance
+  // null for a note that concludes nothing.
+  readonly conclusion: Conclusion | null
+  readonly text: string
+}
+
 export interface CardEvent {
   readonly at: string
   readonly action:
@@ -76,6 +87,7 @@ export interface CardEvent {
     | 'opened'
     | 'written'
     | 'writing-failed'
+    | 'noted'
     | 'closed'
     | 'reopened'
     | 'corrected'
@@ -104,6 +116,8 @@ export interface CardRecord {
   readonly proposal: { readonly as: Closing; readonly reason: string; readonly by: Provenance } | null
   readonly seenSinceClosing: boolean
   readonly occurrences: readonly Occurrence[]
+  // In the order they were written.
+  readonly notes: readonly CardNote[]
   readonly ties: readonly number[]
   readonly mergedInto: number | null
   readonly writing: { readonly attempts: number; readonly failure: string | null }

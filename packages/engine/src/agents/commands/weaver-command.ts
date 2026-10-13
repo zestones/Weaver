@@ -3,6 +3,7 @@ import type { ShellCommand } from '../../lib/shell/syntax/command.ts'
 
 const PROGRAMS: ReadonlySet<string> = new Set(['weaver', 'weaver.js'])
 const NODE = 'node'
+const TABS_STRIPPED = '<<-'
 
 // A command of a shell call that runs Weaver's own program: by its name, by a path to it, or through node.
 export class WeaverCommand {
@@ -13,6 +14,15 @@ export class WeaverCommand {
   private constructor(command: ShellCommand, words: readonly string[]) {
     this.command = command
     this.words = words
+  }
+
+  // What the command is given to read in a heredoc; null when none follows it.
+  get heredoc(): string | null {
+    const heredoc = this.command.redirects.find((redirect) => redirect.heredoc !== null)
+    const text = heredoc?.heredoc ?? null
+
+    // The shell takes the leading tabs off a heredoc opened with `<<-`; the parser leaves them.
+    return text !== null && heredoc?.operator === TABS_STRIPPED ? text.replace(/^\t+/gm, '') : text
   }
 
   static among(commands: readonly ShellCommand[]): WeaverCommand[] {

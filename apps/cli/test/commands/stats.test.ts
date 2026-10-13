@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Loop } from '@weaver/engine'
 import { afterAll, beforeAll, test } from 'vitest'
 import type { ProjectFigures } from '../../src/numbers/stats-page.ts'
-import { flag } from '../fixtures/cards.ts'
+import { flag, note } from '../fixtures/cards.ts'
 import { makeProject, SETTINGS, weaver, writeConfig, writeJson } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-stats-'))
@@ -66,6 +66,8 @@ beforeAll(async () => {
   await hook('Stop', { last_assistant_message: 'Done.' })
   await hook('PreToolUse', { tool_name: 'Write', tool_input: { file_path: join(top, 'tools/x.mjs'), content: '' }, tool_use_id: 'refused' })
   flag(top)
+  note(top, 1)
+  note(top, 1, { conclusion: null, text: 'To fix with the session store.' })
 })
 
 test('weaver stats counts what the journal and the registry hold, as a program reads it', async () => {
@@ -119,6 +121,7 @@ test('weaver stats counts what the journal and the registry hold, as a program r
   assert.deepEqual(cards?.opened, { total: 1, byOrigin: { flag: 1 } })
   assert.deepEqual([cards?.waiting.total, cards?.waiting.notWritten, cards?.written, cards?.closed.total], [1, 1, 0, 0])
   assert.equal(cards?.waiting.oldestAt, '2026-10-11T10:00:00.000Z')
+  assert.deepEqual(cards?.notes, { total: 2, byConclusion: { confirmed: 1 } })
 })
 
 test('weaver stats prints the same numbers for its owner, and concludes nothing', async () => {
@@ -153,6 +156,7 @@ test('weaver stats prints the same numbers for its owner, and concludes nothing'
   assert.ok(lines.includes('Maintenance               turned on 0, off 0'))
   assert.ok(lines.includes('Reviews                   0'))
   assert.ok(lines.includes('Cards opened              1 (flag 1)'))
+  assert.ok(lines.includes('Notes on cards            2 (confirmed 1)'))
   assert.match(text, /^Cards waiting now {9}1; not written yet 1, the oldest since \d{4}-\d{2}-\d{2}$/m)
   assert.ok(lines.includes("Weaver's own errors       0"))
   assert.equal(lines.at(-1), `The lines themselves are in ${join(top, '.git/weaver/events')}, one file for each session.`)

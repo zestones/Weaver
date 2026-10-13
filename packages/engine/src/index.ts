@@ -22,3 +22,5 @@ export type { CheckRun, EventOf, JournalEvent } from './unit-of-work/journal/jou
 export type { Session } from './unit-of-work/session/session.ts'
 export { FlagRecorder } from './flagging/recording/flag-recorder.ts'
 export type { FlagAnswer, FlagAuthor, FlagRequest } from './flagging/recording/flag-recorder.ts'
+export { NoteRecorder } from './noting/recording/note-recorder.ts'
+export type { NoteAnswer, NoteAuthor, NoteRequest } from './noting/recording/note-recorder.ts'

@@ -2,11 +2,19 @@ import type { Place } from '../flags/flag-record.ts'
 import { PlaceText } from '../flags/place-text.ts'
 import { clip } from '../lib/text/clip.ts'
 import { CardMarkdown } from './card-markdown.ts'
-import type { CardOrigin, CardRecord, CardState } from './card-record.ts'
+import type { CardOrigin, CardRecord, CardState, Closing, Conclusion, Provenance } from './card-record.ts'
+
+// What someone concluded of a card, and who.
+export interface Concluded {
+  readonly as: Conclusion
+  readonly by: Provenance
+}
 
 const TITLE_LIMIT = 80
 
 export class Card {
+  static readonly CLOSINGS: readonly Closing[] = ['fixed', 'wontfix', 'issue', 'invalid']
+
   readonly record: CardRecord
 
   constructor(record: CardRecord) {
@@ -40,6 +48,19 @@ export class Card {
     return this.state === 'raw' || this.state === 'open'
   }
 
+  // The last conclusion written on the card, which holds until the card is opened again: what was concluded before
+  // is then to be looked into anew. A flag that says its author fixed the thing is the first conclusion of its card.
+  get conclusion(): Concluded | null {
+    const { notes, flag, provenance, history } = this.record
+    const reopened = history.findLast((event) => event.action === 'reopened')?.at ?? null
+    const concluded = notes.flatMap(({ conclusion, provenance: by }): Concluded[] => (conclusion === null ? [] : [{ as: conclusion, by }]))
+    const last = concluded.findLast(({ by }) => reopened === null || by.at > reopened)
+
+    if (last !== undefined) return last
+
+    return reopened === null && flag?.fields.did === 'fixed' ? { as: 'fixed', by: provenance } : null
+  }
+
   oneLine(): string {
     const [first, ...others] = this.places
     const place = first === undefined ? [] : [`${PlaceText.write(first)}${others.length === 0 ? '' : ` +${String(others.length)}`}`]
@@ -67,12 +88,14 @@ export class Card {
     })
   }
 
-  // How it stands, in a word or two: its state, how it was closed, or the card it was merged into.
+  // How it stands, in a word or two: its state with what was concluded of it, how it was closed, or the card it
+  // was merged into.
   get standing(): string {
     const { state, closing, mergedInto, seenSinceClosing } = this.record
+    const concluded = this.conclusion
 
     if (state === 'merged') return `merged into #${String(mergedInto)}`
-    if (state !== 'closed' || closing === null) return state
+    if (state !== 'closed' || closing === null) return concluded === null ? state : `${state} (${concluded.as})`
 
     return `closed (${closing.as}${seenSinceClosing ? ', seen again' : ''})`
   }

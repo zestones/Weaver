@@ -1,10 +1,10 @@
 import { spawnSync } from 'node:child_process'
 import { DeclarationParts } from '@weaver/engine'
-import type { Card, Closing } from '@weaver/memory'
+import { Card } from '@weaver/memory'
 import type { Project } from '../../project/project.ts'
 import { CardChange, type RegistryChange } from './card-change.ts'
 
-const CLOSINGS: readonly Closing[] = ['fixed', 'wontfix', 'issue']
+const CLOSINGS = Card.CLOSINGS
 const LABELS = '{labels}'
 
 export class CloseCommand extends CardChange {
@@ -13,13 +13,13 @@ export class CloseCommand extends CardChange {
   override readonly summary = 'Close a card'
   override readonly help = {
     group: 'Cards',
-    description: 'Close a card: it was fixed, it will not be, or it is now an issue of its own.',
+    description: 'Close a card: it was fixed, it will not be, it is now an issue of its own, or what it says proved not to be true.',
     words: [
       ['<number>', 'The number of the card, as weaver cards shows it'],
-      ['fixed|wontfix|issue', 'Why it closes: it was fixed, it will not be, or it becomes an issue of its own'],
+      [CLOSINGS.join('|'), 'Why it closes: it was fixed, it will not be, it becomes an issue of its own, or what it says is not true'],
       ['[reason]', 'A few words kept with the card'],
     ],
-    examples: ['weaver close 12 fixed', 'weaver close 12 wontfix "the old behaviour is wanted"'],
+    examples: ['weaver close 12 fixed', 'weaver close 12 wontfix "the old behaviour is wanted"', 'weaver close 12 invalid'],
   } as const
 
   protected override change([number = 0]: readonly number[], [as, ...words]: readonly string[], project: Project): RegistryChange | null {

@@ -160,6 +160,14 @@ interface FlagEvent {
   readonly known: boolean
 }
 
+interface NoteEvent {
+  readonly kind: 'note'
+  readonly unit: number
+  readonly card: number
+  // What the note concludes of its card; null when it concludes nothing.
+  readonly conclusion: string | null
+}
+
 export type EventBody =
   | TouchEvent
   | CheckEvent
@@ -176,5 +184,6 @@ export type EventBody =
   | ReviewEvent
   | AnswerEvent
   | FlagEvent
+  | NoteEvent
 export type JournalEvent = EventBase & EventBody
 export type EventOf<Kind extends EventBody['kind']> = Extract<JournalEvent, { kind: Kind }>

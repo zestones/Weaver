@@ -6,7 +6,7 @@ import { afterAll, beforeEach, test } from 'vitest'
 import { cardOf, contextOf, finding, flag, inRegistry, write } from '../fixtures/cards.ts'
 import { makeProject, weaver } from '../fixtures/project.ts'
 
-const HINT = 'Read one with weaver cards <number>, and close it with weaver close <number> fixed|wontfix|issue [reason].'
+const HINT = 'Read one with weaver cards <number>, and close it with weaver close <number> fixed|wontfix|issue|invalid [reason].'
 const USAGE = [
   'Usage: weaver cards [<number>] [--all] [--file <path>] [--label <family:value>]',
   'Run weaver help cards for what each word means.',
@@ -164,8 +164,40 @@ test('at a terminal the card is drawn, and a program still reads it as Markdown'
   assert.ok(page.includes(`  Observation ${'─'.repeat(64)}`), 'a part of the card opens under a rule that ends with the page')
   assert.ok(page.includes('    Seen      no call of refresh() exists under src/.'), 'the flag is drawn field by field')
   assert.ok(page.includes('  ▸ 42 │ return cached'), 'the line that was flagged is pointed at')
-  assert.deepEqual(page.slice(-2), ['  Close it with weaver close 1 fixed|wontfix|issue [reason].', ''])
+  assert.deepEqual(page.slice(-3), [
+    '  Write on it with weaver note 1 [confirmed|refuted|unsure|fixed] <text>.',
+    '  Close it with weaver close 1 fixed|wontfix|issue|invalid [reason].',
+    '',
+  ])
   assert.equal(lines[1], '  \u001B[1mNothing\u001B[22m \u001B[1mrefreshes\u001B[22m \u001B[1mthe\u001B[22m \u001B[1mtoken\u001B[22m')
+})
+
+test('an agent that reads a card is told how to write on it what it finds, and the owner is not', async () => {
+  flag(top)
+  flag(top, { text: OTHER_FLAG, places: [] })
+  inRegistry(top, (registry) => registry.merge(2, 1, 'the same cache'))
+
+  const card = cardOf(top, 1).markdown().split('\n')
+  const read = await weaver(top, ['cards', '1'], { under: 'claude' })
+
+  assert.deepEqual(read.lines.slice(0, card.length), card)
+  assert.deepEqual(read.lines.slice(card.length), [
+    '',
+    '---',
+    '',
+    '[weaver] If the owner asked you to verify or to fix what this card says, write what you found on the card when you are done, with the command below. Weaver answers in its place, as it does for a flag.',
+    '',
+    "weaver note 1 confirmed|refuted|unsure|fixed <<'EOF'",
+    'What you ran and what it showed, what you only read, and what you changed.',
+    'EOF',
+    'The word says what you conclude of the card: confirmed when what it says is true, refuted when it is not, unsure when you could not tell, fixed when you fixed it. Leave the word out for a note that concludes nothing.',
+  ])
+  assert.equal((await weaver(top, ['cards', '1'])).lines.join('\n'), card.join('\n'), 'the owner reads the card alone')
+  assert.equal(
+    (await weaver(top, ['cards', '2'], { under: 'claude' })).lines.join('\n'),
+    cardOf(top, 2).markdown(),
+    'a card that became another is not written on',
+  )
 })
 
 test('words that cards does not know are answered with how it is written', async () => {

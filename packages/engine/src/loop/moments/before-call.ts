@@ -4,6 +4,8 @@ import { FlagRecorder, type FlagAnswer } from '../../flagging/recording/flag-rec
 import type { ToolCall } from '../../agents/tool-calls/tool-call.ts'
 import { ProjectGuards } from '../../guards/deciding/project-guards.ts'
 import type { Refusal } from '../../guards/results/refusal.ts'
+import { NoteCall } from '../../noting/calls/note-call.ts'
+import { NoteRecorder, type NoteAuthor } from '../../noting/recording/note-recorder.ts'
 import { UnitLines } from '../../unit-of-work/diff/unit-lines.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import { Answer } from '../exchange/answer.ts'
@@ -22,6 +24,10 @@ export class BeforeCall implements Moment {
 
     // A flag is answered here in place of its command, so no guard has a call to judge.
     if (flag !== null) return Answer.refusing(this.flagged(turn, flag))
+
+    const note = NoteCall.in(call)
+
+    if (note !== null) return Answer.refusing(this.noted(turn, note))
 
     const session = turn.session()
     const refusal = new ProjectGuards(turn.declaration, turn.repo).refusal(call)
@@ -69,21 +75,51 @@ export class BeforeCall implements Moment {
     const { event, repo } = turn
     const unit = session?.unit() ?? null
     const lines = session === null || unit === null ? null : new UnitLines(session, unit)
-    const registry = new CardRegistry(repo.stateDir)
+
+    return this.inRegistry(turn, (registry) =>
+      new FlagRecorder(repo, registry).record(
+        { callId: event.callId, places: flag.places, body: flag.body ?? '', cwd: flag.cwd ?? event.cwd },
+        { ...this.author(turn, session), written: (file) => lines?.of(file) ?? null },
+      ),
+    )
+  }
+
+  // A note is answered in place of its command too, for the same reason: the hook knows who writes it.
+  private noted(turn: Turn, note: NoteCall): string {
+    try {
+      const session = turn.session()
+      const answer = this.inRegistry(turn, (registry) =>
+        new NoteRecorder(turn.repo, registry).record({ words: note.words, body: note.body }, this.author(turn, session)),
+      )
+
+      if (answer.card !== null && !answer.known) session?.noted(answer.card.number, answer.conclusion)
+
+      return answer.message
+    } catch (error) {
+      const reason = (error instanceof Error ? error.message : String(error)).replace(/\.$/, '')
+
+      return `[weaver] The note was not written, because Weaver failed: ${reason}. This command is answered here and never runs. Say what you found in your final message, for the owner, and go on with your task.`
+    }
+  }
+
+  private author(turn: Turn, session: Session | null): NoteAuthor {
+    const unit = session?.unit() ?? null
+
+    return {
+      author: turn.agent.name,
+      role: 'author',
+      session: session?.id ?? null,
+      subagent: turn.event.agentId,
+      unit: unit?.number ?? null,
+      requests: unit?.requests ?? [],
+    }
+  }
+
+  private inRegistry<Result>(turn: Turn, work: (registry: CardRegistry) => Result): Result {
+    const registry = new CardRegistry(turn.repo.stateDir)
 
     try {
-      return new FlagRecorder(repo, registry).record(
-        { callId: event.callId, places: flag.places, body: flag.body ?? '', cwd: flag.cwd ?? event.cwd },
-        {
-          author: turn.agent.name,
-          role: 'author',
-          session: session?.id ?? null,
-          subagent: event.agentId,
-          unit: unit?.number ?? null,
-          requests: unit?.requests ?? [],
-          written: (file) => lines?.of(file) ?? null,
-        },
-      )
+      return work(registry)
     } finally {
       registry.close()
     }

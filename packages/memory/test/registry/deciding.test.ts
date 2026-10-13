@@ -46,6 +46,17 @@ test('the owner closes a card as fixed, wontfix or issue, with a reason, and it 
   assert.deepEqual(registry.awaitingWriter(2), [], 'a raw flag that is closed is not written up')
 })
 
+test('a card whose flag proved not to be true is closed as invalid, with or without a reason', () => {
+  const registry = filled()
+  const invalid = registry.closeCard(1, 'invalid', null)
+
+  assert.deepEqual([invalid.state, invalid.standing, invalid.record.closing?.as], ['closed', 'closed (invalid)', 'invalid'])
+  assert.equal(
+    registry.closeCard(2, 'invalid', 'renew() is called by the scheduler').record.closing?.reason,
+    'renew() is called by the scheduler',
+  )
+})
+
 test('closing as wontfix needs a reason, and the card stays as it was without one', () => {
   const registry = filled()
 

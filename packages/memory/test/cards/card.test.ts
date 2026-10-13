@@ -257,6 +257,59 @@ test('a card ends with its occurrences, its ties and how it was closed', () => {
   )
 })
 
+test('what was written on a card since is under its flag, in order, and its header says what was last concluded', () => {
+  const text = new Card(
+    recordOf({
+      state: 'open',
+      written: writtenOf(),
+      notes: [
+        {
+          provenance: provenanceOf({ author: 'codex', session: 'session-2', at: '2026-10-13T09:00:00.000Z' }),
+          conclusion: 'confirmed',
+          text: 'Ran the test with a token of one second:\n\n```text\n401 Unauthorized\n```',
+        },
+        {
+          provenance: provenanceOf({ author: 'owner', role: 'owner', session: null, at: '2026-10-14T09:00:00.000Z' }),
+          conclusion: null,
+          text: 'To fix with the session store.',
+        },
+      ],
+      occurrences: [{ card: null, provenance: provenanceOf({ role: 'reviewer' }), note: '9c8b7a6/F2: still cast' }],
+    }),
+  ).markdown()
+
+  assert.match(
+    text,
+    /\n- What the writer saw: [^\n]+\n- Concluded: confirmed, by codex, as author, on 2026-10-13T09:00:00.000Z\n\n## Observation\n/,
+  )
+  assert.ok(
+    text.endsWith(
+      [
+        '```',
+        '',
+        '## Notes',
+        '',
+        '### 2026-10-13T09:00:00.000Z, codex, as author: confirmed',
+        '',
+        'Ran the test with a token of one second:',
+        '',
+        '```text',
+        '401 Unauthorized',
+        '```',
+        '',
+        '### 2026-10-14T09:00:00.000Z, the owner',
+        '',
+        'To fix with the session store.',
+        '',
+        '## Occurrences',
+        '',
+        '- 2026-10-11T10:00:00.000Z, claude, as reviewer: 9c8b7a6/F2: still cast',
+      ].join('\n'),
+    ),
+  )
+  assert.doesNotMatch(new Card(recordOf()).markdown(), /Concluded|## Notes/)
+})
+
 test('a card closed without a reason says how and when, and a merged one where it went', () => {
   const closed = new Card(
     recordOf({ state: 'closed', closing: { as: 'fixed', reason: null, issue: null, at: '2026-10-12T08:00:00.000Z' } }),

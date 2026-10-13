@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
-import { cardOf, finding, flag, write } from '../fixtures/cards.ts'
+import { cardOf, finding, flag, note, write } from '../fixtures/cards.ts'
 import { makeProject, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-close-'))
@@ -58,6 +58,18 @@ test('close takes a card off the list, as fixed or as wontfix, and keeps the rea
   assert.deepEqual((await weaver(top, ['cards'])).lines, ['Nothing waits for you.'])
 })
 
+test('a card whose flag proved not to be true is closed as invalid', async () => {
+  assert.deepEqual(await weaver(top, ['close', '1', 'invalid', 'refresh()', 'is', 'called', 'by', 'the', 'scheduler']), {
+    status: 0,
+    lines: ['✓ Card #1 closed as invalid.'],
+  })
+  assert.deepEqual(await weaver(top, ['close', '2', 'invalid']), { status: 0, lines: ['✓ Card #2 closed as invalid.'] })
+  assert.deepEqual(
+    [cardOf(top, 1).standing, cardOf(top, 1).record.closing?.reason, cardOf(top, 2).record.closing?.reason],
+    ['closed (invalid)', 'refresh() is called by the scheduler', null],
+  )
+})
+
 test('every error of the registry is shown as it says, and the card stays as it was', async () => {
   assert.deepEqual(await weaver(top, ['close', '1', 'wontfix']), {
     status: 1,
@@ -75,7 +87,7 @@ test('every error of the registry is shown as it says, and the card stays as it 
 })
 
 test('close says how it is written when a word is missing or unknown', async () => {
-  const usage = ['Usage: weaver close <number> fixed|wontfix|issue [reason]', 'Run weaver help close for what each word means.']
+  const usage = ['Usage: weaver close <number> fixed|wontfix|issue|invalid [reason]', 'Run weaver help close for what each word means.']
 
   assert.deepEqual(await weaver(top, ['close']), { status: 2, lines: usage })
   assert.deepEqual(await weaver(top, ['close', '1']), { status: 2, lines: usage })
@@ -85,6 +97,7 @@ test('close says how it is written when a word is missing or unknown', async () 
 
 test('closing as an issue runs the command of the project with the title, the card and its labels, and keeps what it printed', async () => {
   declareFiler('--title', '{title}', '--label', '{labels}', '--body={body}')
+  note(top, 1)
 
   assert.deepEqual(await weaver(top, ['close', '1', 'issue', 'for', 'the', 'next', 'release']), {
     status: 0,
@@ -96,6 +109,11 @@ test('closing as an issue runs the command of the project with the title, the ca
 
   assert.deepEqual([title, labels], ['Nothing refreshes the token', 'type:bug,area:auth'])
   assert.match(body, /^--body=# Nothing refreshes the token\n\n- Card: #1\n[^]*\n- State: open\n[^]*## Flag\n\n```text\nSeen: /)
+  assert.match(
+    body,
+    /\n## Notes\n\n### 2026-10-12T09:30:00\.000Z, claude, as author: confirmed\n\nRan the test with a token of one second:\n/,
+    'an issue carries what was found about its card',
+  )
   assert.equal(state, 'closed')
   assert.deepEqual([closing?.as, closing?.reason, closing?.issue], ['issue', 'for the next release', 'https://issues.example/42'])
   assert.match(

@@ -4,10 +4,12 @@ export { PlaceText } from './flags/place-text.ts'
 export type {
   CardClosing,
   CardEvent,
+  CardNote,
   CardOrigin,
   CardRecord,
   CardState,
   Closing,
+  Conclusion,
   Occurrence,
   Provenance,
   ReviewContent,
@@ -15,8 +17,10 @@ export type {
   WrittenCard,
 } from './cards/card-record.ts'
 export { Card } from './cards/card.ts'
+export type { Concluded } from './cards/card.ts'
+export { NoteText } from './notes/note-text.ts'
 export { CardRegistry } from './registry/card-registry.ts'
-export type { Flagged, NewFlag, NewReviewCard } from './registry/card-registry.ts'
+export type { Flagged, NewFlag, NewReviewCard, Noted } from './registry/card-registry.ts'
 export type { CardFilter } from './registry/card-table.ts'
 export { RegistryError } from './registry/registry-error.ts'
 export type { LabelCatalog, WriterJob, WriterSettings } from './writing/request/writer-job.ts'

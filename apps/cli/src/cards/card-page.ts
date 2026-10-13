@@ -1,4 +1,4 @@
-import { PlaceText, type Card, type CardRecord, type PlaceContext, type Provenance } from '@weaver/memory'
+import { Card, NoteText, PlaceText, type CardRecord, type PlaceContext, type Provenance } from '@weaver/memory'
 import type { Atom } from '../markdown/atom.ts'
 import { DrawnCode, type NumberedLine } from '../markdown/drawn-code.ts'
 import { InlineMarkdown } from '../markdown/inline-markdown.ts'
@@ -54,7 +54,17 @@ export class CardPage {
   }
 
   lines(): string[] {
-    const parts = [this.head(), ...this.body(), this.flag(), this.occurrences(), this.ties(), this.closing(), this.source(), this.next()]
+    const parts = [
+      this.head(),
+      ...this.body(),
+      this.flag(),
+      this.notes(),
+      this.occurrences(),
+      this.ties(),
+      this.closing(),
+      this.source(),
+      this.next(),
+    ]
 
     return parts.filter((part) => part.length > 0).flatMap((part, index) => (index === 0 ? part : ['', ...part]))
   }
@@ -70,16 +80,10 @@ export class CardPage {
       new LocalMoment(provenance.at).text,
       ...(labels.length === 0 ? [] : [labels.join(', ')]),
     ]
-    // A fact is never cut by the end of a line, and the mark that sets it apart from the next stays with it.
-    const stated = facts.map((fact, index): Atom => {
-      const text = index === facts.length - 1 ? fact : `${fact} ${this.paint.dim('·')}`
-
-      return { text, width: this.wrapped.visible(text) }
-    })
 
     return [
       ...this.wrapped.of(this.inline.typed(this.card.title, (word) => this.paint.bold(word))),
-      ...this.wrapped.of(stated),
+      ...this.stated(facts),
       ...this.alerts(),
       ...(places.length === 0 ? [] : ['', ...places.map((place) => `${INDENT}${this.paint.cyan(PlaceText.write(place))}`)]),
     ]
@@ -87,10 +91,23 @@ export class CardPage {
 
   private standing(): string {
     const { state } = this.record
+    const concluded = this.card.conclusion
 
     if (state === 'open') return this.paint.green(this.card.standing)
+    if (state !== 'raw') return this.paint.dim(this.card.standing)
 
-    return state === 'raw' ? this.paint.yellow('raw, not written up yet') : this.paint.dim(this.card.standing)
+    return this.paint.yellow(`raw, not written up yet${concluded === null ? '' : ` (${concluded.as})`}`)
+  }
+
+  // Facts on one line, set apart by a mark. A fact is never cut by the end of a line, and its mark stays with it.
+  private stated(facts: readonly string[]): string[] {
+    return this.wrapped.of(
+      facts.map((fact, index): Atom => {
+        const text = index === facts.length - 1 ? fact : `${fact} ${this.paint.dim('·')}`
+
+        return { text, width: this.wrapped.visible(text) }
+      }),
+    )
   }
 
   // What the owner should know before reading on: the writer disagrees, the writing failed, the thing came back.
@@ -171,6 +188,22 @@ export class CardPage {
     ]
   }
 
+  // What was written on the card since it was made, in order: who, when and what they conclude, then what they say.
+  private notes(): string[] {
+    const notes = this.record.notes.flatMap(({ provenance, conclusion, text }) => [
+      '',
+      ...this.stated([
+        this.paint.bold(this.author(provenance)),
+        this.paint.dim(new LocalMoment(provenance.at).text),
+        ...(conclusion === null ? [] : [conclusion]),
+      ]),
+      '',
+      ...this.markdown.lines(text),
+    ])
+
+    return notes.length === 0 ? [] : [...this.titled('Notes'), ...notes]
+  }
+
   private occurrences(): string[] {
     const lines = this.record.occurrences.flatMap(({ card, provenance, note }) => {
       const whose = `${new LocalMoment(provenance.at).text}, ${this.author(provenance)}${card === null ? '' : `, as card #${String(card)}`}:`
@@ -229,11 +262,15 @@ export class CardPage {
     return `${who}: ${LOOK[look.verdict]}. ${look.note}`.trimEnd()
   }
 
-  // What a card that waits is for: a decision.
+  // What a card that waits is for: a decision, and what is found on the way to it.
   private next(): string[] {
-    const close = `Close it with weaver close ${String(this.record.number)} fixed|wontfix|issue [reason].`
+    const number = String(this.record.number)
+    const hints = [
+      `Write on it with weaver note ${number} [${NoteText.CONCLUSIONS.join('|')}] <text>.`,
+      `Close it with weaver close ${number} ${Card.CLOSINGS.join('|')} [reason].`,
+    ]
 
-    return this.card.isWaiting ? this.wrapped.of(this.dimmed(close)) : []
+    return this.card.isWaiting ? hints.flatMap((hint) => this.wrapped.of(this.dimmed(hint))) : []
   }
 
   private titled(title: string): string[] {

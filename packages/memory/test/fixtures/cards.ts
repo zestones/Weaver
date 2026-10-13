@@ -109,6 +109,7 @@ export function recordOf(fields: Partial<CardRecord> = {}): CardRecord {
     proposal: null,
     seenSinceClosing: false,
     occurrences: [],
+    notes: [],
     ties: [],
     mergedInto: null,
     writing: { attempts: 0, failure: null },

@@ -217,6 +217,7 @@ export class StatsPage {
       made,
       this.row('Cards opened', this.withDetail(opened.total, opened.byOrigin)),
       this.row('Cards written', `${String(cards.written)}; writings that failed ${String(cards.writingFailed)}`),
+      this.row('Notes on cards', this.withDetail(cards.notes.total, cards.notes.byConclusion)),
       this.row('Cards closed', this.withDetail(closed.total, closed.byClosing)),
       this.row('Cards waiting now', `${String(waiting.total)}; not written yet ${String(waiting.notWritten)}${oldest}`),
     ]

@@ -17,6 +17,7 @@ import { TieCommand } from '../changes/tie-command.ts'
 import { UntieCommand } from '../changes/untie-command.ts'
 import { CardsCommand } from '../memory/cards-command.ts'
 import { FlagCommand } from '../memory/flag-command.ts'
+import { NoteCommand } from '../memory/note-command.ts'
 import { StatsCommand } from '../numbers/stats-command.ts'
 import { MaintenanceCommand } from '../sessions/maintenance-command.ts'
 import { DoctorCommand } from '../wiring/doctor-command.ts'
@@ -130,8 +131,9 @@ export class CommandLine {
       new VersionCommand(this.output),
       new MaintenanceCommand(this.cwd, this.output),
       new StatsCommand(this.cwd, this.output),
-      new CardsCommand(this.cwd, this.output),
+      new CardsCommand(this.cwd, this.output, this.caller),
       new FlagCommand(this.cwd, this.output, this.input, this.caller),
+      new NoteCommand(this.cwd, this.output, this.input, this.caller),
       new CloseCommand(this.cwd, this.output),
       new ReopenCommand(this.cwd, this.output),
       new RetitleCommand(this.cwd, this.output),

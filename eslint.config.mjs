@@ -22,13 +22,13 @@ const LAYERS = {
     ['bin'],
     ['loop'],
     ['verdict'],
-    ['checks', 'guards', 'review', 'flagging'],
+    ['checks', 'guards', 'review', 'flagging', 'noting'],
     ['unit-of-work', 'declaration', 'agents'],
     ['lib'],
   ],
   'apps/cli': [['bin'], ['commands'], ['runtimes', 'project'], ['caller', 'input', 'link', 'output', 'skills']],
   'packages/agent-sdk': [['adapters', 'testing'], ['ports'], ['lib']],
-  'packages/memory': [['bin'], ['writing'], ['registry'], ['cards'], ['flags'], ['lib']],
+  'packages/memory': [['bin'], ['writing'], ['registry'], ['notes'], ['cards'], ['flags'], ['lib']],
 }
 
 const layerRules = Object.entries(LAYERS).flatMap(([root, layers]) =>

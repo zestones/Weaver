@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import type {
   CardClosing,
   CardEvent,
+  CardNote,
   CardOrigin,
   CardRecord,
   CardState,
@@ -36,6 +37,12 @@ export interface NewFlag {
 export interface Flagged {
   readonly card: Card
   // true when this very flag was already recorded: same call, or same text in the same session and unit.
+  readonly known: boolean
+}
+
+export interface Noted {
+  readonly card: Card
+  // true when this very note was already on the card: the same words, from the same session and unit.
   readonly known: boolean
 }
 
@@ -144,6 +151,22 @@ export class CardRegistry {
       const closing: CardClosing = { as, reason: why, issue, at: this.now() }
 
       return this.after(record, 'closed', why === null ? as : `${as}: ${why}`, { state: 'closed', closing, seenSinceClosing: false })
+    })
+  }
+
+  // Written on a card whatever its state, but for a merged one: what is found about it goes to the card it became.
+  note(number: number, note: CardNote): Noted {
+    return this.write(() => {
+      const record = this.existing(number)
+      const said = { ...note, text: note.text.trim() }
+
+      if (record.state === 'merged') throw new RegistryError(`${this.merged(record)}: write on that one`)
+      if (said.text === '') throw new RegistryError('a note says something: this one is empty')
+      if (record.notes.some((written) => this.sameNote(written, said))) return { card: new Card(record), known: true }
+
+      const noted = this.after(record, 'noted', said.conclusion, { notes: [...record.notes, said] })
+
+      return { card: new Card(this.cards.update(noted)), known: false }
     })
   }
 
@@ -357,6 +380,20 @@ export class CardRegistry {
     return this.cards.ofText(provenance.session, provenance.unit, text)
   }
 
+  // A hook may see one call twice. Without a session, nothing tells a note of the owner from the same words said
+  // again another day.
+  private sameNote(written: CardNote, said: CardNote): boolean {
+    const { session, unit } = said.provenance
+
+    return (
+      session !== null &&
+      written.provenance.session === session &&
+      written.provenance.unit === unit &&
+      written.conclusion === said.conclusion &&
+      written.text === said.text
+    )
+  }
+
   // What makes two points of reviews one thing. A rule broken at a place is the same however it is worded; a
   // suspicion, or a finding without a place, is only what its words say: a wrong merge would hide a discovery.
   private reviewKey({ origin, places, content }: NewReviewCard): string {
@@ -386,6 +423,7 @@ export class CardRegistry {
       proposal: null,
       seenSinceClosing: false,
       occurrences: [],
+      notes: [],
       ties: [],
       mergedInto: null,
       writing: { attempts: 0, failure: null },

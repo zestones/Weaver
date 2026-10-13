@@ -1,6 +1,7 @@
 import { realpathSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
-import { PlaceText, type Card, type CardFilter, type CardState } from '@weaver/memory'
+import { Card, NoteText, PlaceText, type CardFilter, type CardState } from '@weaver/memory'
+import type { Caller } from '../../caller/caller.ts'
 import { Counted } from '../../output/counted.ts'
 import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
@@ -33,10 +34,12 @@ export class CardsCommand implements Command {
   } as const
   private readonly cwd: string
   private readonly screen: Screen
+  private readonly caller: Caller
 
-  constructor(cwd: string, output: Output) {
+  constructor(cwd: string, output: Output, caller: Caller) {
     this.cwd = cwd
     this.screen = new Screen(output)
+    this.caller = caller
   }
 
   run(args: readonly string[]): number | Promise<number> {
@@ -79,7 +82,7 @@ export class CardsCommand implements Command {
 
       // The parser of Markdown and the grammars of the languages are loaded here, to draw a card: no other command
       // pays for them.
-      await this.screen.page(card.markdown(), async (paint, width) => {
+      await this.screen.page([card.markdown(), ...this.answering(card)].join('\n\n'), async (paint, width) => {
         const { CardPage } = await import('../../cards/card-page.ts')
 
         return new CardPage(card, paint, width).lines()
@@ -89,6 +92,16 @@ export class CardsCommand implements Command {
     } finally {
       registry?.close()
     }
+  }
+
+  // An agent that reads a card is told how to write on it: what it finds would otherwise stay in its conversation.
+  private answering(card: Card): string[] {
+    if (this.caller.agent() === null || card.state === 'merged') return []
+
+    return [
+      '---',
+      `[weaver] If the owner asked you to verify or to fix what this card says, write what you found on the card when you are done, with the command below. Weaver answers in its place, as it does for a flag.\n\n${NoteText.formatFor(String(card.number))}`,
+    ]
   }
 
   private list({ all, file, label }: Asked): number {
@@ -125,7 +138,7 @@ export class CardsCommand implements Command {
       }
 
       this.screen.line()
-      this.screen.hint('Read one with weaver cards <number>, and close it with weaver close <number> fixed|wontfix|issue [reason].')
+      this.screen.hint(`Read one with weaver cards <number>, and close it with weaver close <number> ${Card.CLOSINGS.join('|')} [reason].`)
 
       return 0
     } finally {

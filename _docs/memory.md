@@ -121,19 +121,43 @@ A card follows a strict schema, in two parts.
 
 **What the project declares.** Its labels, as families and values, with the same words as its labels on GitHub (`type`, `area`, `status` for Adaptive). The sections of the body, in the header of the skill, as the finish skill lists the headings of a final message.
 
-**What a card is not.** It gives enough context to be understood alone, months later. It is neither an investigation nor a certainty. Reproducing the problem, finding its cause and writing acceptance criteria come afterwards, if the owner decides to open an issue.
+**What a card is not.** It gives enough context to be understood alone, months later. It is neither an investigation nor a certainty. Reproducing the problem and finding its cause come afterwards, when the owner asks an agent to verify the card: what the agent finds is written on the card, and goes with it if it becomes an issue.
 
 **What can happen to it.**
 
-- The owner closes it, as `fixed`, `wontfix` or `issue`, with a reason. Weaver checks who closes: the command refuses to run under an agent.
+- The owner closes it, as `fixed`, `wontfix`, `issue` or `invalid`, with a reason. `invalid` is for a card whose flag proved not to be true. Weaver checks who closes: the command refuses to run under an agent.
+- It can be written on, as long as it exists: by an agent the owner asked to verify or to fix it, and by the owner. A note may conclude: `confirmed`, `refuted`, `unsure` or `fixed`.
 - It can be corrected, and opened again.
 - When the thing is found again, the card gains an occurrence instead of a duplicate. A closed card that is found again is marked as seen since its closing; it is not reopened by itself.
 - When two cards may be about the same thing and it is not sure, they stay two cards tied together, and a tie can be undone: a wrong merge hides a discovery.
-- It has room for a closing that an agent proposes and that the owner accepts. That path is built after the first version.
+- It has room for a closing that an agent proposes and that the owner accepts. Nothing writes it: see the life of a card, below.
 
 A card keeps its flag word for word: what the agent said and what the writer made of it can always be compared.
 
 **Who reads it, and where.** The owner said on 2026-10-11 how the two readers differ. `weaver cards` is what an agent runs in a chat, to read the registry for the owner or for its own work. A person will browse the cards, decide on them and ask for an investigation in an interface of their own. It was to be a web workbench, which the owner cancelled on 2026-10-13 for a screen in the terminal: see [to do later](todo-later.md). Until it exists, the commands are where the owner decides.
+
+## The life of a card
+
+Settled with the owner on 2026-10-13, with the cards of the first project at hand: twenty-one after a day, none closed.
+
+**The registry is a backlog, not a pile to empty.** A card is open or closed, with no state in between, and may stay open without limit, read or not. Weaver does not keep what the owner has read. Now and then the owner takes one card out:
+
+- it is fixed directly, by the agent at work on something close or by a second one started beside it;
+- or an agent is asked to verify it. When it proves true, it is fixed now, or becomes an issue when it cannot be. When it does not, it is closed as `invalid`.
+
+An issue is therefore a card that proved true and cannot be handled now. Its life goes on where the issues are, and the card is finished.
+
+**What is written on a card.** `weaver note <number>`, with what the note concludes of the card if it concludes, then its text, on the line or in a heredoc. For an agent, the hook answers in place of the command, as for a flag: it knows the session, the unit of work and the request. For the owner, the command writes it. A note that the hook sees twice is written once.
+
+**How an agent knows.** The card as an agent reads it, `weaver cards <number>` under a runtime, ends with the command to write on it, its number filled in. The owner does not read that part, and it is not in the issue a card becomes. Nothing is added to the briefing of every request: what an agent is told decides whether it uses a command, and this one is told at the moment it is needed.
+
+**How a card stands.** The last conclusion written on an open card is shown with its state, in the list and on its page: `open (confirmed)`. A flag that says `Did: fixed in the task` is the first conclusion of its card, so a card born fixed reads `open (fixed)` and waits for the owner all the same: two of the first three said that something was left. A card that is opened again is to be looked into again, and what was concluded before no longer stands. Nothing is decided by a conclusion: the owner closes.
+
+**Left out, each for a reason.**
+
+- A mark on a card the owner has read. The owner reads without judging, and does not open most cards: nearly all would keep the mark.
+- A mark on a card an agent is working on. Nothing would remove it when a session dies. To take up again if the owner hands one card to two agents.
+- Closings proposed in a batch by an agent, for which the record has room. They were meant to empty the pile, which is no longer a goal.
 
 ## Where it is kept
 
@@ -149,6 +173,7 @@ The registry lives on the owner's machine. Whether it must survive a change of m
 | --------------------------------------------------- | ------------------------------------------- |
 | The command of the agent                            | `weaver flag`                               |
 | The command that lists the cards                    | `weaver cards`, in place of `weaver status` |
+| The command that writes on one                      | `weaver note`                               |
 | The command that decides on one                     | `weaver close`                              |
 | The skill that says how a card is written           | `.weaver/skills/wv-card.md`                 |
 | The labels of the project                           | `.weaver/project/labels.json`               |
@@ -199,19 +224,20 @@ Not decisions: facts to keep in mind when the code is written.
 
 **How big the pile may grow, and how long sorting it may take.** Settled when the registry is in use.
 
-**An agent that proposes closings**, which the owner accepts in a batch. It is what emptied the pile of the source harness. After the first version.
+**An agent that proposes closings**, which the owner accepts in a batch. It is what emptied the pile of the source harness. Left out on 2026-10-13: the registry is a backlog, and emptying it is no longer a goal.
 
 **The recall against regressions.** Deferred by the owner on 2026-10-11, and the corrections made during a task come with it. What is known of it is in [to do later](todo-later.md).
 
 ## Plan
 
-The first five steps are built. The owner asked for them in one go, so the trial of step 3 came after the writer instead of before it.
+The first six steps are built. The owner asked for the first five in one go, so the trial of step 3 came after the writer instead of before it.
 
 1. **Prove the attribution.** Done: the hook records a flag, on real payloads of both runtimes kept as fixtures, with two sessions at once, a subagent and a chained command. The owner's commands are refused to an agent, by a guard and by the commands themselves.
 2. **The flag and a small registry.** Done: `weaver flag`, what it refuses, the lines it keeps; listing and closing.
 3. **A real trial.** Done for the first question: agents flag, once they are told well. The second, whether a raw flag is enough for the owner to decide, is the owner's to answer.
 4. **The writer.** Done: `writer.json`, the skill `wv-card.md`, the start at the end of a turn, the card checked against its schema.
 5. **The complete card.** Done: the labels, the ties and the occurrences, correcting and reopening. The ledger of the reviews is gone, and what a review leaves is a card.
-6. **Afterwards.** The life of a card, then an interface in the terminal where the cards are browsed every day: the web workbench first planned is cancelled. Both wait in [to do later](todo-later.md), with the recall against regressions, guards decided by a program and the comparison with the base, and so does the distribution of Weaver. Putting Weaver in place of the source harness on the real work is the owner's to decide.
+6. **The life of a card.** Done: `weaver note`, the conclusion an open card stands with, the `invalid` closing, the notes in the issue a card becomes.
+7. **Afterwards.** An interface in the terminal where the cards are browsed: the web workbench first planned is cancelled. It waits in [to do later](todo-later.md), with the recall against regressions, guards decided by a program and the comparison with the base, and so does the distribution of Weaver. Putting Weaver in place of the source harness on the real work is the owner's to decide.
 
 An agent needs no path to the command: the hook answers in its place.

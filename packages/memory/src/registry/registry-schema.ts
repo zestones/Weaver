@@ -41,4 +41,8 @@ export const MIGRATIONS: readonly string[] = [
     pid INTEGER NOT NULL
   ) STRICT;
   `,
+  // A card can be written on once it exists: every card made before starts with no note.
+  `
+  UPDATE cards SET record = json_set(record, '$.notes', json('[]'));
+  `,
 ]

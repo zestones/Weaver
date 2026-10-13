@@ -173,6 +173,10 @@ export class Session {
     this.log({ kind: 'flag', unit: unit.number, card, known })
   }
 
+  noted(card: number, conclusion: string | null): void {
+    this.log({ kind: 'note', unit: this.unit().number, card, conclusion })
+  }
+
   takeFlags(): readonly number[] {
     return this.store.transact((latest) => ({ record: { ...latest, flagged: [] }, value: latest.flagged })).value
   }

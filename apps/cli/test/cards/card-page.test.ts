@@ -61,6 +61,7 @@ const RAW: CardRecord = {
   proposal: null,
   seenSinceClosing: false,
   occurrences: [],
+  notes: [],
   ties: [],
   mergedInto: null,
   writing: { attempts: 0, failure: null },
@@ -126,7 +127,8 @@ test('a card is drawn from what it holds: what it is, what was written of it, it
     '  Asked     1. refresh the token before it expires…',
     '            #review',
     '',
-    'Close it with weaver close 7 fixed|wontfix|issue [reason].',
+    'Write on it with weaver note 7 [confirmed|refuted|unsure|fixed] <text>.',
+    'Close it with weaver close 7 fixed|wontfix|issue|invalid [reason].',
   ])
 })
 
@@ -196,8 +198,46 @@ test('what a review left is drawn with its rule, the line its reviewer read and 
     '  Session   session-1, unit 2',
     '  Asked     parse the answer',
     '',
-    'Close it with weaver close 2 fixed|wontfix|issue [reason].',
+    'Write on it with weaver note 2 [confirmed|refuted|unsure|fixed] <text>.',
+    'Close it with weaver close 2 fixed|wontfix|issue|invalid [reason].',
   ])
+})
+
+test('what was written on a card since is drawn after its flag: who, when and what they conclude, then what they say', () => {
+  const checked = '2026-10-13T09:00:00.000Z'
+  const said = '2026-10-14T09:00:00.000Z'
+  const noted = page({
+    ...WRITTEN,
+    notes: [
+      {
+        provenance: { ...PROVENANCE, author: 'codex', subagent: 'a1', at: checked },
+        conclusion: 'confirmed',
+        text: 'Ran the test with a token of one second:\n\n```text\n401 Unauthorized\n```',
+      },
+      { provenance: { ...PROVENANCE, author: 'owner', role: 'owner', at: said }, conclusion: null, text: 'To fix with the session store.' },
+    ],
+  })
+
+  assert.deepEqual(noted.slice(1, 3), [`#7 · open (confirmed) · flagged by claude · ${WHEN} ·`, 'type:bug, area:auth'])
+  assert.deepEqual(noted.slice(noted.indexOf(`Notes ${'─'.repeat(66)}`), noted.indexOf(`Where it comes from ${'─'.repeat(52)}`)), [
+    `Notes ${'─'.repeat(66)}`,
+    '',
+    `codex, in a subagent · ${new LocalMoment(checked).text} · confirmed`,
+    '',
+    'Ran the test with a token of one second:',
+    '',
+    '  │ 401 Unauthorized',
+    '',
+    `the owner · ${new LocalMoment(said).text}`,
+    '',
+    'To fix with the session store.',
+    '',
+  ])
+  assert.ok(noted.indexOf(`Flag ${'─'.repeat(67)}`) < noted.indexOf(`Notes ${'─'.repeat(66)}`))
+  assert.equal(
+    page({ ...RAW, flag: RAW.flag && { ...RAW.flag, fields: { ...RAW.flag.fields, did: 'fixed' } } })[1],
+    '#7 · raw, not written up yet (fixed) · flagged by claude ·',
+  )
 })
 
 test('a card that was closed says how, what came again and what it may be the same as, and offers no closing', () => {

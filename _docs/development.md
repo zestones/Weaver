@@ -89,6 +89,8 @@ After that, `weaver update` is the one command that keeps things up to date. It 
 
 A migration is never edited once a release carries it. Files of an earlier version are not read as they are: the hooks and `weaver doctor` tell the owner to run `weaver update`.
 
+The registry of cards, under `.git/weaver/`, has a schema of its own: one entry for each version in `packages/memory/src/registry/registry-schema.ts`, never edited once a release carries it, and each keeps every card. A later Weaver brings a registry up to date the first time it opens it. An earlier one then refuses to read it, and says so: update a project when no agent works in it.
+
 ## TypeScript and packages
 
 `tsconfig.base.json` contains shared strictness and Node.js module resolution defaults. There is no root compilation project or root test-runner configuration.
@@ -119,7 +121,7 @@ Shapes written to disk or read from another program, such as a saved state or a 
 
 A folder holds sub-folders or files, never both. `src/index.ts`, the entry of a package, is the one file allowed beside folders. As soon as files form a family, such as a base class and its subclasses, they get a sub-folder of their own.
 
-The folders of a package are layers, read from the top: a file imports from its own layer and from those below it, never from one above. In the engine these are `bin`, then `loop`, then `verdict`, then `checks`, `guards`, `review` and `flagging` side by side, then `unit-of-work`, `declaration` and `agents` side by side, then `lib`. Start reading at `loop/dispatch/loop.ts`. The memory package, `packages/memory`, has `bin`, `writing`, `registry`, `cards`, `flags` and `lib`, and imports nothing from the engine: start reading at `registry/card-registry.ts`.
+The folders of a package are layers, read from the top: a file imports from its own layer and from those below it, never from one above. In the engine these are `bin`, then `loop`, then `verdict`, then `checks`, `guards`, `review`, `flagging` and `noting` side by side, then `unit-of-work`, `declaration` and `agents` side by side, then `lib`. Start reading at `loop/dispatch/loop.ts`. The memory package, `packages/memory`, has `bin`, `writing`, `registry`, `notes`, `cards`, `flags` and `lib`, and imports nothing from the engine: start reading at `registry/card-registry.ts`.
 
 ### Comments
 

@@ -2,7 +2,7 @@ import type { PlaceContext } from '../flags/flag-record.ts'
 import { PlaceText } from '../flags/place-text.ts'
 import { clip, oneLine } from '../lib/text/clip.ts'
 import { fenced } from '../lib/text/fence.ts'
-import type { CardRecord, Occurrence, Provenance, ReviewContent, WriterLook } from './card-record.ts'
+import type { CardNote, CardRecord, Occurrence, Provenance, ReviewContent, WriterLook } from './card-record.ts'
 import type { Card } from './card.ts'
 
 const REQUEST_LIMIT = 300
@@ -33,6 +33,7 @@ export class CardMarkdown {
       this.header().join('\n'),
       ...this.body(),
       ...this.flag(),
+      ...this.notes(),
       ...this.occurrences(),
       ...this.ties(),
       ...this.closing(),
@@ -55,6 +56,7 @@ export class CardMarkdown {
       ...this.asked(provenance.requests),
       `- Date: ${at}${commit === null ? '' : `, at commit \`${commit}\``}`,
       ...this.look(),
+      ...this.concluded(),
     ]
   }
 
@@ -96,6 +98,12 @@ export class CardMarkdown {
     ]
   }
 
+  private concluded(): string[] {
+    const concluded = this.card.conclusion
+
+    return concluded === null ? [] : [`- Concluded: ${concluded.as}, by ${this.author(concluded.by)}, on ${concluded.by.at}`]
+  }
+
   private body(): string[] {
     const { review, written } = this.record
 
@@ -130,6 +138,16 @@ export class CardMarkdown {
     if (!exists) return [`${name} was not there when it was flagged.`]
 
     return excerpt === '' ? [] : [`${name} when it was flagged${LINES[origin]}:`, fenced(excerpt, 'text')]
+  }
+
+  private notes(): string[] {
+    const { notes } = this.record
+
+    return notes.length === 0 ? [] : ['## Notes', ...notes.flatMap((note) => this.note(note))]
+  }
+
+  private note({ provenance, conclusion, text }: CardNote): string[] {
+    return [`### ${provenance.at}, ${this.author(provenance)}${conclusion === null ? '' : `: ${conclusion}`}`, text.trim()]
   }
 
   private occurrences(): string[] {
