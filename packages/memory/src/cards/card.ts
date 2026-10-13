@@ -72,6 +72,11 @@ export class Card {
     return new CardMarkdown(this).text()
   }
 
+  // The values the card carries in one family of labels.
+  valuesOf(family: string): readonly string[] {
+    return this.record.written?.labels[family] ?? []
+  }
+
   // The labels as `family:value`, for a command that files an issue.
   labels(): string[] {
     return Object.entries(this.record.written?.labels ?? {}).flatMap(([family, values]) => values.map((value) => `${family}:${value}`))

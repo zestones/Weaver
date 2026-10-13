@@ -17,8 +17,11 @@ export type {
   WrittenCard,
 } from './cards/card-record.ts'
 export { Card } from './cards/card.ts'
+export { LabelFamilies } from './cards/label-families.ts'
 export type { Concluded } from './cards/card.ts'
 export { NoteText } from './notes/note-text.ts'
+export { CardListing } from './listing/card-listing.ts'
+export type { CardOrder, Narrowing } from './listing/card-listing.ts'
 export { CardRegistry } from './registry/card-registry.ts'
 export type { Flagged, NewFlag, NewReviewCard, Noted } from './registry/card-registry.ts'
 export type { CardFilter } from './registry/card-table.ts'
