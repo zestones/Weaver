@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { THEME } from '../theme/theme.ts'
 import { BoxFrame } from './box-frame.tsx'
 
-const WIDTH = 64
+const WIDTH = 68
 const KEY_WIDTH = 12
 const KEYS: readonly (readonly [string, readonly (readonly [string, string])[]])[] = [
   [
@@ -12,15 +12,15 @@ const KEYS: readonly (readonly [string, readonly (readonly [string, string])[]])
       ['↑ ↓  j k', 'the card above, the card under'],
       ['← →', 'the view before, the view after'],
       ['enter', 'go into the card, to scroll it'],
-      ['/', 'search what the cards say, and why they were closed'],
+      ['/', 'search what the cards say and why they closed'],
       ['f', 'narrow the list by labels and by date'],
-      ['s', 'cards under their level or how they closed, or newest first'],
+      ['s', 'under their level or closing, or newest first'],
     ],
   ],
   [
     'THE CARD',
     [
-      ['1 2 3', 'what was written, the flag, the notes'],
+      ['1 to 5', 'a side: card, flag, looked into, fixed, noted'],
       ['↑ ↓  space', 'scroll, a line or a page'],
       ['← →', 'the side before, the side after'],
       ['esc', 'back to the list'],

@@ -11,7 +11,8 @@ import { HelpForm } from '../forms/help-form.ts'
 import { LabelsForm } from '../forms/labels-form.ts'
 import { NoteForm } from '../forms/note-form.ts'
 import { TypedText } from '../forms/typed-text.ts'
-import { CardSheet, type SheetTab } from '../sheet/card-sheet.ts'
+import { CardSheet } from '../sheet/card-sheet.ts'
+import { CardSides, type SheetTab } from '../sheet/card-sides.ts'
 import { ListWindow } from './list-window.ts'
 
 // The cards a view shows: those that wait, those of them someone concluded on, the closed ones, or every card.
@@ -28,7 +29,6 @@ interface Said {
 }
 
 const VIEWS: readonly View[] = ['open', 'answered', 'closed', 'all']
-const TABS: readonly SheetTab[] = ['card', 'flag', 'notes']
 const DAY_MS = 24 * 60 * 60 * 1000
 const WEEK_DAYS = 7
 // The list takes about a third of the screen, between what a title needs and what a wide screen can spare.
@@ -58,7 +58,6 @@ const PAGE = 10
 // which the commands ask too, and draws what the registry holds afterwards.
 export class UiModel {
   static readonly VIEWS = VIEWS
-  static readonly TABS = TABS
 
   view: View = 'open'
   // Whether the cards stand under headings: their level, or how they were closed in the view of the closed ones.
@@ -69,6 +68,7 @@ export class UiModel {
   // Whether the keys go to the search.
   searching = false
   focus: 'list' | 'detail' = 'list'
+  // The side of the card in sight. It is kept from card to card: going down the list reads the same side of each.
   tab: SheetTab = 'card'
   box: Form | null = null
   said: Said | null = null
@@ -282,15 +282,14 @@ export class UiModel {
     else if (key.pageDown || input === ' ') this.scroll = Math.min(most, at + this.sheetHeight)
     else if (key.home || input === 'g') this.scroll = 0
     else if (key.end || input === 'G') this.scroll = most
-    else if (key.leftArrow || key.rightArrow)
-      this.show(TABS[(TABS.indexOf(this.tab) + (key.rightArrow ? 1 : TABS.length - 1)) % TABS.length] ?? 'card')
+    else if (key.leftArrow || key.rightArrow) this.turnSide(key.rightArrow ? 1 : -1)
     else this.pressedAnywhere(input)
   }
 
   // The keys that do the same in the list and in the detail.
   private pressedAnywhere(input: string): void {
     const card = this.selected
-    const tab = TABS[Number(input) - 1]
+    const tab = CardSides.TABS[Number(input) - 1]
 
     if (input === 'q') this.finished = true
     else if (input === '?') this.box = new HelpForm()
@@ -376,6 +375,12 @@ export class UiModel {
     this.cursor = 0
     this.chosen = null
     this.first = 0
+  }
+
+  private turnSide(by: number): void {
+    const tabs = CardSides.TABS
+
+    this.show(tabs[(tabs.indexOf(this.tab) + by + tabs.length) % tabs.length] ?? 'card')
   }
 
   private show(tab: SheetTab): void {

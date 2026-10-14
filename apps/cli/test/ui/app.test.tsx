@@ -46,7 +46,11 @@ test('the screen shows the views, the list under its levels, the selected card a
     assert.match(lines[8] ?? '', /▊ {3}CRITICAL {3}bug {3}api {3}● fixed by claude .*:9 {2}▎/)
     assert.match(lines[9] ?? '', /▊ {2}#4 {2}Tokens are written to the log {3}▎/)
     assert.match(lines[10] ?? '', /▊ {7}● fixed {2}api +3h {2}▎/)
-    assert.match(frame(), /▊ {2}Card {3}Flag {3}Notes {2}1 /)
+    assert.match(
+      frame(),
+      /▊ {2}Card +Flag +Investigation +Fix {2}1 +Notes /,
+      'a card has its five sides, and the one that holds a report says how many',
+    )
     assert.match(frame(), /▊ {2}NO LEVEL 1 ─+ {2}▎/, 'a card without a level stands after the others')
     assert.match(
       frame(),
@@ -68,6 +72,11 @@ test('the screen shows the views, the list under its levels, the selected card a
 
     await typed(ESCAPE, 'c')
     assert.match(frame(), /Close #1 +esc/)
+    assert.match(
+      frame(),
+      /▊▔+▎[^\n]*\n[^\n]*▊ {2}Close #1 +esc {3}▎/,
+      'the line above a box is on a row of the box itself: nothing of the box lies beyond it',
+    )
     assert.match(frame(), /f {3}fixed {6}it was fixed/)
     await typed('w', '\t', 'wanted', ENTER)
     assert.equal(cardOf(join(scratch, 'project'), 1).standing, 'closed (wontfix)')

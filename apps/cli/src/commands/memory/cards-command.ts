@@ -155,7 +155,7 @@ export class CardsCommand implements Command {
 
     return [
       '---',
-      `[weaver] If the owner asked you to verify or to fix what this card says, write what you found on the card when you are done, with the command below. Weaver answers in its place, as it does for a flag.\n\n${NoteText.formatFor(String(card.number))}`,
+      `[weaver] If the owner asked you to verify or to fix what this card says, report on the card when you are done, with the commands below: what you looked into, and what you fixed if you did. Weaver answers in their place, as it does for a flag, and refuses a report that leaves a field out.\n\n${NoteText.formatFor(String(card.number))}`,
     ]
   }
 

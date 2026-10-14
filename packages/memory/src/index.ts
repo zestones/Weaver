@@ -19,6 +19,8 @@ export type {
 export { Card } from './cards/card.ts'
 export { LabelFamilies } from './cards/label-families.ts'
 export type { Concluded } from './cards/card.ts'
+export { NoteReport } from './notes/note-report.ts'
+export type { ReportField, ReportKind } from './notes/note-report.ts'
 export { NoteText } from './notes/note-text.ts'
 export { CardListing } from './listing/card-listing.ts'
 export type { CardOrder, Narrowing } from './listing/card-listing.ts'

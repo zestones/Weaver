@@ -1,6 +1,9 @@
 import type { Conclusion } from '../cards/card-record.ts'
+import { NoteReport } from './note-report.ts'
 
 const NUMBER = /^\d+$/
+const RULES =
+  'The first reports an investigation: confirmed when what the card says is true, refuted when it is not, unsure when you could not tell. The second reports a fix. When you looked into the card and then fixed it, write both, in that order. Each keyword starts a line. A field may span lines, and may say that there is nothing to say. Without a word, a note concludes nothing and is free text.'
 
 // Reads a note as it is typed: the number of its card, what it concludes if it does, then what it says.
 export class NoteText {
@@ -27,14 +30,15 @@ export class NoteText {
       .join('\n\n')
   }
 
-  // The format with the number of a card in it, for an agent that reads this card.
+  // The format with the number of a card in it, for an agent that reads this card: one command for each report.
   static formatFor(card: string): string {
-    return [
-      `weaver note ${card} ${NoteText.CONCLUSIONS.join('|')} <<'EOF'`,
-      'What you ran and what it showed, what you only read, and what you changed.',
-      'EOF',
-      'The word says what you conclude of the card: confirmed when what it says is true, refuted when it is not, unsure when you could not tell, fixed when you fixed it. Leave the word out for a note that concludes nothing.',
-    ].join('\n')
+    const reports = NoteReport.KINDS.map((kind) => {
+      const words = NoteText.CONCLUSIONS.filter((word) => NoteReport.kindOf(word) === kind)
+
+      return [`weaver note ${card} ${words.join('|')} <<'EOF'`, ...NoteReport.asked(kind), 'EOF'].join('\n')
+    })
+
+    return [...reports, RULES].join('\n\n')
   }
 
   // Empty when the note can be written.

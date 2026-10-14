@@ -52,7 +52,7 @@ const NOW = new Date('2026-10-11T13:00:00.000Z')
 //   1  written, a bug of the API, high
 //   2  written, a debt of the client, low
 //   3  a finding of a review, which has no label
-//   4  written, a bug of the API, critical, on which an agent wrote that it fixed it
+//   4  written, a bug of the API, critical, on which an agent reported that it fixed it
 //   5  written, and closed as wontfix
 export function makeInterfaceProject(top: string): string {
   makeProject(top)
@@ -70,7 +70,10 @@ export function makeInterfaceProject(top: string): string {
     places: [{ file: 'src/log.ts', line: 9 }],
   })
   write(top, 4, { title: 'Tokens are written to the log', labels: { type: ['bug'], area: ['api'], level: ['critical'] } })
-  note(top, 4, { conclusion: 'fixed', text: 'Removed the line that logged it.\nCommit abc1234.' })
+  note(top, 4, {
+    conclusion: 'fixed',
+    text: 'Changed: removed the line that logged it, in `src/log.ts`.\nVerified: logged in, and read the log: no token in it.\nLeft: nothing.',
+  })
   flag(top, { text: 'Seen: a comment is out of date.\nExpected: x.\nFound: y.\nChecked: z.\nDid: left as it is.', places: [] })
   write(top, 5, { title: 'A comment is out of date', labels: { type: ['debt'], level: ['low'] } })
   inRegistry(top, (registry) => registry.closeCard(5, 'wontfix', 'not worth a change'))

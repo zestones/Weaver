@@ -123,6 +123,32 @@ test('the closed cards stand under how they were closed, the last closed first, 
   assert.deepEqual([model.view, model.order], ['open', 'level'], 'the cards that wait stand under their level')
 })
 
+test('a card has its five sides under the same digits, and the side in sight is kept from card to card', () => {
+  assert.deepEqual([model.selected?.number, model.tab], [4, 'card'])
+  press(model, 'enter', '4')
+  assert.equal(model.tab, 'fix')
+  press(model, 'right', 'right')
+  assert.equal(model.tab, 'card', 'the arrows go round the five sides')
+  press(model, 'left', 'left', 'esc', 'down')
+  assert.deepEqual(
+    [model.selected?.number, model.tab, model.sheet.lines],
+    [1, 'fix', ['Nobody has reported a fix of this card yet.']],
+    'going down the list reads the same side of each card, which says so when nothing was written there',
+  )
+
+  press(model, 'n', 'type:Ran: the test.', 'tab', 'ctrl+s', 'n', 'type:To take up after the release.', 'ctrl+s')
+  press(model, '5')
+  assert.deepEqual([model.tab, model.sheet.lines.at(-1)], ['notes', 'To take up after the release.'])
+  press(model, '3')
+  assert.deepEqual(
+    [model.tab, model.sheet.lines.slice(1)],
+    ['investigation', ['', 'Ran       the test.']],
+    'the owner owes no report: what they wrote is read as it is',
+  )
+  press(model, '6')
+  assert.equal(model.tab, 'investigation', 'a digit past the last side does nothing')
+})
+
 test('a card is closed in its box: what someone concluded gives how, and the reason the owner keeps or corrects', () => {
   press(model, 'c')
 
@@ -131,13 +157,17 @@ test('a card is closed in its box: what someone concluded gives how, and the rea
   assert.ok(closing instanceof CloseForm)
   assert.deepEqual(
     [closing.card.number, closing.closing, closing.reason.text, closing.taken?.by.author],
-    [4, 'fixed', 'Removed the line that logged it.', 'claude'],
+    [4, 'fixed', 'removed the line that logged it, in `src/log.ts`.', 'claude'],
+    'the reason is what the report of the fix says was changed',
   )
 
   assert.equal(closing.typing, true, 'a reason taken from a note is where the keys go')
   press(model, 'type: (abc1234)', 'enter')
   assert.deepEqual([model.box, model.said], [null, { text: 'Card #4 closed as fixed.', problem: false }])
-  assert.deepEqual([cardOf(top, 4).record.closing?.reason, cardOf(top, 4).state], ['Removed the line that logged it. (abc1234)', 'closed'])
+  assert.deepEqual(
+    [cardOf(top, 4).record.closing?.reason, cardOf(top, 4).state],
+    ['removed the line that logged it, in `src/log.ts`. (abc1234)', 'closed'],
+  )
   assert.deepEqual([numbers(model), model.selected?.number], [[1, 2, 3], 1], 'the card that took its place is selected')
 
   press(model, 'c', 'w', 'enter')
@@ -214,9 +244,10 @@ test('enter goes into the card: its sides are turned and scrolled, and esc comes
   assert.deepEqual([model.sheet.above, model.sheet.lines[0]], [1, first])
   press(model, 'G')
   assert.equal(model.sheet.below, 0)
-  press(model, 'g', 'right')
-  assert.deepEqual([model.tab, model.sheet.above], ['notes', 0])
+  press(model, 'g', 'right', 'right')
+  assert.deepEqual([model.tab, model.sheet.above], ['fix', 0])
   assert.match(model.sheet.lines[0] ?? '', /^▍ claude {2}● fixed {2}\d{4}-\d\d-\d\d \d\d:\d\d$/)
+  assert.match(model.sheet.lines[2] ?? '', /^Changed {3}removed the line that logged it, in/, 'a report is read field by field')
   press(model, 'esc', 'q')
   assert.deepEqual([model.focus, model.finished], ['list', true])
 })

@@ -8,6 +8,7 @@ import { TerminalMarkdown } from '../../src/markdown/terminal-markdown.ts'
 import { WrappedLines } from '../../src/markdown/wrapped-lines.ts'
 import { Paint } from '../../src/output/paint.ts'
 import { CardSheet } from '../../src/ui/sheet/card-sheet.ts'
+import { CardSides, type SheetTab } from '../../src/ui/sheet/card-sides.ts'
 import { ThemePaint } from '../../src/ui/theme/theme-paint.ts'
 import { THEME } from '../../src/ui/theme/theme.ts'
 import { cardOf, contextOf, finding, flag, inRegistry, note, write } from '../fixtures/cards.ts'
@@ -25,7 +26,7 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true })
 })
 
-test('a card is drawn one side at a time: what was written of it, the flag it comes from, what was written on it since', () => {
+test('a card is drawn one side at a time: what was written of it, the flag it comes from, what was looked into since', () => {
   flag(top, { context: [contextOf('src/auth/token.ts', 42, '    return cached')] })
   write(top, 1)
   note(top, 1)
@@ -76,8 +77,17 @@ test('a card is drawn one side at a time: what was written of it, the flag it co
     ],
     'fields that run over a line are set apart by an empty one',
   )
-  assert.match(sheet.lines('notes')[0] ?? '', /^▍ claude {2}✓ confirmed {2}\d{4}-\d\d-\d\d \d\d:\d\d$/)
-  assert.deepEqual(sheet.lines('notes').slice(1), ['', 'Ran the test with a token of one second:', '', '  │ 401 Unauthorized'])
+  assert.match(sheet.lines('investigation')[0] ?? '', /^▍ claude {2}✓ confirmed {2}\d{4}-\d\d-\d\d \d\d:\d\d$/)
+  assert.deepEqual(
+    sheet.lines('investigation').slice(1),
+    ['', 'Ran the test with a token of one second:', '', '  │ 401 Unauthorized'],
+    'a note that gives no field of a report is drawn as the text it is',
+  )
+  assert.deepEqual(
+    CardSides.TABS.map((tab) => new CardSides(cardOf(top, 1)).holds(tab)),
+    [true, true, true, false, false],
+    'a card has its five sides whether or not something was written on the last three',
+  )
 })
 
 test('a card nobody wrote up shows its flag, one a review left shows what the review said, and one without notes says so', () => {
@@ -92,7 +102,11 @@ test('a card nobody wrote up shows its flag, one a review left shows what the re
     '',
     'Seen      the cache is never emptied.',
   ])
-  assert.deepEqual(raw.lines('notes'), ['Nothing is written on this card yet.'])
+  assert.deepEqual(
+    [raw.lines('investigation'), raw.lines('fix'), raw.lines('notes')],
+    [['Nobody has looked into this card yet.'], ['Nobody has reported a fix of this card yet.'], ['Nothing is written on this card yet.']],
+    'a side nothing was written on says so',
+  )
   assert.deepEqual(found.lines('card'), [
     '▍ FINDING',
     '',
@@ -117,6 +131,71 @@ test('a card nobody wrote up shows its flag, one a review left shows what the re
     ['▍ WHERE IT COMES FROM', '', 'Session   session-1, unit 1'],
     'a card that comes from a review has no flag',
   )
+})
+
+test('what was written on a card since stands on three sides: what was looked into, what was fixed, and what concludes nothing', () => {
+  const later = (minutes: number) => ({ ...cardOf(top, 1).record.provenance, at: `2026-10-12T10:${String(minutes)}:00.000Z` })
+
+  flag(top, {
+    text: 'Seen: the session is never closed.\nExpected: x.\nFound: y.\nChecked: z.\nDid: fixed in the task: closed it in `logout()`.',
+    places: [],
+  })
+  note(top, 4, {
+    text: 'Ran: the test with a token of one second:\n\n```text\n401 Unauthorized\n```\nRead: `src/auth/token.ts`.\nShows: the token is refused once it is a second old. It does not show which caller should refresh it.',
+  })
+  note(top, 4, { provenance: later(10), conclusion: null, text: 'To take up after the release.' })
+  note(top, 4, {
+    provenance: later(20),
+    conclusion: 'fixed',
+    text: 'The card was right.\nChanged: `refresh()` is called before a request.\nVerified: ran the suite: 42 passed.\nLeft: nothing.',
+  })
+  note(top, 4, { provenance: later(30), conclusion: 'unsure', text: 'Ran: the suite again.\nRead: nothing.\nShows: nothing new.' })
+
+  const card = cardOf(top, 4)
+  const sides = new CardSides(card)
+  const sheet = new CardSheet(card, plain, 64)
+  const signed = /^▍ claude {2}(. \w+) {2}\d{4}-\d\d-\d\d \d\d:\d\d(.*)$/
+  const heads = (tab: SheetTab) => sheet.lines(tab).flatMap((line) => (signed.exec(line) ?? []).slice(1, 2))
+
+  assert.deepEqual(
+    CardSides.TABS.map((tab) => sides.countOf(tab)),
+    [0, 0, 2, 2, 1],
+    'a flag that says its author fixed the thing counts as the first fix',
+  )
+  assert.deepEqual(sheet.lines('investigation').slice(1, 12), [
+    '',
+    'Ran       the test with a token of one second:',
+    '',
+    '            │ 401 Unauthorized',
+    '',
+    'Read      src/auth/token.ts.',
+    '',
+    'Shows     the token is refused once it is a second old. It does',
+    '          not show which caller should refresh it.',
+    '',
+    '',
+  ])
+  assert.deepEqual(heads('investigation'), ['✓ confirmed', '? unsure'], 'each side is in the order it was written')
+  assert.deepEqual(sheet.lines('investigation').slice(-3), ['Ran       the suite again.', 'Read      nothing.', 'Shows     nothing new.'])
+
+  const fix = sheet.lines('fix')
+
+  assert.match(fix[0] ?? '', /^▍ claude {2}● fixed {2}\d{4}-\d\d-\d\d \d\d:\d\d {2}in its flag$/)
+  assert.deepEqual(fix.slice(1, 5), ['', 'closed it in logout().', '', ''])
+  assert.deepEqual(
+    fix.slice(6),
+    [
+      '',
+      'The card was right.',
+      '',
+      'Changed   refresh() is called before a request.',
+      'Verified  ran the suite: 42 passed.',
+      'Left      nothing.',
+    ],
+    'what a report says before its first field stands above them',
+  )
+  assert.deepEqual(sheet.lines('notes').slice(1), ['', 'To take up after the release.'])
+  assert.match(sheet.lines('notes')[0] ?? '', /^▍ claude {2}\d{4}/, 'a note that concludes nothing says who and when')
 })
 
 test('the paint of the interface gives each style the colour of the theme, and gives the line back to the ivory afterwards', () => {

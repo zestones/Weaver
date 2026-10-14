@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
+import { NoteReport } from '../../src/notes/note-report.ts'
 import { NoteText } from '../../src/notes/note-text.ts'
 
 const read = (words: readonly string[], body: string | null = null) => {
@@ -45,16 +46,23 @@ test('a note without the number of a card, or that says nothing, has a problem t
   assert.deepEqual(new NoteText([], null).problems().length, 2)
 })
 
-test('the format shown to an agent is one a note can be copied from, with the number of the card it reads', () => {
-  const [command = '', said = '', end = ''] = NoteText.formatFor('12').split('\n')
-  const [number = '', conclusions = ''] = command.replace('weaver note ', '').split(' ')
+test('the format shown to an agent is one a report can be copied from, with the number of the card it reads', () => {
+  const [investigation = '', fix = '', rules = ''] = NoteText.formatFor('12').split('\n\n')
+  const copied = (block: string, word: string) => {
+    const [command = '', ...lines] = block.split('\n')
+    const [number = '', conclusions = ''] = command.replace('weaver note ', '').split(' ')
 
-  assert.equal(command, "weaver note 12 confirmed|refuted|unsure|fixed <<'EOF'")
-  assert.equal(end, 'EOF')
-  assert.deepEqual(read([number, conclusions.split('|')[1] ?? ''], said), {
-    card: 12,
-    conclusion: 'refuted',
-    text: 'What you ran and what it showed, what you only read, and what you changed.',
-  })
+    assert.ok(conclusions.split('|').includes(word))
+    assert.equal(lines.at(-1), 'EOF')
+
+    return new NoteText([number, word], lines.slice(0, -1).join('\n'))
+  }
+
+  assert.equal(investigation.split('\n')[0], "weaver note 12 confirmed|refuted|unsure <<'EOF'")
+  assert.equal(fix.split('\n')[0], "weaver note 12 fixed <<'EOF'")
+  assert.deepEqual([copied(investigation, 'refuted').card, copied(investigation, 'refuted').conclusion], [12, 'refuted'])
+  assert.deepEqual(new NoteReport('refuted', copied(investigation, 'refuted').text).problems(), [])
+  assert.deepEqual(new NoteReport('fixed', copied(fix, 'fixed').text).problems(), [])
+  assert.match(rules, /^The first reports an investigation: .* Without a word, a note concludes nothing and is free text\.$/)
   assert.match(NoteText.FORMAT, /^weaver note <number> /)
 })

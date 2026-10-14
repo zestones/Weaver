@@ -1,17 +1,26 @@
 import { LabelFamilies, PlaceText, type Card } from '@weaver/memory'
 import { Box, Text } from 'ink'
 import type { ReactNode } from 'react'
-import { UiModel } from '../model/ui-model.ts'
+import type { UiModel } from '../model/ui-model.ts'
 import { Framed } from '../parts/framed.tsx'
 import { Level } from '../parts/level.ts'
 import { Pill } from '../parts/pill.tsx'
-import type { SheetTab } from '../sheet/card-sheet.ts'
+import { CardSides, type SheetTab } from '../sheet/card-sides.ts'
 import { CONCLUDED } from '../theme/marks.ts'
 import { THEME } from '../theme/theme.ts'
 
 const FOUND: Readonly<Record<Card['origin'], string>> = { flag: 'flagged', owner: 'flagged', finding: 'found', suspicion: 'suspected' }
-const TAB_NAMES: Readonly<Record<SheetTab, string>> = { card: 'Card', flag: 'Flag', notes: 'Notes' }
-const TAB_GAP = 3
+const TAB_NAMES: Readonly<Record<SheetTab, string>> = {
+  card: 'Card',
+  flag: 'Flag',
+  investigation: 'Investigation',
+  fix: 'Fix',
+  notes: 'Notes',
+}
+// How the sides are set out, roomiest first: three columns apart, each with how many reports or notes it holds, then
+// closer, then without the counts on a screen that has no room for them.
+const TIGHTEST = { gap: 1, counted: false }
+const TAB_LAYOUTS = [{ gap: 3, counted: true }, { gap: 2, counted: true }, { gap: 1, counted: true }, TIGHTEST]
 
 interface Props {
   readonly model: UiModel
@@ -19,34 +28,46 @@ interface Props {
 
 // The sides of a card, the one in sight underlined in gold, the rule going on under the others.
 function Tabs({ model, card }: { readonly model: UiModel; readonly card: Card }): ReactNode {
-  const notes = card.record.notes.length
-  // How many notes the card holds stands on a chip beside the name of their side.
-  const count = notes === 0 ? '' : ` ${String(notes)} `
-  const widths = UiModel.TABS.map((tab) => TAB_NAMES[tab].length + (tab === 'notes' && count !== '' ? 1 + count.length : 0))
-  const at = UiModel.TABS.indexOf(model.tab)
-  const before = widths.slice(0, at).reduce((sum, width) => sum + width + TAB_GAP, 0)
-  const under = TAB_NAMES[model.tab].length
+  const sides = new CardSides(card)
+  const tabs = CardSides.TABS
   const { above, below } = model.sheet
+  const scrolled = [...(above > 0 ? [`↑ ${String(above)}`] : []), ...(below > 0 ? [`↓ ${String(below)}`] : [])].join('  ')
+  // How many reports or notes a side holds stands on a chip beside its name; a side that holds none has no chip.
+  const chips = (counted: boolean): string[] =>
+    tabs.map((tab) => (counted && sides.countOf(tab) > 0 ? ` ${String(sides.countOf(tab))} ` : ''))
+  const widthsOf = (counts: readonly string[]): number[] =>
+    tabs.map((tab, index) => TAB_NAMES[tab].length + ((counts[index] ?? '') === '' ? 0 : 1 + (counts[index] ?? '').length))
+  // A gap stands after each side, and one before how far the side is scrolled.
+  const { gap, counted } =
+    TAB_LAYOUTS.find(
+      (layout) =>
+        widthsOf(chips(layout.counted)).reduce((sum, width) => sum + width, 0) + layout.gap * (tabs.length + 1) + scrolled.length <=
+        model.sheetWidth,
+    ) ?? TIGHTEST
+  const counts = chips(counted)
+  const widths = widthsOf(counts)
+  const at = tabs.indexOf(model.tab)
+  const before = widths.slice(0, at).reduce((sum, width) => sum + width + gap, 0)
+  const under = TAB_NAMES[model.tab].length
 
   return (
     <Box flexDirection='column'>
-      <Box gap={TAB_GAP} height={1}>
-        {UiModel.TABS.map((tab) => (
+      <Box gap={gap} height={1} overflow='hidden'>
+        {tabs.map((tab, index) => (
           <Box key={tab} flexShrink={0} gap={1}>
-            <Text bold={tab === model.tab} color={tab === model.tab ? THEME.ivory : THEME.muted}>
+            {/* A side nothing was written on is fainter than the others: it is there, and there is nothing to read. */}
+            <Text bold={tab === model.tab} color={tab === model.tab ? THEME.ivory : sides.holds(tab) ? THEME.muted : THEME.faint}>
               {TAB_NAMES[tab]}
             </Text>
-            {tab === 'notes' && count !== '' ? (
+            {(counts[index] ?? '') === '' ? null : (
               <Text color={THEME.ivory} backgroundColor={THEME.chip}>
-                {count}
+                {counts[index]}
               </Text>
-            ) : null}
+            )}
           </Box>
         ))}
         <Box flexGrow={1} />
-        <Text color={THEME.muted}>
-          {[...(above > 0 ? [`↑ ${String(above)}`] : []), ...(below > 0 ? [`↓ ${String(below)}`] : [])].join('  ')}
-        </Text>
+        <Text color={THEME.muted}>{scrolled}</Text>
       </Box>
       <Box height={1} overflow='hidden'>
         <Text color={THEME.line}>{'─'.repeat(before)}</Text>

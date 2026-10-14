@@ -12,7 +12,9 @@ import { A_FILE, bashCall, eventsOf, prompt, refusalOf, stateOf } from '../fixtu
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-notes-'))
 const WRITTEN = (card: number): string =>
   `[weaver] Note written on card ${String(card)} for the owner. This command is answered here and never runs: that is expected. Go on with your task.`
-const REPORT = 'Ran the test with a token of one second:\n\n    401 Unauthorized\n'
+const REPORT =
+  'Ran: the test with a token of one second:\n\n    401 Unauthorized\n\nRead: nothing else.\nShows: the token is refused after a second.\n'
+const FIX = 'Changed: refresh() is called before a request.\nVerified: ran the suite: 42 passed.\nLeft: nothing.\n'
 let session: Session
 let counter = 0
 
@@ -74,7 +76,7 @@ test('a call that writes on several cards, and flags too, is answered for each: 
   const command = [
     `weaver note 1 confirmed <<'EOF'\n${REPORT}EOF`,
     'echo "exit $?"',
-    `weaver note 2 refuted <<'EOF'\nrenew() is called by the scheduler.\nEOF`,
+    `weaver note 2 refuted <<'EOF'\nRan: nothing.\nRead: the scheduler.\nShows: renew() is called by the scheduler.\nEOF`,
     flagCommand([A_FILE], FLAG_BODY.replace('refresh()', 'rotate()')),
   ].join('\n')
 
@@ -90,7 +92,7 @@ test('a call that writes on several cards, and flags too, is answered for each: 
     cardsOf(session.repo).map((card) => [card.number, card.standing, card.record.notes.map((written) => written.text)]),
     [
       [1, 'raw (confirmed)', [REPORT.trim()]],
-      [2, 'raw (refuted)', ['renew() is called by the scheduler.']],
+      [2, 'raw (refuted)', ['Ran: nothing.\nRead: the scheduler.\nShows: renew() is called by the scheduler.']],
       [3, 'raw', []],
     ],
   )
@@ -101,12 +103,52 @@ test('a call that writes on several cards, and flags too, is answered for each: 
 })
 
 test('a call the hook sees twice writes one note', () => {
-  const call = note('1 fixed')
+  const call = note('1 fixed', FIX)
 
   assert.equal(refusalOf(session, call), WRITTEN(1))
   assert.equal(refusalOf(session, call), '[weaver] This note is already on card 1. Go on with your task.')
   assert.equal(cardsOf(session.repo)[0]?.record.notes.length, 1)
   assert.equal(notesOf().length, 1)
+})
+
+test('an agent that concludes owes a report: one that leaves a field out is refused, with what is missing and the format', () => {
+  const asked = (words: string, body: string) => refusalOf(session, note(words, body))
+  const unusable = (problem: string) => `[weaver] The note was not written: ${problem}\n\n${NoteText.FORMAT}`
+
+  assert.equal(
+    asked('1 confirmed', 'Ran the test with a token of one second: 401.\n'),
+    unusable(
+      '`Ran:` is missing: say what you ran and what it showed, or that you ran nothing. `Read:` is missing: say what you read without running it, or that you read nothing. `Shows:` is missing: say what this proves, and what it does not.',
+    ),
+  )
+  assert.equal(
+    asked('1 fixed', REPORT),
+    unusable(
+      '`Changed:` is missing: say what you changed, and where. `Verified:` is missing: say how you checked it afterwards and what that showed, or that you did not. `Left:` is missing: say what is left to do, or that nothing is.',
+    ),
+    'what was looked into is not what was changed: a fix has a report of its own',
+  )
+  assert.equal(
+    asked('1 fixed', FIX.replace('Left: nothing.\n', '')),
+    unusable('`Left:` is missing: say what is left to do, or that nothing is.'),
+  )
+  assert.deepEqual([cardsOf(session.repo)[0]?.record.notes.length, notesOf()], [0, []])
+
+  assert.equal(
+    asked('1', 'Looked at it with the owner: to take up after the release.\n'),
+    WRITTEN(1),
+    'a note that concludes nothing is free',
+  )
+
+  const both = [`weaver note 1 confirmed <<'EOF'\n${REPORT}EOF`, `weaver note 1 fixed <<'EOF'\n${FIX}EOF`].join('\n')
+
+  assert.equal(refusalOf(session, bashCall(both)), `${WRITTEN(1)}\n${WRITTEN(1)}`)
+  assert.deepEqual(
+    cardsOf(session.repo)[0]?.record.notes.map((written) => written.conclusion),
+    [null, 'confirmed', 'fixed'],
+    'an agent that looked into a card and then fixed it writes both reports, in one call if it wants',
+  )
+  assert.equal(cardsOf(session.repo)[0]?.standing, 'raw (fixed)')
 })
 
 test('a note that cannot be used is not written, and the agent reads what is wrong and the format', () => {

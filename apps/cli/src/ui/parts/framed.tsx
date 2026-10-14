@@ -11,11 +11,13 @@ const EDGE = { topLeft: ' ', top: '▁', topRight: ' ', left: '▊', right: '▎
 interface Props extends BoxProps {
   // Whether the keys go to what the frame holds: its frame is then the gold of the theme.
   readonly lit: boolean
+  // What the frame stands on, which is what shows outside its line: the ground of the screen for a pane.
+  readonly on?: string
   readonly children?: ReactNode
 }
 
 // A pane or a box: a ground of its own, inside a frame that fits it.
-export function Framed({ lit, children, ...box }: Props): ReactNode {
+export function Framed({ lit, on = THEME.ground, children, ...box }: Props): ReactNode {
   const frame = lit ? THEME.gold : THEME.line
 
   return (
@@ -25,11 +27,11 @@ export function Framed({ lit, children, ...box }: Props): ReactNode {
       borderTopColor={frame}
       borderBottomColor={frame}
       borderRightColor={frame}
-      borderLeftColor={THEME.ground}
+      borderLeftColor={on}
       borderLeftBackgroundColor={frame}
-      borderTopBackgroundColor={THEME.ground}
-      borderBottomBackgroundColor={THEME.ground}
-      borderRightBackgroundColor={THEME.ground}
+      borderTopBackgroundColor={on}
+      borderBottomBackgroundColor={on}
+      borderRightBackgroundColor={on}
       backgroundColor={THEME.panel}
     >
       {children}

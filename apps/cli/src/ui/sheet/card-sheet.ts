@@ -1,4 +1,5 @@
 import {
+  NoteReport,
   PlaceText,
   type Card,
   type CardNote,
@@ -15,10 +16,7 @@ import { WrappedLines } from '../../markdown/wrapped-lines.ts'
 import { LocalMoment } from '../../output/local-moment.ts'
 import type { Paint } from '../../output/paint.ts'
 import { CONCLUDED } from '../theme/marks.ts'
-
-// The three sides of a card in the interface: what was written of it, the flag it comes from, and what was written
-// on it since.
-export type SheetTab = 'card' | 'flag' | 'notes'
+import { CardSides, type SheetTab } from './card-sides.ts'
 
 // A part of a side: what it holds, under a heading when it has one.
 interface Part {
@@ -32,6 +30,12 @@ const HASH_LENGTH = 12
 const CUT = '…'
 // The mark that opens a heading.
 const HEADING = '▍'
+// What a side nothing was written on says.
+const NOTHING: Readonly<Record<Exclude<SheetTab, 'card' | 'flag'>, string>> = {
+  investigation: 'Nobody has looked into this card yet.',
+  fix: 'Nobody has reported a fix of this card yet.',
+  notes: 'Nothing is written on this card yet.',
+}
 const DID = { left: 'left as it is', 'worked-around': 'worked around', fixed: 'fixed in the task' } as const
 const LOOK = { agrees: 'agrees with the flag', contradicts: 'contradicts the flag', 'cannot-tell': 'could not tell' } as const
 const WRITTEN: Readonly<Record<PlaceContext['origin'], string>> = {
@@ -45,17 +49,22 @@ const WRITTEN: Readonly<Record<PlaceContext['origin'], string>> = {
 // given room, and code stands on a ground.
 export class CardSheet {
   private readonly record: CardRecord
+  private readonly sides: CardSides
   private readonly paint: Paint
   private readonly width: number
   private readonly markdown: TerminalMarkdown
+  // What is drawn beside the name of a field.
+  private readonly beside: TerminalMarkdown
   private readonly inline: InlineMarkdown
   private readonly wrapped: WrappedLines
   private readonly code: DrawnCode
 
   constructor(card: Card, paint: Paint, width: number) {
     this.record = card.record
+    this.sides = new CardSides(card)
     this.paint = paint
     this.markdown = new TerminalMarkdown(paint, width)
+    this.beside = new TerminalMarkdown(paint, width - NAME_WIDTH - 1)
     this.width = this.markdown.width
     this.inline = new InlineMarkdown(paint)
     this.wrapped = new WrappedLines(this.width)
@@ -65,7 +74,7 @@ export class CardSheet {
   // A heading has an empty line under it, and two above it: it belongs to what follows. A part without a heading
   // goes on from the one before, an empty line apart.
   lines(tab: SheetTab): string[] {
-    const parts = (tab === 'card' ? this.written() : tab === 'flag' ? this.origin() : this.notes()).filter(
+    const parts = (tab === 'card' ? this.written() : tab === 'flag' ? this.origin() : this.noted(tab)).filter(
       (part) => part.head !== null || part.lines.length > 0,
     )
 
@@ -222,16 +231,57 @@ export class CardSheet {
     )
   }
 
-  // What was written on the card since it was made, in order: who, what they conclude and when, then what they say.
-  private notes(): Part[] {
-    const { notes } = this.record
+  // What was written on one side of the card since it was made, in order: who, what they conclude and when, then
+  // what they say.
+  private noted(tab: keyof typeof NOTHING): Part[] {
+    const parts = [
+      ...(tab === 'fix' ? this.claimed() : []),
+      ...this.sides.notesOf(tab).map((note) => ({ head: this.signed(note), lines: this.said(note) })),
+    ]
 
-    if (notes.length === 0) return [this.loose([this.paint.dim('Nothing is written on this card yet.')])]
-
-    return notes.map((note) => ({ head: this.noted(note), lines: this.markdown.typed(note.text) }))
+    return parts.length === 0 ? [this.loose([this.paint.dim(NOTHING[tab])])] : parts
   }
 
-  private noted({ provenance, conclusion }: CardNote): string {
+  // A flag that says its author fixed the thing is all the card holds of that fix: no report was asked for it.
+  private claimed(): Part[] {
+    const { flag, provenance } = this.record
+
+    if (flag === null || !this.sides.bornFixed) return []
+
+    return [
+      {
+        head: `${this.signed({ provenance, conclusion: 'fixed' })}  ${this.paint.dim('in its flag')}`,
+        lines:
+          flag.fields.didNote === null
+            ? [this.paint.dim('The flag says that it was fixed in the task, and no more.')]
+            : this.markdown.typed(flag.fields.didNote),
+      },
+    ]
+  }
+
+  // The fields of a report one under the other, after what the note says before them. A note that gives no field
+  // is drawn as the text it is.
+  private said({ conclusion, text }: CardNote): string[] {
+    const report = conclusion === null ? null : new NoteReport(conclusion, text)
+    const fields = report?.fields ?? []
+
+    if (report === null || fields.length === 0) return this.markdown.typed(text)
+
+    const drawn = this.fielded(fields.map(({ name, said }) => this.reported(name, said)))
+
+    return report.opening === '' ? drawn : [...this.markdown.typed(report.opening), '', ...drawn]
+  }
+
+  // A field of a report: its name, and beside it what it says, which is Markdown as a note is.
+  private reported(name: string, said: string): string[] {
+    const lines = this.beside.typed(said)
+
+    return (lines.length === 0 ? [''] : lines).map((line, index) =>
+      `${index === 0 ? this.paint.dim(name.padEnd(NAME_WIDTH)) : ' '.repeat(NAME_WIDTH)} ${line}`.trimEnd(),
+    )
+  }
+
+  private signed({ provenance, conclusion }: Pick<CardNote, 'provenance' | 'conclusion'>): string {
     const concluded = conclusion === null ? [] : [this.concluded(conclusion)]
 
     return [
