@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
+import { CheckMemory } from '../../src/checks/results/check-memory.ts'
 import type { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
 import { ProjectChecks } from '../../src/checks/running/project-checks.ts'
 import type { Repository } from '../../src/lib/git/repository.ts'
@@ -207,4 +208,37 @@ test('checks that wait for each other in a loop are reported, never waited for',
 
   assert.equal(outcomes.one?.reason, 'the check never started: its `after` chain loops')
   assert.equal(outcomes.two?.blocking, true)
+})
+
+test('a check given the same two trees again gives its verdict again without running; a change of a file runs it', async () => {
+  const runs = join(scratch, `runs-${String(counter)}.txt`)
+  const counting = `require('fs').appendFileSync(${JSON.stringify(runs)}, 'x'); process.exitCode = 1`
+  const project = declarationOf({
+    checks: {
+      slow: { judge: ['node', '-e', counting], rules: gate('G1') },
+      timed: { judge: ['sleep', '5'], timeoutSeconds: 1, rules: gate('G2') },
+    },
+  })
+  const memory = new CheckMemory(new Session(repo, 's', 'claude').dir)
+  const judged = async (): Promise<Record<string, CheckOutcome>> => {
+    const outcomes = await new ProjectChecks().judge(project, unitDiff(), project.checkLimits.deadlineFrom(Date.now()), memory)
+
+    return Object.fromEntries(outcomes.map((outcome) => [outcome.id, outcome]))
+  }
+
+  writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
+
+  const first = await judged()
+  const again = await judged()
+
+  assert.equal(readFileSync(runs, 'utf8'), 'x', 'the second verdict came from memory')
+  assert.equal(first.slow?.keptFrom, null)
+  assert.match(again.slow?.keptFrom ?? '', /^\d{4}-\d\d-\d\dT/)
+  assert.deepEqual([again.slow?.status, again.slow?.blocking, again.slow?.run.kept], ['fail', true, true])
+  assert.deepEqual([again.timed?.status, again.timed?.keptFrom], ['timeout', null], 'a run out of time says nothing of the files')
+
+  writeFiles(repo.top, { 'src/a.js': 'export const a = 3\n' })
+  await judged()
+
+  assert.equal(readFileSync(runs, 'utf8'), 'xx')
 })

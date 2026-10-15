@@ -105,7 +105,7 @@ test('a script deletion of an untracked visible file remains a real deletion', (
 })
 
 test('a failed Git ignore query cannot silently drop unit files', () => {
-  const files = { '../outside.py': { base: null, last: null, foreign: false, touchedAt: '' } }
+  const files = { '../outside.py': { base: null, last: null, foreign: false, touchedAt: '', since: '' } }
 
   assert.throws(() => new BaseTree(session.repo, session.dir).of(snapshot(), files), /Cannot classify ignored unit files/)
 })

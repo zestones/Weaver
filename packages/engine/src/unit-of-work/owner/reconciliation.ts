@@ -43,8 +43,9 @@ export class Reconciliation {
       return [path, action === null ? this.edited(file, blob) : this.afterOwnerAction(path, file, blob, action)] as const
     })
     const files = Object.fromEntries(outcomes.flatMap(([path, outcome]) => (outcome.file === null ? [] : [[path, outcome.file]])))
+    const unit = action === null ? this.unit.withFiles(files) : this.unit.withFiles(files).withoutReturned()
 
-    return { head, unit: this.unit.withFiles(files), notes: outcomes.flatMap(([, outcome]) => outcome.note ?? []) }
+    return { head, unit, notes: outcomes.flatMap(([, outcome]) => outcome.note ?? []) }
   }
 
   private ownerAction(head: string | null, paths: readonly string[]): OwnerAction | null {

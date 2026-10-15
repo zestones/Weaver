@@ -1,5 +1,6 @@
 import { counted } from '../../lib/text/counted.ts'
 import type { WriterLauncher } from '@weaver/memory'
+import { CheckMemory } from '../../checks/results/check-memory.ts'
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import { WriterStart } from '../../flagging/writing/writer-start.ts'
@@ -111,8 +112,11 @@ export class EndOfTurn implements Moment {
     return session.repair(() => this.checks.repair(declaration, diff, deadline))
   }
 
-  // The only way to speak to an agent that has stopped is to refuse its stop.
+  // The only way to speak to an agent that has stopped is to refuse its stop. One that waits for a task it left
+  // running is not reminded: it is woken when the task ends.
   private pending(turn: EndingTurn, declaration: Declaration): Answer {
+    if (turn.session.waitsInBackground) return this.ended(turn, null, Answer.saying(PENDING))
+
     return turn.session.remind()
       ? this.ended(turn, 'reminder', Answer.blocking(declaration.finish.reminder()))
       : this.ended(turn, null, Answer.saying(PENDING))
@@ -125,7 +129,7 @@ export class EndOfTurn implements Moment {
     const repaired = finished.isEmpty ? [] : await this.repair(session, declaration, finished, deadline)
     const unit = repaired.length === 0 ? finished : session.unit()
     const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
-    const outcomes = unit.isEmpty ? [] : await this.checks.judge(declaration, diff, deadline)
+    const outcomes = unit.isEmpty ? [] : await this.checks.judge(declaration, diff, deadline, new CheckMemory(session.dir))
     // The reviewer judges what the checks let through: a change they refuse will be rewritten anyway.
     const blocked = outcomes.some((outcome) => outcome.blocking)
     const candidates = outcomes.flatMap((outcome) => outcome.candidates)

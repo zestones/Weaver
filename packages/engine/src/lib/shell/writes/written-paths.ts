@@ -149,6 +149,12 @@ function redirected(command: ShellCommand): Written[] {
     }))
 }
 
+// perl and ruby write in place what they name, and may also run a script that writes anything.
+const ALSO_SCRIPTS = new Set(['perl', 'ruby'])
+
+// Whether every file the command writes is named in its words.
+export const namesItsWrites = (command: ShellCommand): boolean => command.program in WRITERS && !ALSO_SCRIPTS.has(command.program)
+
 export interface WrittenPaths {
   readonly paths: readonly string[]
   readonly removed: readonly string[]

@@ -32,6 +32,11 @@ export abstract class Check {
     return this.declared.warn !== null
   }
 
+  // All that decides what the check says of two trees, besides the trees: how it runs, and the rules it stands behind.
+  get fingerprint(): string {
+    return JSON.stringify([this.declared, this.rules.map((rule) => rule.id)])
+  }
+
   // What the check finds on the files a call just changed, read as a verdict would be. null when it has nothing to
   // say of them: no warning of its own, or none of its files. A warning that did not end in time, or had none left,
   // is kept as such and tells the agent nothing.

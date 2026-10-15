@@ -177,7 +177,7 @@ test('a finding the author leaves goes to the owner with its reason, and changes
   assert.match(left.systemMessage ?? '', /Reviewed by codex: 1 finding, 0 answered fixed\. 1 item to validate\./)
   assert.match(
     reportOf(left.systemMessage ?? ''),
-    /## To validate\n\n- \w{7}\/F1 N1 src\/a\.ts:1: two levels of abstraction in one function \(not fixed by the agent: the owner asked for one function here\)/,
+    /## To validate\n\n- src\/a\.ts\n {2}- \w{7}\/F1 N1, line 1: two levels of abstraction in one function \(not fixed by the agent: the owner asked for one function here\)/,
   )
   assert.equal(reviewer.requests.length, 1)
   assert.deepEqual(unitFiles(session), [])
@@ -193,7 +193,10 @@ test('an author that does not answer is asked twice, then let go: the owner is t
   const letGo = await finish(reviewer)
 
   assert.equal(letGo.decision, undefined)
-  assert.match(reportOf(letGo.systemMessage ?? ''), /- \w{7}\/F1 N1 src\/a\.ts:1: [^\n]* \(the agent gave no answer that could be taken\)/)
+  assert.match(
+    reportOf(letGo.systemMessage ?? ''),
+    /- src\/a\.ts\n {2}- \w{7}\/F1 N1, line 1: [^\n]* \(the agent gave no answer that could be taken\)/,
+  )
   assert.deepEqual(
     eventsOf(session, 'answer').map((event) => event.status),
     ['missing'],
@@ -269,7 +272,7 @@ test('what the reviewer suspects, ran, and reported outside the change is for th
   assert.match(output.systemMessage ?? '', /Reviewed by codex: no finding\. 1 suspicion for you\. 1 item to validate\./)
   assert.match(
     report,
-    /- \w{7}\/S1 weaver:suspicion src\/a\.ts: the value may be read before it is set \(suspected by the reviewer, not verified\)/,
+    /- src\/a\.ts\n {2}- \w{7}\/S1 weaver:suspicion, the value may be read before it is set \(suspected by the reviewer, not verified\)/,
   )
   assert.match(report, /- what the reviewer ran:\n {2}- `npm test`: 12 passed\n {2}- `node <<'JS' \[2 more lines\]`: printed 1/)
   assert.match(

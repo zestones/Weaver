@@ -58,6 +58,43 @@ test('a file written back to its base leaves the unit', () => {
   assert.deepEqual(unitFiles(session), [])
 })
 
+test('a call the runtime never ran gives no base when the turn ends: a file written back stays out of the unit', () => {
+  prompt(session, 'try it, then undo it')
+  agentWrites(session, { [A_FILE]: 'export const a = 4\n' })
+  // The runtime denies the call after the hook has seen it: no hook comes after it.
+  startTool(session, bashCall(`git show HEAD:${A_FILE} > /tmp/a.ts && cp /tmp/a.ts ${A_FILE}`))
+  agentWrites(session, { [A_FILE]: 'export const a = 1\n' })
+
+  session.closeOpenCalls()
+
+  assert.deepEqual(unitFiles(session), [])
+})
+
+test('a command still running in the background when a file is written back gives it no base either', () => {
+  prompt(session, 'try it, then undo it')
+  agentWrites(session, { [A_FILE]: 'export const a = 4\n' })
+  startTool(session, bashCall('npx prettier --write src', { run_in_background: true }))()
+  agentWrites(session, { [A_FILE]: 'export const a = 1\n' })
+  agentWrites(session, { [B_FILE]: 'export const b = 2\n' })
+
+  session.closeOpenCalls()
+
+  assert.deepEqual(unitFiles(session), [B_FILE])
+  assert.equal(stateOf(session)?.unit.files[B_FILE]?.base, null)
+})
+
+test('a call that started before the session first wrote a file saw it first: what it saw is the base', () => {
+  prompt(session, 'change it')
+
+  const command = startTool(session, bashCall(`sed -i s/1/2/ ${A_FILE}`))
+
+  writeFiles(session.repo.top, { [A_FILE]: 'export const a = 2\n' })
+  agentWrites(session, { [A_FILE]: 'export const a = 3\n' })
+  command()
+
+  assert.equal(stateOf(session)?.unit.files[A_FILE]?.base, git(session.repo.top, ['rev-parse', `HEAD:${A_FILE}`]))
+})
+
 test('an edit by the owner in a file of the unit marks it foreign and is checked with it', async () => {
   prompt(session, 'change it')
   agentWrites(session, { [A_FILE]: 'export const a = 5\n' })
@@ -136,7 +173,7 @@ test('a commit made by the agent itself settles nothing: its files are still che
 
   await finishWith(session, checks)
 
-  assert.match(answer.body?.systemMessage ?? '', /moved HEAD/)
+  assert.match(answer.body?.systemMessage ?? '', /HEAD moved while the Bash call ran, by the call or by the owner meanwhile/)
   assert.deepEqual(checks.seen, [[A_FILE]])
   assert.deepEqual(
     settles().map(({ by }) => by),
@@ -145,7 +182,7 @@ test('a commit made by the agent itself settles nothing: its files are still che
   assert.equal(eventsOf(session, 'head-moved').length, 1)
 })
 
-test('a shell command is charged with what it certainly writes; the rest that changed meanwhile is only shown', () => {
+test('a command whose words name all it writes is charged with those; the rest that changed meanwhile is only shown', () => {
   prompt(session, 'generate it')
   agentRuns(session, `echo x > ${B_FILE}`, () => {
     writeFiles(session.repo.top, { [B_FILE]: 'x\n', [A_FILE]: 'export const a = 99\n', 'ignored/cache.txt': 'x\n' })
@@ -158,7 +195,7 @@ test('a shell command is charged with what it certainly writes; the rest that ch
     writeFiles(session.repo.top, { 'src/c.ts': 'export const c = 1\n' })
   })
 
-  assert.deepEqual(unitFiles(session), [B_FILE], 'an unknown script is not charged')
+  assert.deepEqual(unitFiles(session), [B_FILE, 'src/c.ts'], 'a script is charged with all that changed while it ran')
 
   agentRuns(session, "python3 -c \"open('src/d.ts', 'w').write('x')\"", () => {
     writeFiles(session.repo.top, { 'src/d.ts': 'x\n' })
@@ -167,7 +204,27 @@ test('a shell command is charged with what it certainly writes; the rest that ch
     writeFiles(session.repo.top, { 'src/e.ts': 'export const e = 1\n' })
   })
 
-  assert.deepEqual(unitFiles(session), [B_FILE, 'src/d.ts', 'src/e.ts'])
+  assert.deepEqual(unitFiles(session), [B_FILE, 'src/c.ts', 'src/d.ts', 'src/e.ts'])
+})
+
+test('a script is never charged with a file another session works on, unless that session left it as HEAD holds it', () => {
+  const other = new Session(session.repo, 'other', 'codex')
+
+  prompt(session, 'extract it')
+  prompt(other, 'change b and a')
+  agentWrites(other, { [B_FILE]: 'export const b = 30\n', [A_FILE]: 'export const a = 30\n' })
+  ownerGit(['add', A_FILE])
+  ownerGit(['commit', '-qm', 'the owner takes a'])
+  agentRuns(session, 'python3 tools/extract.py', () => {
+    writeFiles(session.repo.top, {
+      [A_FILE]: 'export const a = 31\n',
+      [B_FILE]: 'export const b = 31\n',
+      'src/c.ts': 'export const c = 31\n',
+    })
+  })
+
+  assert.deepEqual(unitFiles(session), [A_FILE, 'src/c.ts'])
+  assert.deepEqual(stateOf(session)?.unit.unattributed, [B_FILE])
 })
 
 test('a script the project declares as a generator is charged with what it wrote', () => {

@@ -56,10 +56,14 @@ export class AttributionWindow {
     return this.record.at
   }
 
-  close(repo: Repository): ClosedWindow {
+  // `heldElsewhere` gives, among paths, those another session works on: a call that may have written anything is not
+  // charged with them, since it cannot be told who did.
+  close(repo: Repository, heldElsewhere: (paths: readonly string[]) => ReadonlySet<string>): ClosedWindow {
     const changes = this.changes(repo)
     const attribution = new Attribution(this.record.attribution)
-    const charged = new Map([...changes].filter(([path]) => attribution.charges(path)))
+    const broad = this.record.attribution === 'all' && !this.record.exact
+    const held = broad ? heldElsewhere([...changes.keys()]) : new Set<string>()
+    const charged = new Map([...changes].filter(([path]) => attribution.charges(path) && !held.has(path)))
     const head = repo.head()
 
     return {

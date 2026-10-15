@@ -5,6 +5,7 @@ import type { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { Check } from '../kinds/check.ts'
 import { ExitCheck } from '../kinds/exit-check.ts'
 import { FindingsCheck } from '../kinds/findings-check.ts'
+import type { CheckMemory } from '../results/check-memory.ts'
 import type { CheckOutcome } from '../results/check-outcome.ts'
 import type { CheckRunner } from './check-runner.ts'
 
@@ -56,7 +57,7 @@ export class ProjectChecks implements CheckRunner {
     }
   }
 
-  async judge(declaration: Declaration, unit: UnitDiff, deadline: number): Promise<CheckOutcome[]> {
+  async judge(declaration: Declaration, unit: UnitDiff, deadline: number, memory?: CheckMemory): Promise<CheckOutcome[]> {
     const { parallel } = declaration.checkLimits
     const env = unit.environment()
     const checks = declaration.checks.map((declared) => this.checkOf(declaration, declared))
@@ -72,7 +73,7 @@ export class ProjectChecks implements CheckRunner {
 
         running.set(
           check.id,
-          this.start(check, done, unit, env, Math.max(MIN_TIMEOUT_MS, deadline - Date.now())).then((outcome) => {
+          this.start(check, done, unit, env, Math.max(MIN_TIMEOUT_MS, deadline - Date.now()), memory).then((outcome) => {
             done.set(check.id, outcome)
             running.delete(check.id)
           }),
@@ -106,19 +107,28 @@ export class ProjectChecks implements CheckRunner {
     return index === -1 ? null : (queue.splice(index, 1)[0] ?? null)
   }
 
-  private start(
+  private async start(
     check: Check,
     done: ReadonlyMap<string, CheckOutcome>,
     unit: UnitDiff,
     env: NodeJS.ProcessEnv,
     timeoutMs: number,
+    memory: CheckMemory | undefined,
   ): Promise<CheckOutcome> {
     const prerequisite = check.after === null ? undefined : done.get(check.after)
 
-    if (prerequisite?.status === 'timeout') return Promise.resolve(check.skipped(`${prerequisite.id} did not finish`))
+    if (prerequisite?.status === 'timeout') return check.skipped(`${prerequisite.id} did not finish`)
 
-    return check
+    const kept = memory?.recall(check, unit) ?? null
+
+    if (kept !== null) return kept
+
+    const outcome = await check
       .judge(unit, env, timeoutMs)
       .catch((error: unknown) => check.broken(`the check crashed: ${error instanceof Error ? error.message : String(error)}`))
+
+    memory?.keep(check, unit, outcome)
+
+    return outcome
   }
 }

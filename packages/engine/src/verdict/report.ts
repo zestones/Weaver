@@ -46,9 +46,18 @@ export class Report {
   refusal(reportPath: string): string {
     const { round, maxRefusals, blocking } = this.verdict
 
+    const kept = blocking.filter((outcome) => outcome.keptFrom !== null).map((outcome) => outcome.id)
+    const unchanged =
+      kept.length === 0
+        ? []
+        : [
+            `Not run again, since nothing they read changed after their last run: ${kept.join(', ')}. Finishing again without a change gets the same verdict: fix the files, or tell the owner what keeps you from it.`,
+          ]
+
     return [
       `[weaver] The checks fail on this unit of work (refusal ${String(round)} of ${String(maxRefusals)}): fix what follows, then finish again.`,
       IN_WORDS,
+      ...unchanged,
       '',
       ...blocking.flatMap((outcome) => this.failureBlock(outcome)),
       ...this.repairedLines(),
@@ -85,7 +94,7 @@ export class Report {
 
   summary(reportPath: string): string {
     const { outcomes, diff, unattributed } = this.verdict
-    const waiting = this.verdict.toValidate().length
+    const waiting = this.verdict.toValidate().entries.length
     const ran = outcomes.filter((outcome) => outcome.ran).length
     const parts =
       diff.files.length === 0
@@ -98,7 +107,10 @@ export class Report {
 
     parts.push(...this.repairedLines(), ...this.reviewedLines())
 
-    if (unattributed.length > 0) parts.push(`Changed during its commands, not charged: ${unattributed.join(', ')}.`)
+    if (unattributed.length > 0)
+      parts.push(
+        `Changed during its commands, not charged: ${unattributed.join(', ')}, which another session works on or the command did not name.`,
+      )
     if (waiting > 0) parts.push(`${counted(waiting, 'item')} to validate.`)
 
     return [...parts, `Report: ${reportPath}`].join(' ')
@@ -115,7 +127,7 @@ export class Report {
         diff.files.map((file) => `- ${file.status} ${file.path}`),
       ),
       ...this.section(
-        'Changed during the session’s commands, not charged',
+        'Changed during the session’s commands, not charged: another session works on them, or the command named other files',
         verdict.unattributed.map((path) => `- ${path}`),
       ),
       ...this.section(
@@ -127,10 +139,7 @@ export class Report {
         verdict.outcomes.flatMap((outcome) => this.checkLines(outcome)),
       ),
       ...this.section('Review', this.reviewSection()),
-      ...this.section(
-        'To validate',
-        verdict.toValidate().map((line) => `- ${line}`),
-      ),
+      ...this.section('To validate', verdict.toValidate().lines()),
       ...this.section(
         'Rules for a reviewer, which no review judged',
         (verdict.review?.judged === true ? [] : declaration.reviewCriteria(diff.paths)).map((rule) => `- ${rule.id}: ${rule.statement}`),
@@ -255,7 +264,8 @@ export class Report {
   }
 
   private checkLines(outcome: CheckOutcome): string[] {
-    const head = `- ${outcome.status} \`${outcome.id}\` (${outcome.rules.join(', ')}), ${String(outcome.ms)} ms`
+    const given = outcome.keptFrom === null ? '' : `, given again from its run at ${outcome.keptFrom}: nothing it reads changed since`
+    const head = `- ${outcome.status} \`${outcome.id}\` (${outcome.rules.join(', ')}), ${String(outcome.ms)} ms${given}`
     const reason = outcome.reason === null ? [] : [`  ${outcome.reason}`]
     const output =
       outcome.status === 'pass' || outcome.status === 'skip' || outcome.output.trim() === ''

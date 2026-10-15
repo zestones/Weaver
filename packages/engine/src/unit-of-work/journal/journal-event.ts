@@ -19,6 +19,8 @@ export interface CheckRun {
   readonly failures: number
   readonly toValidate: number
   readonly candidates: number
+  // A verdict given again: nothing the check reads changed since it ran. Older lines leave it out.
+  readonly kept?: boolean
 }
 
 interface TouchEvent {
@@ -40,6 +42,18 @@ interface CheckEvent {
   // The lines the unit added, and the files a repair rewrote before the checks judged.
   readonly lines: number
   readonly repaired: number
+  readonly ms: number
+  readonly checks: readonly CheckRun[]
+}
+
+// Checks run on demand, by `weaver check`, in the middle of a task: the unit of work of the agent that asked, or null
+// for the owner's own changes, which are judged against HEAD.
+interface AskedEvent {
+  readonly kind: 'asked'
+  readonly unit: number | null
+  readonly passed: boolean
+  readonly failed: readonly string[]
+  readonly files: number
   readonly ms: number
   readonly checks: readonly CheckRun[]
 }
@@ -171,6 +185,7 @@ interface NoteEvent {
 export type EventBody =
   | TouchEvent
   | CheckEvent
+  | AskedEvent
   | WarnEvent
   | HookEvent
   | TurnEvent

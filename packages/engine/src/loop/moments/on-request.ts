@@ -1,3 +1,4 @@
+import { TaskNotification } from '../../agents/events/task-notification.ts'
 import { FlagBriefing } from '../../flagging/briefing/flag-briefing.ts'
 import { ReviewStore } from '../../review/results/review-store.ts'
 import { OwnerDirectives } from '../../review/routing/owner-directives.ts'
@@ -16,6 +17,10 @@ export class OnRequest implements Moment {
     const session = turn.session()
     const maintenance = new MaintenanceNotice(session).briefing
     const briefed = Answer.adding([new FlagBriefing().text, ...(maintenance === null ? [] : [maintenance])].join('\n\n'))
+
+    const ended = new TaskNotification(prompt).ended
+
+    if (ended !== null && !turn.event.subagent) session?.endedInBackground(ended)
 
     // A subagent's prompt is its parent's words, not the owner's.
     if (turn.event.subagent || !request.isFromOwner) return briefed

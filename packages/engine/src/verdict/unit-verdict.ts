@@ -4,8 +4,9 @@ import type { UnitDiff } from '../unit-of-work/diff/unit-diff.ts'
 import type { EventBody } from '../unit-of-work/journal/journal-event.ts'
 import type { UnitOfWork } from '../unit-of-work/unit/unit-of-work.ts'
 import type { LiftedCall } from '../unit-of-work/unit/unit-record.ts'
-import type { UnitReview } from '../review/rounds/unit-review.ts'
+import { UnitReview } from '../review/rounds/unit-review.ts'
 import type { CheckOutcome } from '../checks/results/check-outcome.ts'
+import { ValidationList, type ValidationItem } from './validation-list.ts'
 
 export interface VerdictFields {
   readonly unit: UnitOfWork
@@ -21,6 +22,8 @@ export interface VerdictFields {
 const DECLARATION_RULE = 'weaver:declaration'
 // And the one that follows what the owner's maintenance let through.
 const MAINTENANCE_RULE = 'weaver:maintenance'
+// How a guard names a write it refuses.
+const WRITTEN = /^Writing (.+)$/
 
 export class UnitVerdict {
   readonly unit: number
@@ -58,20 +61,49 @@ export class UnitVerdict {
     return this.blocking.length === 0
   }
 
-  toValidate(): string[] {
-    const findings = this.outcomes.flatMap((outcome) => outcome.validationLines())
+  // What waits for the owner, a file at a time.
+  toValidate(): ValidationList {
+    const findings = this.outcomes.flatMap((outcome) =>
+      outcome.toValidate.map(({ rule, file, line, message }) => ({ file, rule, line: line ?? null, message })),
+    )
     const advisory = this.outcomes
       .filter((outcome) => outcome.failedWithoutBlocking)
-      .map((outcome) => `${this.behind(outcome)} reports: ${outcome.excerpt().slice(0, 3).join(' / ')}`)
+      .map((outcome) => this.unplaced('', `${this.behind(outcome)} reports: ${outcome.excerpt().slice(0, 3).join(' / ')}`))
     const declaration = this.diff.changesUnder(DeclarationFolder.NAME)
-      ? [`${DECLARATION_RULE} ${DeclarationFolder.NAME}: the unit changed the project's declaration`]
+      ? [this.unplaced(DECLARATION_RULE, `${DeclarationFolder.NAME}: the unit changed the project's declaration`)]
       : []
 
-    const lifted = this.lifted.map(
-      ({ guard, what }) => `${MAINTENANCE_RULE} ${guard}: ${what} went through in maintenance, which this guard refuses`,
-    )
+    return new ValidationList([...findings, ...advisory, ...this.liftedItems(), ...declaration, ...this.reviewItems()])
+  }
 
-    return [...findings, ...advisory, ...lifted, ...declaration, ...(this.review?.toValidate() ?? [])]
+  // A write is about its file; anything else a guard refuses is about the change.
+  private liftedItems(): ValidationItem[] {
+    return this.lifted.map(({ guard, what }) => {
+      const written = WRITTEN.exec(what)?.[1] ?? null
+
+      return written === null
+        ? this.unplaced(MAINTENANCE_RULE, `${guard}: ${what} went through in maintenance, which this guard refuses`)
+        : { file: written, rule: MAINTENANCE_RULE, line: null, message: `written, which the guard ${guard} refuses` }
+    })
+  }
+
+  private reviewItems(): ValidationItem[] {
+    const { review } = this
+
+    if (review === null) return []
+
+    const points = review.points().map(({ place, content }) => ({
+      file: place?.file ?? null,
+      rule: `${content.review} ${content.rule ?? UnitReview.SUSPICION_RULE}`,
+      line: place?.line ?? null,
+      message: `${content.message} (${content.standing})`,
+    }))
+
+    return points.length > 0 ? points : review.toValidate().map((line) => this.unplaced('', line))
+  }
+
+  private unplaced(rule: string, message: string): ValidationItem {
+    return { file: null, rule, line: null, message }
   }
 
   private behind(outcome: CheckOutcome): string {
@@ -87,7 +119,7 @@ export class UnitVerdict {
       round: this.round,
       passed: this.passed,
       failed: this.blocking.map((outcome) => outcome.id),
-      toValidate: this.toValidate().length,
+      toValidate: this.toValidate().items.length,
       files: this.diff.files.length,
       lines: this.diff.addedLines,
       repaired: this.repaired.length,

@@ -63,6 +63,11 @@ export class FlagRecorder {
       provenance: { author, role, session, subagent, unit, requests, commit: this.repo.head(), at: new Date().toISOString() },
     })
     const number = String(card.number)
+    const missing = context.filter((place) => !place.exists).map(({ place }) => place.file)
+    const kept =
+      missing.length === 0
+        ? ''
+        : ` ${missing.join(', ')}: no such file in the repository, neither from where the command ran nor from its top. The card keeps the place as it was written.`
 
     return {
       card,
@@ -70,7 +75,7 @@ export class FlagRecorder {
       problems: [],
       message: known
         ? `[weaver] This flag is already recorded as ${number}. Go on with your task.`
-        : `[weaver] Flag ${number} recorded for the owner. This command is answered here and never runs: that is expected. Go on with your task.`,
+        : `[weaver] Flag ${number} recorded for the owner.${kept} This command is answered here and never runs: that is expected. Go on with your task.`,
     }
   }
 

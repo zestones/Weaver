@@ -96,7 +96,7 @@ test('in maintenance, what the guards of the project refuse goes through and wai
   assert.equal(systemMessage.endsWith(REMINDER), true, systemMessage)
   assert.match(
     reportOf(systemMessage),
-    /## To validate\n\n- weaver:maintenance tools: Writing tools\/markers\.mjs went through in maintenance, which this guard refuses\n- weaver:maintenance tools: Running `git commit` went through in maintenance, which this guard refuses\n- weaver:maintenance weaver:declaration: Writing \.weaver\/project\/guards\.json went through in maintenance, which this guard refuses\n/,
+    /## To validate\n\n- tools\/markers\.mjs\n {2}- weaver:maintenance, written, which the guard tools refuses\n- \.weaver\/project\/guards\.json\n {2}- weaver:maintenance, written, which the guard weaver:declaration refuses\n- weaver:maintenance, tools: Running `git commit` went through in maintenance, which this guard refuses\n/,
   )
   assert.deepEqual(stateOf(session)?.unit.lifted, [], 'the next unit of work starts with none')
   assert.notEqual(session.maintenance, null, 'nothing closes maintenance but the owner')
@@ -128,7 +128,7 @@ test('what went through with no file changed still reaches the owner: the task e
 
   assert.match(systemMessage, /^\[weaver\] No file changed in this turn\. 1 item to validate\. Report: \S+ /)
   assert.equal(systemMessage.endsWith(REMINDER), true)
-  assert.match(reportOf(systemMessage), /- weaver:maintenance tools: Running `git commit` went through in maintenance/)
+  assert.match(reportOf(systemMessage), /- weaver:maintenance, tools: Running `git commit` went through in maintenance/)
   assert.deepEqual(
     eventsOf(session, 'settle').map(({ unit, files }) => [unit, files]),
     [[1, 0]],

@@ -176,7 +176,10 @@ export class JournalNumbers {
   }
 
   private checks(): JournalFigures['checks'] {
-    const runs = this.of('check').flatMap((verdict) => verdict.checks)
+    // A verdict given again was not a run of the check.
+    const runs = this.of('check')
+      .flatMap((verdict) => verdict.checks)
+      .filter((run) => run.kept !== true)
 
     return this.grouped(
       runs,

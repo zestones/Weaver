@@ -12,6 +12,7 @@ import {
   agentRuns,
   agentWrites,
   B_FILE,
+  bashCall,
   declaration,
   eventsOf,
   FAILING,
@@ -19,6 +20,7 @@ import {
   LINT,
   PASSING,
   prompt,
+  startTool,
   stateOf,
   stubChecks,
   unitFiles,
@@ -207,8 +209,58 @@ test('what waits for the owner is counted, listed in the report and never blocks
   assert.match(output.systemMessage ?? '', /2 items to validate\./)
   assert.match(
     report,
-    /## To validate\n\n- S1 src\/a\.ts:1: eslint-disable added\n- weaver:declaration \.weaver: the unit changed the project's declaration/,
+    /## To validate\n\n- src\/a\.ts\n {2}- S1, line 1: eslint-disable added\n- weaver:declaration, \.weaver: the unit changed the project's declaration/,
   )
   assert.equal(checksOf()[0]?.toValidate, 2)
   assert.deepEqual(unitFiles(session), [])
+})
+
+test('an agent that waits for a task it left running is not reminded how to end its work, until the task ends', async () => {
+  const project = declaration({ finish: { headings: ['Request'] } })
+  const checks = stubChecks([PASSING])
+  const notified = (task: string, status: string | null): string =>
+    `<task-notification>\n<task-id>${task}</task-id>\n${status === null ? '<event>seed at 40%</event>' : `<status>${status}</status>`}\n</task-notification>`
+
+  prompt(session, 'seed the bench, then measure', project)
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  startTool(session, { ...bashCall('./seed.sh', { run_in_background: true }), tool_response: { backgroundTaskId: 'b1' } }, project)()
+  startTool(
+    session,
+    { tool_name: 'Monitor', tool_input: { command: 'tail -f seed.log' }, tool_response: { taskId: 'b2', timeoutMs: 1800000 } },
+    project,
+  )()
+
+  const waiting = await finishWith(session, checks, project, 'The seed runs: I go on when it ends.')
+
+  assert.equal(waiting.decision, undefined)
+  assert.match(waiting.systemMessage ?? '', /Checks pending/)
+
+  prompt(session, notified('b2', null), project)
+  prompt(session, notified('b2', 'completed'), project)
+  prompt(session, notified('b1', null), project)
+
+  assert.equal((await finishWith(session, checks, project, 'Still seeding.')).decision, undefined, 'b1 has not ended')
+
+  prompt(session, notified('b1', 'failed'), project)
+
+  const reminded = await finishWith(session, checks, project, 'The seed failed; I look into it.')
+
+  assert.equal(reminded.decision, 'block')
+  assert.match(reminded.reason ?? '', /your last message does not end it/)
+  assert.equal(checks.calls.count, 0)
+})
+
+test('a task whose end the runtime never tells is given up on once the time it was given has passed', async () => {
+  const project = declaration({ finish: { headings: ['Request'] } })
+
+  prompt(session, 'watch it', project)
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  startTool(
+    session,
+    { tool_name: 'Monitor', tool_input: { command: 'tail -f x.log' }, tool_response: { taskId: 'b3', timeoutMs: 1 } },
+    project,
+  )()
+  await new Promise((resolve) => setTimeout(resolve, 5))
+
+  assert.equal((await finishWith(session, stubChecks([PASSING]), project, 'Watching.')).decision, 'block')
 })

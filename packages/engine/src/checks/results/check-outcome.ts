@@ -15,6 +15,8 @@ export interface OutcomeFields {
   readonly failures?: readonly Finding[]
   readonly toValidate?: readonly Finding[]
   readonly candidates?: readonly Finding[]
+  // When the run whose verdict this gives again took place; null for a verdict given now.
+  readonly keptFrom?: string | null
 }
 
 const EXCERPT_LINES = 30
@@ -33,6 +35,7 @@ export class CheckOutcome {
   readonly toValidate: readonly Finding[]
   // Places a rule of the review is about, for the reviewer to judge one by one.
   readonly candidates: readonly Finding[]
+  readonly keptFrom: string | null
 
   constructor(fields: OutcomeFields) {
     this.id = fields.id
@@ -45,6 +48,18 @@ export class CheckOutcome {
     this.failures = fields.failures ?? []
     this.toValidate = fields.toValidate ?? []
     this.candidates = fields.candidates ?? []
+    this.keptFrom = fields.keptFrom ?? null
+  }
+
+  get fields(): OutcomeFields {
+    const { id, rules, status, blocking, ms, output, reason, failures, toValidate, candidates } = this
+
+    return { id, rules, status, blocking, ms, output, reason, failures, toValidate, candidates }
+  }
+
+  // A pass or a failure the check gave of the files; not a run out of time, nor one that could not run.
+  get isVerdict(): boolean {
+    return (this.status === 'pass' || this.status === 'fail') && this.reason === null
   }
 
   get ran(): boolean {
@@ -60,6 +75,7 @@ export class CheckOutcome {
       failures: this.failures.length,
       toValidate: this.toValidate.length,
       candidates: this.candidates.length,
+      kept: this.keptFrom !== null,
     }
   }
 
@@ -85,10 +101,6 @@ export class CheckOutcome {
     const lines = this.failures.length > 0 ? this.failures.map((finding) => this.line(finding)) : this.output.trim().split('\n')
 
     return lines.length > WARNING_LINES ? [...lines.slice(0, WARNING_LINES), `… ${String(lines.length - WARNING_LINES)} more`] : lines
-  }
-
-  validationLines(): string[] {
-    return this.toValidate.map((finding) => this.line(finding))
   }
 
   excerpt(): string[] {

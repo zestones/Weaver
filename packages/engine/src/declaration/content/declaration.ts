@@ -57,6 +57,11 @@ export class Declaration {
     return [this.finish.skill, this.review?.skill ?? null, this.writer?.skill ?? null].flatMap((skill) => skill ?? [])
   }
 
+  // The same project, with only the checks named.
+  withChecks(ids: ReadonlySet<string>): Declaration {
+    return new Declaration({ ...this, checks: this.checks.filter((check) => ids.has(check.id)) })
+  }
+
   rulesOf(check: string): Rule[] {
     return this.rules.filter((rule) => rule.check === check)
   }

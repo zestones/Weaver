@@ -9,6 +9,14 @@ export interface AgentEventFields {
   readonly agentId: string | null
   readonly lastMessage: string | null
   readonly transcriptPath: string | null
+  readonly background: BackgroundTask | null
+}
+
+// A task a call left running after it returned, as its runtime names it in the call's result.
+export interface BackgroundTask {
+  readonly id: string
+  // How long the runtime keeps it, when it says; null when the task runs until it ends.
+  readonly timeoutMs: number | null
 }
 
 export class AgentEvent {
@@ -22,6 +30,7 @@ export class AgentEvent {
   readonly lastMessage: string | null
   // Where the runtime writes what the session says and spends, which Weaver does not see.
   readonly transcriptPath: string | null
+  readonly background: BackgroundTask | null
 
   constructor(fields: AgentEventFields) {
     this.sessionId = fields.sessionId
@@ -32,6 +41,7 @@ export class AgentEvent {
     this.agentId = fields.agentId
     this.lastMessage = fields.lastMessage
     this.transcriptPath = fields.transcriptPath
+    this.background = fields.background
   }
 
   get subagent(): boolean {

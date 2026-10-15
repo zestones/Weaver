@@ -47,6 +47,8 @@ A turn starts with your request and ends when the agent stops. In between, Weave
 
 A task is finished when the last message of the agent carries the headings the project's finish skill lists. Until then the unit of work stays open, and the agent is pointed to the skill once a request.
 
+A call is charged with what it changed. An edit is charged with its file, and a command whose words say what it writes, `sed -i`, `cp`, a redirection, with those files. A command whose words do not say all it writes, such as a script, an interpreter or a tool Weaver does not know, is charged with everything that changed while it ran, except the files another session is working on: those stay that session's, and the report lists them. A file the agent writes back as it was leaves the unit, and keeps the base it had: a call that ends late never gives it another.
+
 Every rule of a project has one of three levels, which says who judges it and what a failure does:
 
 | Level   | Who judges                        | What a failure does                                                          |
@@ -61,6 +63,9 @@ A few things the diagram leaves out:
 - **A finding needs an answer, not obedience.** The agent writes `F1 fixed: …` or `F1 not fixed: …` in its final message. An answer `fixed` is refused while the file has not changed. What it does not fix waits for you, with its reason.
 - **A suspicion is for you alone.** For a rule about what the code does, a finding must carry the experiment that shows it. Without one it is a suspicion: you read it, the agent never does.
 - **A review never holds a turn hostage.** One that outlasts its wait goes on by itself, and its findings come at the next end of turn. So does one you send a message over while the end of the turn waits for it: the message is taken at once in Claude Code, and once the review is over in Codex, which hands it over only then. Interrupting the end of the turn, with Escape or Ctrl+C, stops the review with it. One that breaks is listed for you.
+- **A check never runs twice on the same files.** Each one keeps what it said of the two trees it judged. An end of turn that finds nothing changed since gives the same verdict at once and says so, which costs nothing when the agent finishes again without a change, or after a review it only answered.
+- **An agent hears a check without ending its task.** `weaver check backend` runs that check on its unit of work as the end of the task would, and counts as no refusal; the end of the task then gives its verdict again if nothing changed.
+- **An agent that waits for its own work is left to wait.** While a command it sent to the background or a watch it started has not ended, it may stop without its final sections: it is not reminded, and its runtime wakes it when the task ends.
 - **Every limit is written in the project**: how many times the checks may refuse, how long they may run, how long the warnings of a call may take, how long a review may take.
 
 ## What agents discover: flags and cards
@@ -166,7 +171,7 @@ A command that needs more than the names of the files reads what Weaver sets in 
 | Variable             | Given to          | What it holds                                                                                                                   |
 | -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `WEAVER_UNIT_DIFF`   | `repair`, `judge` | A JSON file: the files the unit of work changed, each with its status and the line ranges it added.                             |
-| `WEAVER_BASE_TREE`   | `repair`, `judge` | The git tree the unit of work started from.                                                                                     |
+| `WEAVER_BASE_TREE`   | `repair`, `judge` | The git tree the unit is checked against: the working tree, with each file of the unit as it was before the agent changed it.   |
 | `WEAVER_HEAD_TREE`   | `repair`, `judge` | The git tree of the working tree now.                                                                                           |
 | `WEAVER_CALL_DIFF`   | `warn`            | A JSON file: the files the call changed, each with its status and the blobs it held `before` and holds `after`.                 |
 | `WEAVER_GIT_OBJECTS` | all three         | The object store that holds those trees and blobs: git reads them with it as `GIT_OBJECT_DIRECTORY`, over the repository's own. |
@@ -201,6 +206,7 @@ Releases stay side by side, and a project runs the one that wired it until `weav
 | `weaver update [--dry-run] [--offline]`                           | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks.                                                                            |
 | `weaver doctor`                                                   | Checks the configuration, the hook, and each agent runtime.                                                                                                                       |
 | `weaver maintenance [on\|off] [<session>]`                        | Lifts the guards of the project for one session of an agent, or puts them back; alone, says which sessions are in maintenance.                                                    |
+| `weaver check [<name>...]`                                        | Runs the checks of the project on the work in progress, without ending it: under an agent, its unit of work; from your terminal, what differs from HEAD.                          |
 | `weaver stats [--since <day>\|<n>d] [--json]`                     | Counts what Weaver kept of its work in the project: times, verdicts, warnings, reviews, cards.                                                                                    |
 | `weaver version`                                                  | Says which version of Weaver this is.                                                                                                                                             |
 | `weaver flag <place>...`                                          | Flags something yourself, the five fields read on the standard input.                                                                                                             |
@@ -219,23 +225,24 @@ What a command prints follows the [Command Line Interface Guidelines](https://cl
 
 Weaver writes what it does in a journal, one line for each event, under `.git/weaver/events/`: nothing of it is committed, and nothing leaves the machine. Each line says when, in which session, under which runtime and by which version of Weaver.
 
-| Line          | What it keeps                                                                                                                           |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `request`     | What you asked, the directives it carried, and where the runtime writes the transcript of the session.                                  |
-| `hook`        | One run of the hook: the event, the tool, the subagent that made the call, and the time it took from the start of its process.          |
-| `touch`       | The files a call changed.                                                                                                               |
-| `warn`        | The checks that ran right after a call: how each ended, in how long, and which ones told the agent something.                           |
-| `turn`        | One end of turn: whether the agent said it had finished, and what held it back, the checks, a review or the reminder.                   |
-| `check`       | One verdict: the files and the lines of the unit of work, what a repair rewrote, the time, and each check with its status and its time. |
-| `review`      | One review: the runtime and the model, the rules given, the findings and the rule of each, the time and the cost.                       |
-| `answer`      | What the author answered to one finding: fixed, not fixed, or nothing.                                                                  |
-| `settle`      | The end of a unit of work, by a verdict or by your own commit.                                                                          |
-| `refuse`      | A call a guard refused.                                                                                                                 |
-| `lift`        | A call a guard would have refused, let through in maintenance.                                                                          |
-| `maintenance` | Maintenance turned on or off for a session.                                                                                             |
-| `flag`        | A flag an agent made, and the card it became.                                                                                           |
-| `head-moved`  | A call that moved `HEAD`.                                                                                                               |
-| `error`       | Weaver could not do its work: a hook that failed, a configuration it could not read.                                                    |
+| Line          | What it keeps                                                                                                                                                         |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `request`     | What you asked, the directives it carried, and where the runtime writes the transcript of the session.                                                                |
+| `hook`        | One run of the hook: the event, the tool, the subagent that made the call, and the time it took from the start of its process.                                        |
+| `touch`       | The files a call changed.                                                                                                                                             |
+| `warn`        | The checks that ran right after a call: how each ended, in how long, and which ones told the agent something.                                                         |
+| `turn`        | One end of turn: whether the agent said it had finished, and what held it back, the checks, a review or the reminder.                                                 |
+| `check`       | One verdict: the files and the lines of the unit of work, what a repair rewrote, the time, and each check with its status and its time, or the verdict it gave again. |
+| `asked`       | Checks run by `weaver check`: whose unit of work, the files, and each check with its status and its time.                                                             |
+| `review`      | One review: the runtime and the model, the rules given, the findings and the rule of each, the time and the cost.                                                     |
+| `answer`      | What the author answered to one finding: fixed, not fixed, or nothing.                                                                                                |
+| `settle`      | The end of a unit of work, by a verdict or by your own commit.                                                                                                        |
+| `refuse`      | A call a guard refused.                                                                                                                                               |
+| `lift`        | A call a guard would have refused, let through in maintenance.                                                                                                        |
+| `maintenance` | Maintenance turned on or off for a session.                                                                                                                           |
+| `flag`        | A flag an agent made, and the card it became.                                                                                                                         |
+| `head-moved`  | A call that moved `HEAD`.                                                                                                                                             |
+| `error`       | Weaver could not do its work: a hook that failed, a configuration it could not read.                                                                                  |
 
 `weaver stats` counts these lines and the cards of the registry: how many, how long, how often. `--since 2026-10-01` or `--since 7d` starts the count on a day, and `--json` gives the same figures to a program. It states what was kept and concludes nothing: what the numbers mean is yours to work out, with the lines themselves at hand.
 

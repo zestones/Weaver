@@ -27,9 +27,18 @@ test('inline code that writes, a formatter, a generator or a target an expansion
   }
 })
 
-test('anything else writes nothing that can be told from its words', () => {
-  for (const line of ['node scripts/run.mjs', 'make dev-api', 'python3 script.py', 'python3 -c "print(\'hello\')"']) {
-    assert.equal(of(line), 'none', line)
+test('a script, an interpreter or a program whose words do not say what it writes may write anything', () => {
+  for (const line of [
+    'node scripts/run.mjs',
+    'make dev-api',
+    'python3 script.py',
+    'python3 -c "print(\'hello\')"',
+    'python3 - <<EOF\nimport runpy\nrunpy.run_path("extract.py")\nEOF',
+    'python3 extract.py > extract.log',
+    `perl -pi -e 's/a/b/' src/a.ts`,
+    'git checkout -- src/a.ts',
+  ]) {
+    assert.equal(of(line), 'all', line)
   }
 })
 
@@ -39,23 +48,19 @@ test('formatters that write account for all their writes', () => {
   }
 })
 
-test('a generator the project declares may write anything, and one it does not declare nothing that can be told', () => {
-  const hints = { writers: ['npm run api:types', 'make contract', 'python -m openapi_document'], readers: [] }
+test('a generator the project declares may write anything, even one that reads by its name', () => {
+  const hints = { writers: ['npm run build', 'make contract'], readers: [] }
 
-  for (const command of [
-    'npm run api:types',
-    'make contract',
-    'timeout 900 make -C platform contract',
-    'cd api && python -m openapi_document',
-  ]) {
+  for (const command of ['npm run build', 'make contract', 'timeout 900 make -C platform contract']) {
     assert.equal(shellWrites(command, ROOT, ROOT, hints), 'all', command)
-    assert.equal(of(command), 'none', command)
   }
+
+  assert.equal(of('npm run build'), null)
 })
 
 test('a checker the project declares as a reader only reads', () => {
   const hints = { writers: [], readers: ['python -m tools.lint'] }
 
   assert.equal(shellWrites('python -m tools.lint --all', ROOT, ROOT, hints), null)
-  assert.equal(of('python -m tools.lint --all'), 'none')
+  assert.equal(of('python -m tools.lint --all'), 'all')
 })

@@ -33,6 +33,8 @@ const UNJUDGED: ReadonlySet<ReviewStanding> = new Set(['running', 'failed', 'int
 
 // What a review means for the unit it judged, at one end of turn.
 export class UnitReview {
+  static readonly SUSPICION_RULE = SUSPICION_RULE
+
   readonly standing: ReviewStanding
   readonly content: string
   readonly outcome: ReviewOutcome

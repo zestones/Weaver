@@ -8,7 +8,7 @@ export interface Transaction<Value> {
   readonly value: Value
 }
 
-const VERSION = 6
+const VERSION = 7
 const LOCK_WAIT_MS = 5000
 const LOCK_POLL_MS = 20
 
@@ -65,6 +65,8 @@ export class SessionStore {
       head: null,
       flagged: [],
       maintenance: null,
+      asked: null,
+      background: {},
     }
   }
 

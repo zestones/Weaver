@@ -164,4 +164,6 @@ test('a flag may name no place at all, and the owner flags without a session', (
       { place: { file: 'docs/missing.md', line: null }, exists: false, origin: 'unknown' },
     ],
   )
+  assert.match(owner.message, /recorded for the owner\. docs\/missing\.md: no such file in the repository, neither from where/)
+  assert.doesNotMatch(nowhere.message, /no such file/)
 })

@@ -29,7 +29,7 @@ export class PlaceReader {
   // `text` is the place as it was written, `cwd` where the command that names it runs.
   read(text: string, cwd: string): PlaceContext {
     const { path, line } = new PlaceText(text)
-    const file = this.inside(path, cwd)
+    const file = this.located(path, cwd)
     const lines = file === null ? null : this.lines(file)
 
     // A path outside the repository is kept as written, as a file that is not there.
@@ -57,6 +57,18 @@ export class PlaceReader {
       wroteBy: line === null || flagged === null || origin === 'unit' ? [] : this.blamed(file, line),
       lastCommits: this.commits(['-n', String(LAST_COMMITS), '--', `:(top,literal)${file}`]),
     }
+  }
+
+  // Read from where the command runs, as a shell would; an agent often names a file from the top of the repository
+  // wherever it stands, so a path found from there only is taken from there.
+  private located(path: string, cwd: string): string | null {
+    const here = this.inside(path, cwd)
+
+    if (isAbsolute(path) || (here !== null && this.lines(here) !== null)) return here
+
+    const fromTop = this.inside(path, this.top)
+
+    return fromTop !== null && this.lines(fromTop) !== null ? fromTop : here
   }
 
   private inside(path: string, cwd: string): string | null {

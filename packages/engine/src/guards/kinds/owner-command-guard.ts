@@ -5,6 +5,7 @@ import { Guard } from './guard.ts'
 
 const OWNED: ReadonlySet<string> = new Set(['close', 'install', 'uninstall', 'update', 'maintenance'])
 const CARDS = 'cards'
+const HELP: ReadonlySet<string> = new Set(['--help', '-h'])
 // What `weaver cards` does beyond listing and printing.
 const CHANGES: ReadonlySet<string> = new Set(['reopen', 'retitle', 'label', 'rewrite', 'tie', 'untie', 'separate'])
 
@@ -25,7 +26,10 @@ export class OwnerCommandGuard extends Guard {
     return owned === undefined ? null : this.refuse(`Running \`weaver ${owned}\``)
   }
 
+  // Asking how a command is used decides nothing: the command shows its help and does nothing else.
   private owned(words: readonly string[]): string[] {
+    if (words.some((word) => HELP.has(word))) return []
+
     const [command = '', action = ''] = words.filter((word) => !word.startsWith('-'))
 
     if (OWNED.has(command)) return [command]

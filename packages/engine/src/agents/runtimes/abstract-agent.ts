@@ -22,6 +22,9 @@ export abstract class AbstractAgent implements Agent {
   read(payload: Payload): AgentEvent {
     const cwd = payload.text('cwd') ?? process.cwd()
     const tool = payload.text('tool_name')
+    const response = payload.record('tool_response')
+    // A command sent to the background gives the id of its task, a watch the id of its own and how long it lasts.
+    const task = response.text('backgroundTaskId') ?? response.text('taskId')
 
     return new AgentEvent({
       sessionId: payload.text('session_id'),
@@ -32,6 +35,7 @@ export abstract class AbstractAgent implements Agent {
       agentId: payload.text('agent_id'),
       lastMessage: payload.text('last_assistant_message'),
       transcriptPath: payload.text('transcript_path'),
+      background: task === null ? null : { id: task, timeoutMs: response.number('timeoutMs') },
     })
   }
 

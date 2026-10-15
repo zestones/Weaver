@@ -67,6 +67,16 @@ test('a path is read from where the command runs and named from the top of the r
   assert.deepEqual(reader.read(join(repo.top, TOKEN), '/').place, { file: TOKEN, line: null })
 })
 
+test('a path named from the top of the repository is found from there when the command runs in a folder below', () => {
+  const reader = new PlaceReader(repo)
+  const below = join(repo.top, 'src/auth')
+
+  assert.deepEqual(reader.read(`${TOKEN}:2`, below).place, { file: TOKEN, line: 2 })
+  assert.equal(reader.read(`${TOKEN}:2`, below).lineText, 'const line2 = 2')
+  assert.deepEqual(reader.read('docs/notes.md', join(repo.top, '.cache/agents/sweep')).place, { file: 'docs/notes.md', line: null })
+  assert.deepEqual(reader.read('gone.ts', below).place, { file: 'src/auth/gone.ts', line: null }, 'found nowhere: read from where it ran')
+})
+
 test('a file that is not there is kept as a place all the same, and a path outside the repository as it was written', () => {
   const reader = new PlaceReader(repo, () => [])
   const gone = reader.read('src/auth/gone.ts:4', repo.top)

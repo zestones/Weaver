@@ -1,4 +1,7 @@
 export { Loop } from './loop/dispatch/loop.ts'
+export { ChecksOnDemand } from './loop/on-demand/checks-on-demand.ts'
+export type { AskedVerdict } from './loop/on-demand/checks-on-demand.ts'
+export type { CheckOutcome } from './checks/results/check-outcome.ts'
 export { Answer } from './loop/exchange/answer.ts'
 export type { AnswerBody } from './loop/exchange/answer.ts'
 export { Declaration } from './declaration/content/declaration.ts'

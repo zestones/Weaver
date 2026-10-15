@@ -27,6 +27,11 @@ export class AfterCall implements Moment {
 
     if (callId === null || session === null) return Answer.silent()
 
+    const { background } = turn.event
+
+    // Only the agent itself is told of the end of its tasks: a subagent's are its own.
+    if (background !== null && !turn.event.subagent) session.startedInBackground(background.id, background.timeoutMs)
+
     const touches = session.closeCall(callId)
     const alert = new HeadAlert(touches).text
     const changes = new Map(touches.flatMap((touch) => [...touch.changes]))

@@ -17,6 +17,12 @@ export class Payload {
     return typeof value === 'string' ? value : null
   }
 
+  number(key: string): number | null {
+    const value = this.raw[key]
+
+    return typeof value === 'number' && Number.isFinite(value) ? value : null
+  }
+
   flag(key: string): boolean {
     return this.raw[key] === true
   }

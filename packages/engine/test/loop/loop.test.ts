@@ -154,6 +154,32 @@ test('a unit is refused until its own diff passes the declared gates, then settl
   assert.deepEqual(kinds(), ['touch', 'check', 'touch', 'check', 'touch', 'check', 'settle'])
 })
 
+test('a unit that finishes again without a change is given the same verdict at once, the checks not run again', () => {
+  hook('UserPromptSubmit', { prompt: 'add b' })
+  write('src/b.js', 'export const b = ;\n')
+  stop()
+
+  const again = stop()
+  const [first, second] = new Journal(repo).read().flatMap((event) => (event.kind === 'check' ? [event] : []))
+
+  assert.equal(again.decision, 'block')
+  assert.match(
+    again.reason ?? '',
+    /refusal 2 of 2\): fix what follows, then finish again\.\n.*\nNot run again, since nothing they read changed after their last run: syntax\./,
+  )
+  assert.deepEqual(
+    second?.checks.map(({ id, status, kept }) => [id, status, kept]),
+    [
+      ['syntax', 'fail', true],
+      ['markers', 'pass', true],
+    ],
+  )
+  assert.deepEqual(
+    first?.checks.map(({ kept }) => kept),
+    [false, false],
+  )
+})
+
 test('the FIXME that was there before the unit is not the unit’s: only the lines it adds are judged', () => {
   hook('UserPromptSubmit', { prompt: 'bump a' })
   tool('Edit', { file_path: join(repo.top, 'src/a.js'), old_string: 'a = 1', new_string: 'a = 2' }, () => {
@@ -172,7 +198,7 @@ test('a finding under a human rule waits for the owner and does not hold the age
 
   assert.equal(answer.decision, undefined)
   assert.match(answer.systemMessage ?? '', /1 item to validate\./)
-  assert.match(report, /- M2 src\/c\.js:1: lint suppression added/)
+  assert.match(report, /- src\/c\.js\n {2}- M2, line 1: lint suppression added/)
 })
 
 test('what the owner saves while the agent runs its tests is never charged to the agent', () => {
@@ -213,7 +239,10 @@ test('a command that exits with an error is still charged with what it wrote bef
   writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n// FIXME an old one, not this unit’s\n', 'notes.md': 'the owner’s\n' })
   hook('PostToolUseFailure', call)
 
-  assert.match(stop().systemMessage ?? '', /passed on 1 changed file\. Changed during its commands, not charged: notes\.md\./)
+  assert.match(
+    stop().systemMessage ?? '',
+    /passed on 1 changed file\. Changed during its commands, not charged: notes\.md, which another session works on or the command did not name\./,
+  )
 })
 
 test('a check may repair before it judges: what it rewrites stays the unit’s work, and the agent is told to read it again', () => {

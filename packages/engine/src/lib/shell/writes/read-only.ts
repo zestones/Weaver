@@ -8,6 +8,8 @@ const READERS = new Set([
   ...'ls cat head tail less more nl column wc sort uniq cut tr diff cmp jq yq echo printf'.split(' '),
   ...'grep egrep fgrep rg fd find tree stat file du df realpath readlink basename dirname pwd which type'.split(' '),
   ...'date true false test [ sleep ps pgrep lsof ss id whoami uname printenv cd pushd popd hash'.split(' '),
+  // What an agent may run of Weaver only reads, or is answered by its hook: the rest is the owner's, and refused.
+  'weaver',
 ])
 const WRITING_FLAGS: Readonly<Record<string, RegExp>> = {
   sort: /^(-[a-zA-Z]*o|--output)/,
@@ -81,17 +83,23 @@ function toolReads(command: ShellCommand): boolean | null {
   }
 
   if (module === 'sqlfluff') return toolArgs[0] === 'lint' || toolArgs[0] === 'parse'
+  // The test runner of Node, read as the other runners of tests are.
+  if (program === 'node' && args.includes('--test')) return !args.includes('--test-update-snapshots')
   if (module === 'pytest') return !toolArgs.some((arg) => /^(--update|--snapshot-update|--update-snapshots)$/.test(arg))
   if (TOOLS.has(module)) return !toolArgs.some((arg) => TOOL_WRITES.test(arg))
 
   return null
 }
 
-function commandReads(command: ShellCommand, hints: ScriptHints): boolean {
+const commandReads = (command: ShellCommand, hints: ScriptHints): boolean =>
+  !writesThroughRedirect(command) && readsApartFromRedirects(command, hints)
+
+// Whether the command itself only reads: what its redirections write is told apart, from its words.
+export function readsApartFromRedirects(command: ShellCommand, hints: ScriptHints): boolean {
   const { program, args } = command
   const writing = WRITING_FLAGS[program]
 
-  if (writesThroughRedirect(command) || isWriter(command, hints)) return false
+  if (isWriter(command, hints)) return false
   if (isReader(command, hints)) return true
   if (program === 'git') return GIT_READS.has(gitSubcommand(args) ?? '') && !args.some((arg) => arg.startsWith('--output'))
   if (program === 'npm') return npmReads(args)

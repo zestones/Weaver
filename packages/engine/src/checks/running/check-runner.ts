@@ -1,6 +1,7 @@
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import type { CallDiff } from '../../unit-of-work/diff/call-diff.ts'
 import type { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
+import type { CheckMemory } from '../results/check-memory.ts'
 import type { CheckOutcome } from '../results/check-outcome.ts'
 
 export interface CheckRunner {
@@ -14,5 +15,6 @@ export interface CheckRunner {
   // The repairs and the checks share one time: `deadline` is the moment it ends.
   repair(declaration: Declaration, unit: UnitDiff, deadline: number): Promise<void>
 
-  judge(declaration: Declaration, unit: UnitDiff, deadline: number): Promise<readonly CheckOutcome[]>
+  // A check whose verdict `memory` holds for the same trees gives it again without running.
+  judge(declaration: Declaration, unit: UnitDiff, deadline: number, memory?: CheckMemory): Promise<readonly CheckOutcome[]>
 }

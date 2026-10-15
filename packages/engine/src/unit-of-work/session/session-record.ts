@@ -2,7 +2,7 @@ import type { WindowRecord } from '../attribution/window-record.ts'
 import type { UnitRecord } from '../unit/unit-record.ts'
 
 export interface SessionRecord {
-  readonly version: 6
+  readonly version: 7
   readonly agent: string
   readonly unit: UnitRecord
   readonly pending: Readonly<Record<string, WindowRecord>>
@@ -15,4 +15,14 @@ export interface SessionRecord {
   readonly flagged: readonly number[]
   // Since when the owner lifts the guards of the project for this session; null outside maintenance.
   readonly maintenance: string | null
+  // The last `weaver check` its agent ran, as the hook saw it go by: the command reads it to know whose work it checks.
+  readonly asked: AskedCheck | null
+  // The tasks its agent left running, by their id, each with when it is given up on if its end is never told.
+  readonly background: Readonly<Record<string, string>>
+}
+
+interface AskedCheck {
+  readonly at: string
+  // The names the command was given, in order.
+  readonly names: readonly string[]
 }

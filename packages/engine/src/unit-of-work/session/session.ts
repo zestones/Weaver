@@ -9,6 +9,7 @@ import type { OwnerRequest } from '../owner/owner-request.ts'
 import { Reconciliation } from '../owner/reconciliation.ts'
 import { UnitOfWork } from '../unit/unit-of-work.ts'
 import type { LiftedCall, UnitFile } from '../unit/unit-record.ts'
+import { HeldElsewhere } from './held-elsewhere.ts'
 import type { SessionRecord } from './session-record.ts'
 import { SessionStore, type Transaction } from './session-store.ts'
 
@@ -80,6 +81,44 @@ export class Session {
     if (changed) this.log({ kind: 'maintenance', on })
 
     return changed
+  }
+
+  // A task with no end in sight is given up on after this long, should the runtime never tell of its end.
+  static readonly BACKGROUND_GIVEN_UP_MS = 12 * 60 * 60 * 1000
+
+  // `timeoutMs` is how long the runtime keeps the task, when it says.
+  startedInBackground(task: string, timeoutMs: number | null): void {
+    const until = new Date(Date.now() + (timeoutMs ?? Session.BACKGROUND_GIVEN_UP_MS)).toISOString()
+
+    this.store.update((latest) => ({ ...latest, background: { ...latest.background, [task]: until } }))
+  }
+
+  endedInBackground(task: string): void {
+    this.store.update((latest) => ({
+      ...latest,
+      background: Object.fromEntries(Object.entries(latest.background).filter(([id]) => id !== task)),
+    }))
+  }
+
+  // Whether the agent waits for a task it left running: it may stop without ending its work, and resume at its end.
+  get waitsInBackground(): boolean {
+    const now = new Date().toISOString()
+
+    return Object.values(this.state()?.background ?? {}).some((until) => until > now)
+  }
+
+  asked(names: readonly string[]): void {
+    this.store.update((latest) => ({ ...latest, asked: { at: new Date().toISOString(), names } }))
+  }
+
+  // Whether the agent ran `weaver check` with these names since `since`: the one command that does reads it, once.
+  takeAsked(names: readonly string[], since: string): boolean {
+    return this.store.transact((latest) => {
+      const { asked } = latest
+      const same = asked !== null && asked.at >= since && asked.names.join('\0') === names.join('\0')
+
+      return { record: same ? { ...latest, asked: null } : latest, value: same }
+    }).value
   }
 
   // What a guard would have refused waits for the owner with the unit of work it was made in.
@@ -229,7 +268,8 @@ export class Session {
     if (pending === undefined) return { record: latest, value: null }
 
     const window = new AttributionWindow(pending)
-    const closed = window.close(this.repo)
+    const elsewhere = new HeldElsewhere(this.repo, dirname(this.dir), this.id)
+    const closed = window.close(this.repo, (paths) => elsewhere.among(paths))
     const { unit, foreign } = new UnitOfWork(latest.unit).charge(window, closed)
 
     return {

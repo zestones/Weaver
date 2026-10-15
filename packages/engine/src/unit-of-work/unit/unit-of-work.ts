@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
 import type { AttributionWindow, Change, ClosedWindow } from '../attribution/attribution-window.ts'
-import type { Intent, LiftedCall, UnitFile, UnitRecord } from './unit-record.ts'
+import type { Intent, LiftedCall, ReturnedFile, UnitFile, UnitRecord } from './unit-record.ts'
 
 type Files = Readonly<Record<string, UnitFile>>
+type Returned = Readonly<Record<string, ReturnedFile>>
 
 export class UnitOfWork {
   readonly record: UnitRecord
@@ -20,6 +21,7 @@ export class UnitOfWork {
       check: { rounds: 0, result: null, reminded: false, reviewed: [], reviewing: null },
       unattributed: [],
       lifted: [],
+      returned: {},
     })
   }
 
@@ -120,17 +122,22 @@ export class UnitOfWork {
     return new UnitOfWork({ ...this.record, files: this.changed(files) })
   }
 
+  // A git action of the owner may change what HEAD holds: what a file returned to is then no base to go by.
+  withoutReturned(): UnitOfWork {
+    return new UnitOfWork({ ...this.record, returned: {} })
+  }
+
   charge(window: AttributionWindow, closed: ClosedWindow): { unit: UnitOfWork; foreign: string[] } {
     const now = new Date().toISOString()
     const files: Record<string, UnitFile> = { ...this.record.files }
 
-    for (const [path, change] of closed.charged) files[path] = this.touched(files[path], change, window, now)
+    for (const [path, change] of closed.charged) files[path] = this.touched(path, change, window, now)
 
     const kept = this.changed(files)
     const unattributed = [...new Set([...this.record.unattributed, ...closed.shown])].filter((path) => !(path in kept))
 
     return {
-      unit: new UnitOfWork({ ...this.record, files: kept, unattributed }),
+      unit: new UnitOfWork({ ...this.record, files: kept, unattributed, returned: this.returnedWith(files, kept) }),
       foreign: [...closed.charged.keys()].filter((path) => files[path]?.foreign === true),
     }
   }
@@ -146,13 +153,28 @@ export class UnitOfWork {
     return Object.fromEntries(Object.entries(files).filter(([, file]) => file.base !== file.last))
   }
 
-  // A file that differs from what the session last left in it was changed by someone else, unless the session changed it
-  // again while this window was open.
-  private touched(file: UnitFile | undefined, change: Change, window: AttributionWindow, now: string): UnitFile {
-    if (file === undefined) return { base: change.before, last: change.after, foreign: false, touchedAt: now }
+  private returnedWith(files: Files, kept: Files): Returned {
+    const back = Object.entries(files).filter(([path]) => !(path in kept))
+    const earlier = Object.entries(this.record.returned).filter(([path]) => !(path in files))
 
-    const foreign = file.foreign || (file.last !== change.before && file.touchedAt < window.openedAt)
+    return Object.fromEntries([...earlier, ...back.map(([path, { base, since }]) => [path, { base, since }] as const)])
+  }
 
-    return { base: file.base, last: change.after, foreign, touchedAt: now }
+  // The base is what the earliest look at a file saw. A window that closes late, such as one whose call never ran or
+  // ran in the background, saw it before the session first did only if it opened before then: otherwise its before is
+  // the session's own work. A file that differs from what the session last left in it was changed by someone else,
+  // unless the session changed it again while this window was open.
+  private touched(path: string, change: Change, window: AttributionWindow, now: string): UnitFile {
+    const file = this.record.files[path]
+    const known = file ?? this.record.returned[path]
+
+    if (known === undefined) return { base: change.before, last: change.after, foreign: false, touchedAt: now, since: window.openedAt }
+
+    const earlier = window.openedAt < known.since
+    const base = earlier ? change.before : known.base
+    const since = earlier ? window.openedAt : known.since
+    const foreign = file !== undefined && (file.foreign || (file.last !== change.before && file.touchedAt < window.openedAt))
+
+    return { base, last: change.after, foreign, touchedAt: now, since }
   }
 }

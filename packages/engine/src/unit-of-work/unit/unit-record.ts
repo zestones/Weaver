@@ -13,6 +13,14 @@ export interface UnitFile {
   readonly last: Blob
   readonly foreign: boolean
   readonly touchedAt: string
+  // When the session first saw it, which a call that started earlier may move back.
+  readonly since: string
+}
+
+// A file the session wrote back to what it held before: out of the unit, but its base is still known.
+export interface ReturnedFile {
+  readonly base: Blob
+  readonly since: string
 }
 
 // A call a guard would have refused, which the owner's maintenance let through.
@@ -40,4 +48,5 @@ export interface UnitRecord {
   readonly check: CheckProgress
   readonly unattributed: readonly string[]
   readonly lifted: readonly LiftedCall[]
+  readonly returned: Readonly<Record<string, ReturnedFile>>
 }

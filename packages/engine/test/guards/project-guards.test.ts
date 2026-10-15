@@ -173,6 +173,9 @@ test('the commands of Weaver that decide or change are the owner’s, however an
     'node /opt/weaver/dist/bin/weaver.js cards 12',
     'echo weaver close 12 fixed',
     'git close 12',
+    'weaver maintenance --help',
+    'weaver cards rewrite -h',
+    'weaver check backend',
   ]) {
     assert.equal(refusal(command), null, command)
   }

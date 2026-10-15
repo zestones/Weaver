@@ -23,8 +23,8 @@ test("the base tree puts back only the unit's files, so what others changed neve
 
   const head = new WorkingTreeSnapshot(repo, dir).tree()
   const files = {
-    'a.txt': { base: before.get('a.txt') ?? null, last: null, foreign: false, touchedAt: '' },
-    'new.txt': { base: before.get('new.txt') ?? null, last: null, foreign: false, touchedAt: '' },
+    'a.txt': { base: before.get('a.txt') ?? null, last: null, foreign: false, touchedAt: '', since: '' },
+    'new.txt': { base: before.get('new.txt') ?? null, last: null, foreign: false, touchedAt: '', since: '' },
   }
   const base = new BaseTree(repo, dir).of(head, files)
 

@@ -1,4 +1,5 @@
 import { CardRegistry } from '@weaver/memory'
+import { WeaverCommand } from '../../agents/commands/weaver-command.ts'
 import { FlagCall } from '../../flagging/calls/flag-call.ts'
 import { FlagRecorder, type FlagAnswer } from '../../flagging/recording/flag-recorder.ts'
 import type { ToolCall } from '../../agents/tool-calls/tool-call.ts'
@@ -10,6 +11,7 @@ import { UnitLines } from '../../unit-of-work/diff/unit-lines.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import { Answer } from '../exchange/answer.ts'
 import type { Turn } from '../exchange/turn.ts'
+import { ChecksOnDemand } from '../on-demand/checks-on-demand.ts'
 import type { Moment } from './moment.ts'
 
 export class BeforeCall implements Moment {
@@ -38,6 +40,13 @@ export class BeforeCall implements Moment {
       session?.log(refusal.event(call.name))
 
       return Answer.refusing(refusal.told(session?.shortId ?? null))
+    }
+
+    // The command runs apart from the hook: it learns whose work to check from what the hook saw go by.
+    for (const weaver of WeaverCommand.among(call.commands())) {
+      const [command = '', ...words] = weaver.words
+
+      if (command === ChecksOnDemand.COMMAND) session?.asked(ChecksOnDemand.namesIn(words))
     }
 
     const writes = call.writes(turn.repo.top, turn.declaration.scripts)

@@ -9,6 +9,6 @@ export class HeadAlert {
     this.text =
       moved === undefined
         ? null
-        : `[weaver] The ${moved.tool} call moved HEAD. Commits are the owner's: the files of this unit of work are still checked as the agent's.`
+        : `[weaver] HEAD moved while the ${moved.tool} call ran, by the call or by the owner meanwhile. Commits are the owner's: one the call made settles nothing, and the files of this unit of work are still checked as the agent's.`
   }
 }
