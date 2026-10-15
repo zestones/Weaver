@@ -11,6 +11,7 @@ export interface AgentTaskFields {
   readonly answerSchema?: AnswerSchema | null
   readonly beforeTool?: readonly string[] | null
   readonly environment?: Readonly<Record<string, string>>
+  readonly signal?: AbortSignal | null
 }
 
 export class AgentTask {
@@ -30,6 +31,8 @@ export class AgentTask {
   readonly beforeTool: readonly string[] | null
   // Variables added to the environment the agent runs in.
   readonly environment: Readonly<Record<string, string>>
+  // Ends the agent when it aborts: the task then fails as stopped.
+  readonly signal: AbortSignal | null
 
   constructor(fields: AgentTaskFields) {
     this.prompt = fields.prompt
@@ -41,5 +44,6 @@ export class AgentTask {
     this.answerSchema = fields.answerSchema ?? null
     this.beforeTool = fields.beforeTool ?? null
     this.environment = fields.environment ?? {}
+    this.signal = fields.signal ?? null
   }
 }

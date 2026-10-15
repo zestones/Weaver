@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { withScratch } from '../../lib/files/scratch.ts'
-import { runProcess, starts, TIMED_OUT } from '../../lib/process/process.ts'
+import { runProcess, starts, STOPPED, TIMED_OUT } from '../../lib/process/process.ts'
 import { isRecord, parseJson } from '../../lib/text/json.ts'
 import type { AgentExecution } from '../../ports/agent-execution.ts'
 import { AgentResult } from '../../ports/agent-result.ts'
@@ -45,11 +45,14 @@ export class CodexExecution implements AgentExecution {
       timeoutMs: task.timeoutSeconds * 1000,
       env: { ...process.env, ...task.environment },
       input: task.prompt,
+      signal: task.signal,
     })
     const seconds = result.ms / 1000
 
     if (result.code === TIMED_OUT)
       return new AgentResult({ text: '', seconds, failure: `no answer after ${String(task.timeoutSeconds)} s`, failureKind: 'timeout' })
+    if (result.code === STOPPED)
+      return new AgentResult({ text: '', seconds, failure: 'stopped before it answered', failureKind: 'stopped' })
 
     const events = this.events(result.stdout)
     const text = events.flatMap((event) => this.message(event)).at(-1)

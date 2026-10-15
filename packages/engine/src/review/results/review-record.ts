@@ -7,7 +7,8 @@ import type { ReviewOutcomeFields } from './review-outcome.ts'
 // A review as it is kept, from the moment it is asked: what was asked and of whom, what the reviewer saw, what it
 // found, and what the author answered.
 export interface ReviewRecord {
-  readonly state: 'running' | 'reviewed' | 'failed'
+  // interrupted: the end of turn that waited for it was, by the owner or by its runtime.
+  readonly state: 'running' | 'reviewed' | 'failed' | 'interrupted'
   readonly request: ReviewRequestFields
   readonly assignment: ReviewAssignment
   readonly startedAt: string

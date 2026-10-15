@@ -8,6 +8,7 @@ import { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
 import { ReviewOutcome } from '../../src/review/results/review-outcome.ts'
 import { ReviewStore } from '../../src/review/results/review-store.ts'
 import { ReviewRounds } from '../../src/review/rounds/review-rounds.ts'
+import { ReviewRun } from '../../src/review/running/review-run.ts'
 import type { Reviewer } from '../../src/review/running/reviewer.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import { cardsOf, FLAG_BODY, flagCommand, withRegistry } from '../fixtures/cards.ts'
@@ -97,6 +98,73 @@ test('a review that runs longer than the end of a turn waits for goes on by itse
   assert.deepEqual(standings(), ['running', 'sent-back'])
   assert.equal((await finish(slow, project, saying('F1 not fixed: clearer as one function'))).decision, undefined)
   assert.deepEqual(unitFiles(session), [])
+})
+
+test('a message the owner sends while the end of turn waits for the review takes the turn from it: the review goes on', async () => {
+  const slow: Reviewer = { review: () => sleep(1200).then(() => found) }
+  const project = reviewed({ waitSeconds: 60 })
+  const began = Date.now()
+  const ending = finish(slow, project)
+
+  await sleep(200)
+  prompt(session, 'and the tests too')
+
+  const left = await ending
+
+  assert.ok(Date.now() - began < 1000, `the turn ended after ${String(Date.now() - began)} ms`)
+  assert.equal(left.decision, undefined)
+  assert.match(left.systemMessage ?? '', /The review by codex is still running/)
+
+  await sleep(1200)
+
+  assert.equal((await finish(slow, project)).decision, 'block', 'its findings come with the next end of turn')
+  assert.deepEqual(standings(), ['running', 'sent-back'])
+})
+
+test('an end of turn interrupted while it waits takes its review with it: the reviewer is stopped, and #review runs it again', async () => {
+  let stopped = false
+  const waiting: Reviewer = {
+    review: (_request, _assignment, _repo, signal) =>
+      new Promise((resolve) => {
+        signal?.addEventListener('abort', () => {
+          stopped = true
+          resolve(new ReviewOutcome({ ...BY, seconds: 1, failure: 'stopped before it answered' }))
+        })
+      }),
+  }
+  // The end of turn that waits is gone at once, as one its runtime cancels; the reviewer looks for it a moment later.
+  const cancelled = new ReviewRounds(
+    {
+      start: (repo, dir, content) => {
+        setTimeout(() => {
+          new ReviewStore(dir).wait(content, DEAD_PROCESS)
+        }, 0)
+        new ReviewRun(waiting, 50).run(repo, dir, content).catch(() => undefined)
+      },
+    },
+    2,
+  )
+
+  await finishThrough(session, stubChecks([PASSING]), cancelled, reviewed())
+  await sleep(300)
+
+  const next = await finish(stubReviewer([found]))
+
+  assert.equal(stopped, true)
+  assert.equal(next.decision, undefined)
+  assert.match(
+    next.systemMessage ?? '',
+    /The review by codex was stopped with the end of turn that waited for it: write #review in a request to have it run again\./,
+  )
+  assert.match(
+    reportOf(next.systemMessage ?? ''),
+    /- weaver:review the review by codex was stopped: the end of turn that waited for it was interrupted/,
+  )
+  assert.deepEqual(standings(), ['running', 'interrupted'])
+
+  prompt(session, 'run it after all #review')
+
+  assert.equal((await finish(stubReviewer([found]), reviewed(), 'Done.')).decision, 'block')
 })
 
 test('a review whose process died is a review that failed, never one that found nothing', async () => {

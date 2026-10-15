@@ -1,7 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process'
 
 export interface ProcessResult {
-  // 124 when the deadline killed the process, as timeout(1) reports it.
+  // 124 when the deadline killed the process, as timeout(1) reports it; 130 when the signal stopped it, as a shell
+  // reports an interrupt.
   readonly code: number
   readonly output: string
   readonly stdout: string
@@ -15,9 +16,11 @@ export interface ProcessOptions {
   readonly outputLimit?: number
   // What the command reads on its standard input; without it, it reads nothing.
   readonly input?: string
+  readonly signal?: AbortSignal | null
 }
 
 export const TIMED_OUT = 124
+export const STOPPED = 130
 const OUTPUT_LIMIT = 2 * 1024 * 1024
 const KILL_GRACE_MS = 2000
 
@@ -58,20 +61,31 @@ export function runProcess(command: string, args: readonly string[], options: Pr
       detached: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
-    let killed = false
+    let ended: 'killed' | 'stopped' | null = null
     let error: string | null = null
 
     // A command that ends before it has read everything closes the pipe: its exit says what happened.
     child.stdin.on('error', () => undefined)
     child.stdin.end(options.input ?? '')
 
-    const timer = setTimeout(() => {
-      killed = true
+    const end = (why: 'killed' | 'stopped'): void => {
+      if (ended !== null) return
+
+      ended = why
       signalGroup(child.pid, 'SIGTERM')
       setTimeout(() => {
         signalGroup(child.pid, 'SIGKILL')
       }, KILL_GRACE_MS).unref()
+    }
+    const timer = setTimeout(() => {
+      end('killed')
     }, options.timeoutMs)
+    const stop = (): void => {
+      end('stopped')
+    }
+
+    if (options.signal?.aborted === true) stop()
+    else options.signal?.addEventListener('abort', stop, { once: true })
 
     child.stdout.on('data', (chunk: Buffer) => {
       stdout.collect(chunk)
@@ -85,13 +99,16 @@ export function runProcess(command: string, args: readonly string[], options: Pr
     })
     child.on('close', (code) => {
       clearTimeout(timer)
+      options.signal?.removeEventListener('abort', stop)
 
       const output =
         combined.text() +
         (error === null ? '' : `\n[weaver] ${error}`) +
-        (killed ? `\n[weaver] stopped after ${String(options.timeoutMs)} ms` : '')
+        (ended === 'killed' ? `\n[weaver] stopped after ${String(options.timeoutMs)} ms` : '') +
+        (ended === 'stopped' ? '\n[weaver] stopped by the one who started it' : '')
+      const exit = ended === 'killed' ? TIMED_OUT : ended === 'stopped' ? STOPPED : (code ?? 1)
 
-      resolve({ code: killed ? TIMED_OUT : (code ?? 1), output, stdout: stdout.text(), ms: Date.now() - started })
+      resolve({ code: exit, output, stdout: stdout.text(), ms: Date.now() - started })
     })
   })
 }

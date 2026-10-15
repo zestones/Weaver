@@ -166,6 +166,11 @@ export class Report {
     if (standing === 'failed') {
       return [`The review by ${outcome.runtime} did not give its findings: write #review in a request to have it tried again.`]
     }
+    if (standing === 'interrupted') {
+      return [
+        `The review by ${outcome.runtime} was stopped with the end of turn that waited for it: write #review in a request to have it run again.`,
+      ]
+    }
     if (standing === 'clean') return [`Reviewed by ${outcome.runtime}: no finding.${suspected}`]
     if (standing === 'for-owner') return [`Reviewed by ${outcome.runtime}: ${found} left to you.${suspected}`]
 
@@ -192,6 +197,7 @@ export class Report {
       ]
     }
     if (standing === 'failed') return [head, `- no findings could be read: ${outcome.failure ?? ''}`]
+    if (standing === 'interrupted') return [head, `- stopped: ${outcome.failure ?? ''}`]
 
     return [
       head,

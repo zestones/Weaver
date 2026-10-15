@@ -113,6 +113,21 @@ test('a task that fails is an answer that says why: refused by the runtime, unre
   assert.equal((await claude.run(task('ask:echo'))).failureKind, null)
 })
 
+test('a task stopped by the one who gave it ends its agent at once, and is a failure that says so, which no one asks again', async () => {
+  const stop = new AbortController()
+  const asked = claude.run(task('ask:slow', { signal: stop.signal }))
+
+  setTimeout(() => {
+    stop.abort()
+  }, 300)
+
+  const stopped = await asked
+
+  assert.deepEqual([stopped.failure, stopped.failureKind], ['stopped before it answered', 'stopped'])
+  assert.ok(stopped.seconds < 5, `ended after ${String(stopped.seconds)} s`)
+  assert.equal((await claude.run(task('ask:slow', { signal: AbortSignal.abort() }))).failureKind, 'stopped', 'already stopped')
+})
+
 test('a runtime is available when its command line starts', () => {
   assert.equal(claude.isAvailable(), true)
   assert.equal(new ClaudeCodeExecution(join(scratch, 'nowhere')).isAvailable(), false)

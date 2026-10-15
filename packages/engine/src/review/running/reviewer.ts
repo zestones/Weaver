@@ -4,5 +4,6 @@ import type { ReviewOutcome } from '../results/review-outcome.ts'
 import type { ReviewAssignment } from '../routing/review-routing.ts'
 
 export interface Reviewer {
-  review(request: ReviewRequest, assignment: ReviewAssignment, repo: Repository): Promise<ReviewOutcome>
+  // The signal stops the review: its reviewer is ended, and what it worked in is cleared.
+  review(request: ReviewRequest, assignment: ReviewAssignment, repo: Repository, signal?: AbortSignal): Promise<ReviewOutcome>
 }

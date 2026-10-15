@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, rmSync, statSync } from 'node:fs'
+import { mkdirSync, rmSync, statSync, utimesSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, isAbsolute, join, relative } from 'node:path'
 import type { Repository } from '../../lib/git/repository.ts'
@@ -30,7 +30,12 @@ export class ReviewCopy {
     for (let slot = 1; slot <= SLOTS; slot += 1) {
       const path = join(root, `${name}-${String(slot)}`)
 
-      if (ReviewCopy.isAbandoned(path)) rmSync(path, { recursive: true, force: true })
+      try {
+        if (ReviewCopy.isAbandoned(path)) ReviewCopy.remove(path)
+      } catch {
+        // What a copy holds may not be removable by its owner: the place is left as it is.
+        continue
+      }
 
       try {
         mkdirSync(path)
@@ -63,20 +68,29 @@ export class ReviewCopy {
     return modified !== undefined && Date.now() - modified > KEEP_MS
   }
 
+  private static remove(path: string): void {
+    try {
+      rmSync(path, { recursive: true, force: true })
+    } catch {
+      // A tool may have left folders it made read-only.
+      execFileSync('chmod', ['-R', 'u+rwX', path], { stdio: 'ignore' })
+      rmSync(path, { recursive: true, force: true })
+    }
+  }
+
+  // `cp -a` gives the copy the date of the project: its age counts from now.
   fill(): void {
     execFileSync('cp', ['-a', '--reflink=auto', '--no-target-directory', this.repo.top, this.path], { stdio: ['ignore', 'ignore', 'pipe'] })
+
+    const now = new Date()
+
+    utimesSync(this.path, now, now)
     this.dropState()
     this.dropRemotes()
   }
 
   discard(): void {
-    try {
-      rmSync(this.path, { recursive: true, force: true })
-    } catch {
-      // A tool may have left folders it made read-only.
-      execFileSync('chmod', ['-R', 'u+rwX', this.path], { stdio: 'ignore' })
-      rmSync(this.path, { recursive: true, force: true })
-    }
+    ReviewCopy.remove(this.path)
   }
 
   // The copy is not a place Weaver supervises: what it knows of the sessions stays in the repository.

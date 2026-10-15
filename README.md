@@ -57,10 +57,10 @@ Every rule of a project has one of three levels, which says who judges it and wh
 
 A few things the diagram leaves out:
 
-- **A review is due** when a rule of level `llm` applies to the change, the project declares a reviewer, and your request does not say `#no-review`. `#review` in a request runs again a review that broke, and `#critical` gives the review to the runtime that did not write the change.
+- **A review is due** when a rule of level `llm` applies to the change, the project declares a reviewer, and your request does not say `#no-review`. `#review` in a request runs again a review that broke or that you stopped, and `#critical` gives the review to the runtime that did not write the change.
 - **A finding needs an answer, not obedience.** The agent writes `F1 fixed: …` or `F1 not fixed: …` in its final message. An answer `fixed` is refused while the file has not changed. What it does not fix waits for you, with its reason.
 - **A suspicion is for you alone.** For a rule about what the code does, a finding must carry the experiment that shows it. Without one it is a suspicion: you read it, the agent never does.
-- **A review never holds a turn hostage.** One that outlasts its wait goes on by itself, and its findings come at the next end of turn. One that breaks is listed for you.
+- **A review never holds a turn hostage.** One that outlasts its wait goes on by itself, and its findings come at the next end of turn. So does one you send a message over while the end of the turn waits for it: the message is taken at once in Claude Code, and once the review is over in Codex, which hands it over only then. Interrupting the end of the turn, with Escape or Ctrl+C, stops the review with it. One that breaks is listed for you.
 - **Every limit is written in the project**: how many times the checks may refuse, how long they may run, how long the warnings of a call may take, how long a review may take.
 
 ## What agents discover: flags and cards

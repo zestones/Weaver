@@ -1,6 +1,7 @@
 // timeout: no answer in the time given. runtime: the runtime refused the task or could not run it, which another try
-// may get past. answer: the agent answered, but not in the shape it was asked for.
-export type AgentFailure = 'timeout' | 'runtime' | 'answer'
+// may get past. answer: the agent answered, but not in the shape it was asked for. stopped: the one who gave the task
+// stopped it.
+export type AgentFailure = 'timeout' | 'runtime' | 'answer' | 'stopped'
 
 export interface AgentResultFields {
   readonly text: string

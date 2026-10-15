@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterAll, test } from 'vitest'
@@ -61,6 +61,40 @@ test('a copy left behind by a review that died is cleared after a day', () => {
 
   assert.equal(next.path, abandoned.path)
   assert.equal(existsSync(join(next.path, 'leftover.txt')), false)
+  next.discard()
+})
+
+test('a copy is as old as itself, not as the project it copies: a fresh one is never taken for abandoned', () => {
+  const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  utimesSync(repo.top, lastWeek, lastWeek)
+
+  const fresh = ReviewCopy.reserve(repo, root)
+
+  fresh.fill()
+
+  const next = ReviewCopy.reserve(repo, root)
+
+  assert.notEqual(next.path, fresh.path)
+  assert.equal(existsSync(join(fresh.path, 'src/a.ts')), true)
+  next.discard()
+  fresh.discard()
+})
+
+test('a copy left behind with folders a tool made read-only is cleared all the same, and the place is taken again', () => {
+  const abandoned = ReviewCopy.reserve(repo, root)
+  const yesterday = new Date(Date.now() - 25 * 60 * 60 * 1000)
+  const locked = join(abandoned.path, 'snapshot/payload')
+
+  writeFiles(abandoned.path, { 'snapshot/payload/file.txt': 'x' })
+  chmodSync(locked, 0o555)
+  chmodSync(join(abandoned.path, 'snapshot'), 0o555)
+  utimesSync(abandoned.path, yesterday, yesterday)
+
+  const next = ReviewCopy.reserve(repo, root)
+
+  assert.equal(next.path, abandoned.path)
+  assert.equal(existsSync(join(next.path, 'snapshot')), false)
   next.discard()
 })
 

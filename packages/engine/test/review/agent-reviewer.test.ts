@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AgentResult, ExecutionCatalog, ScriptedExecution } from '@weaver/agent-sdk'
+import { AgentResult, ExecutionCatalog, ScriptedExecution, type AgentExecution } from '@weaver/agent-sdk'
 import { afterAll, test } from 'vitest'
 import type { ChangedFile } from '../../src/lib/git/tree-diff.ts'
 import { ReviewRequest, type ReviewRequestFields } from '../../src/review/request/review-request.ts'
@@ -48,8 +48,8 @@ const READS: ReviewAssignment = {
 const NOTHING = { summary: 'Read it.', findings: [], suspicions: [], experiments: [] }
 const SETUP = { hook: '/weaver/hook.js', copies, retryAfterMs: 5 }
 const answered = (answer: unknown) => new ScriptedExecution('codex', [new AgentResult({ text: '', answer, seconds: 12, costUsd: 0.02 })])
-const review = (agent: ScriptedExecution, assignment: ReviewAssignment = READS) =>
-  new AgentReviewer(new ExecutionCatalog([new ScriptedExecution('claude', []), agent]), SETUP).review(request(), assignment, repo)
+const review = (agent: ScriptedExecution, assignment: ReviewAssignment = READS, signal?: AbortSignal) =>
+  new AgentReviewer(new ExecutionCatalog([new ScriptedExecution('claude', []), agent]), SETUP).review(request(), assignment, repo, signal)
 
 afterAll(() => {
   rmSync(scratch, { recursive: true, force: true })
@@ -174,6 +174,40 @@ test('a runtime that refuses the review is asked once more; a review out of time
   assert.equal(stuck.tasks.length, 2, 'once more, not for ever')
   assert.equal((await review(slow)).failure, 'no answer after 120 s')
   assert.equal(slow.tasks.length, 1)
+})
+
+test('a review that is stopped ends its reviewer, leaves no copy behind, and is not asked again', async () => {
+  const stop = new AbortController()
+  const waiting: AgentExecution = {
+    runtime: 'codex',
+    isAvailable: () => true,
+    hooks: () => Promise.resolve(null),
+    run: (task) =>
+      new Promise((resolve) => {
+        task.signal?.addEventListener('abort', () => {
+          resolve(new AgentResult({ text: '', seconds: 1, failure: 'stopped before it answered', failureKind: 'stopped' }))
+        })
+      }),
+  }
+  const asked = new AgentReviewer(new ExecutionCatalog([waiting]), SETUP).review(
+    request(),
+    { ...READS, experiments: true },
+    repo,
+    stop.signal,
+  )
+
+  setTimeout(() => {
+    stop.abort()
+  }, 100)
+
+  assert.equal((await asked).failure, 'stopped before it answered')
+  assert.deepEqual(readdirSync(copies), [])
+
+  const refused = new ScriptedExecution('codex', [new AgentResult({ text: '', seconds: 1, failure: 'usage limit reached' })])
+
+  await review(refused, READS, AbortSignal.abort())
+  assert.equal(refused.tasks.length, 1, 'a refusal is not tried again once the review is stopped')
+  assert.equal(refused.tasks[0]?.signal?.aborted, true)
 })
 
 test('a change too long to show is left for the reviewer to read in the files', () => {

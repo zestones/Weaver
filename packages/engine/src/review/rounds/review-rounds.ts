@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises'
+import { isAlive } from '../../lib/process/alive.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import type { ReviewPolicy } from '../../declaration/content/review-policy.ts'
 import type { Finding } from '../../declaration/rules/finding.ts'
@@ -61,7 +62,7 @@ export class ReviewRounds {
     const review = policy === null ? null : await this.stage(work, policy)
 
     if (review?.standing === 'sent-back') work.session.reviewRound(review.content)
-    if (review?.standing === 'failed') work.session.reviewFailed(review.content)
+    if (review?.standing === 'failed' || review?.standing === 'interrupted') work.session.reviewFailed(review.content)
 
     return review
   }
@@ -142,10 +143,11 @@ export class ReviewRounds {
     return this.delivered(store, content, work, policy)
   }
 
-  // The unit points at its review from the moment it starts: a hook that is stopped while it waits leaves the review
-  // to the next end of turn, which finds it instead of asking for another.
+  // The unit points at its review from the moment it starts, and the review at the end of turn that waits for it, before
+  // its reviewer can look.
   private started(session: Session, content: string): void {
     session.reviewRunning(content)
+    new ReviewStore(session.dir).wait(content, process.pid)
     this.launcher.start(session.repo, session.dir, content)
   }
 
@@ -163,26 +165,34 @@ export class ReviewRounds {
 
     const outcome = new ReviewOutcome(record.outcome ?? { runtime, reason, seconds: 0, failure: 'the review left no answer' })
 
+    if (record.state === 'interrupted') return new UnitReview({ ...about, standing: 'interrupted', outcome })
     if (record.state === 'failed' || outcome.failure !== null) return new UnitReview({ ...about, standing: 'failed', outcome })
     if (!outcome.found) return new UnitReview({ ...about, standing: 'clean', outcome })
 
     return new UnitReview({ ...about, standing: round <= policy.maxRefusals ? 'sent-back' : 'for-owner', outcome })
   }
 
-  // The review is in the hands of another process: the end of the turn waits for it as long as the project allows,
-  // and no longer than that process lives.
+  // The review is in the hands of another process: the end of the turn waits for it as long as the project allows, no
+  // longer than that process lives, and no longer once the owner has sent a message. The end of turn that stops waiting
+  // leaves the review to go on; one that is interrupted while it waits takes the review with it.
   private async awaited(store: ReviewStore, content: string, waitMs: number): Promise<ReviewRecord> {
     const deadline = Date.now() + waitMs
 
-    for (;;) {
-      const record = store.find(content)
+    store.wait(content, process.pid)
 
-      if (record === null) throw new Error('the review this unit of work was waiting for is no longer kept')
-      if (record.state !== 'running') return record
-      if (this.isLost(record)) return this.lost(store, content, record)
-      if (Date.now() >= deadline) return record
+    try {
+      for (;;) {
+        const record = store.find(content)
 
-      await sleep(this.pollMs)
+        if (record === null) throw new Error('the review this unit of work was waiting for is no longer kept')
+        if (record.state !== 'running') return record
+        if (this.isLost(record)) return this.lost(store, content, record)
+        if (Date.now() >= deadline || store.waiter(content) !== process.pid) return record
+
+        await sleep(this.pollMs)
+      }
+    } finally {
+      store.stopWaiting(content, process.pid)
     }
   }
 
@@ -203,13 +213,7 @@ export class ReviewRounds {
   private isLost(record: ReviewRecord): boolean {
     if (record.worker === null) return Date.now() - Date.parse(record.startedAt) > START_GRACE_MS
 
-    try {
-      process.kill(record.worker, 0)
-
-      return false
-    } catch {
-      return true
-    }
+    return !isAlive(record.worker)
   }
 
   private answered(store: ReviewStore, content: string, record: ReviewRecord, work: ReviewedWork, policy: ReviewPolicy): UnitReview {

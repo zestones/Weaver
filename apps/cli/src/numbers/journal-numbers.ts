@@ -258,8 +258,10 @@ export class JournalNumbers {
   }
 
   private reviewer(reviews: readonly EventOf<'review'>[]): ReviewerFigures {
-    // A review that was skipped took no time, and one that still runs has not said how long it took.
-    const timed = reviews.filter((review) => review.standing !== 'skipped' && review.standing !== 'running')
+    // A review that was skipped took no time, one that still runs has not said how long it took, and one that was
+    // interrupted did not get to the end.
+    const untimed = new Set(['skipped', 'running', 'interrupted'])
+    const timed = reviews.filter((review) => !untimed.has(review.standing))
 
     return {
       reviews: reviews.length,

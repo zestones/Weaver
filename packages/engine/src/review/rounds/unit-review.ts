@@ -5,8 +5,9 @@ import type { ReviewPoint } from './review-point.ts'
 
 // running: the review goes on after this end of turn. sent-back: the author has findings to answer. answers-wanted:
 // its answers are missing or cannot be taken. answered: each finding has its answer, or the author was asked enough.
-// for-owner: found once the review may refuse no more.
-export type ReviewStanding = 'running' | 'sent-back' | 'answers-wanted' | 'answered' | 'clean' | 'for-owner' | 'failed' | 'skipped'
+// for-owner: found once the review may refuse no more. interrupted: stopped with the end of turn that waited for it.
+export type ReviewStanding =
+  'running' | 'sent-back' | 'answers-wanted' | 'answered' | 'clean' | 'for-owner' | 'failed' | 'interrupted' | 'skipped'
 
 export interface UnitReviewFields {
   readonly standing: ReviewStanding
@@ -27,7 +28,8 @@ const SUSPICION_RULE = 'weaver:suspicion'
 const KEY_LENGTH = 7
 const HOLDING: ReadonlySet<ReviewStanding> = new Set(['sent-back', 'answers-wanted'])
 const ENDING: ReadonlySet<ReviewStanding> = new Set(['answered', 'clean', 'for-owner'])
-const JUST_RUN: ReadonlySet<ReviewStanding> = new Set(['running', 'sent-back', 'clean', 'for-owner', 'failed', 'skipped'])
+const JUST_RUN: ReadonlySet<ReviewStanding> = new Set(['running', 'sent-back', 'clean', 'for-owner', 'failed', 'interrupted', 'skipped'])
+const UNJUDGED: ReadonlySet<ReviewStanding> = new Set(['running', 'failed', 'interrupted', 'skipped'])
 
 // What a review means for the unit it judged, at one end of turn.
 export class UnitReview {
@@ -61,7 +63,7 @@ export class UnitReview {
 
   // Whether the rules of the review were judged at all.
   get judged(): boolean {
-    return this.standing !== 'failed' && this.standing !== 'skipped' && this.standing !== 'running'
+    return !UNJUDGED.has(this.standing)
   }
 
   answerOf(index: number): FindingAnswer | null {
@@ -73,6 +75,7 @@ export class UnitReview {
 
     if (standing === 'failed')
       return [`${REVIEW_RULE} the review by ${outcome.runtime} did not give its findings: ${outcome.failure ?? ''}`]
+    if (standing === 'interrupted') return [`${REVIEW_RULE} the review by ${outcome.runtime} was stopped: ${outcome.failure ?? ''}`]
 
     return this.points().map(({ place, content }) => {
       const where = place === null ? 'the change' : `${place.file}${place.line === null ? '' : `:${String(place.line)}`}`

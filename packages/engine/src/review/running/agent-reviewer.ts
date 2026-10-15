@@ -33,12 +33,13 @@ export class AgentReviewer implements Reviewer {
     this.retryAfterMs = setup.retryAfterMs ?? RETRY_AFTER_MS
   }
 
-  async review(request: ReviewRequest, assignment: ReviewAssignment, repo: Repository): Promise<ReviewOutcome> {
+  async review(request: ReviewRequest, assignment: ReviewAssignment, repo: Repository, signal?: AbortSignal): Promise<ReviewOutcome> {
     const execution = this.catalog.find(assignment.runtime)
+    const stop = signal ?? null
 
     if (execution === null) return this.failed(assignment, `Weaver cannot start ${assignment.runtime}`)
     if (!assignment.experiments) {
-      return this.read(request, assignment, repo, await this.ask(execution, this.task(request, assignment, repo.top, null)))
+      return this.read(request, assignment, repo, await this.ask(execution, this.task(request, assignment, repo.top, null, stop)))
     }
 
     const copy = this.copyOf(repo)
@@ -46,20 +47,25 @@ export class AgentReviewer implements Reviewer {
     if (typeof copy === 'string') return this.failed(assignment, copy)
 
     try {
-      return this.read(request, assignment, repo, await this.ask(execution, this.task(request, assignment, copy.path, copy)))
+      return this.read(request, assignment, repo, await this.ask(execution, this.task(request, assignment, copy.path, copy, stop)))
     } finally {
       copy.discard()
     }
   }
 
   // A runtime that refuses a task, for a limit reached or a login that lapsed, may take it a minute later. A review
-  // that ran out of time or answered out of shape would do the same again.
+  // that ran out of time, answered out of shape or was stopped would do the same again.
   private async ask(execution: AgentExecution, task: AgentTask): Promise<AgentResult> {
     const first = await execution.run(task)
 
     if (first.failureKind !== 'runtime' || !execution.isAvailable()) return first
 
-    await sleep(this.retryAfterMs)
+    try {
+      await sleep(this.retryAfterMs, undefined, task.signal === null ? {} : { signal: task.signal })
+    } catch {
+      // Stopped while it waited to try again.
+      return first
+    }
 
     return execution.run(task)
   }
@@ -79,7 +85,13 @@ export class AgentReviewer implements Reviewer {
     }
   }
 
-  private task(request: ReviewRequest, assignment: ReviewAssignment, cwd: string, copy: ReviewCopy | null): AgentTask {
+  private task(
+    request: ReviewRequest,
+    assignment: ReviewAssignment,
+    cwd: string,
+    copy: ReviewCopy | null,
+    signal: AbortSignal | null,
+  ): AgentTask {
     const { runtime, model, effort, timeoutSeconds } = assignment
 
     return new AgentTask({
@@ -92,6 +104,7 @@ export class AgentReviewer implements Reviewer {
       effort,
       answerSchema: request.schema(),
       environment: { [AgentReviewer.MARK]: '1' },
+      signal,
     })
   }
 

@@ -1,4 +1,5 @@
 import { FlagBriefing } from '../../flagging/briefing/flag-briefing.ts'
+import { ReviewStore } from '../../review/results/review-store.ts'
 import { OwnerDirectives } from '../../review/routing/owner-directives.ts'
 import { OwnerRequest } from '../../unit-of-work/owner/owner-request.ts'
 import { Answer } from '../exchange/answer.ts'
@@ -20,6 +21,9 @@ export class OnRequest implements Moment {
     if (turn.event.subagent || !request.isFromOwner) return briefed
 
     const directives = new OwnerDirectives([prompt])
+
+    // A message sent while an end of turn waits for a review takes the turn from it: the review goes on.
+    if (session !== null) new ReviewStore(session.dir).releaseAll()
 
     session?.log({
       kind: 'request',

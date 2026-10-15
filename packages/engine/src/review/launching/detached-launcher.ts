@@ -3,8 +3,12 @@ import { dirname, extname, join } from 'node:path'
 import type { Repository } from '../../lib/git/repository.ts'
 import type { ReviewLauncher } from './review-launcher.ts'
 
-// The review runs in a process of its own, which the end of the hook that started it does not stop: a review may
-// take longer than an agent runtime lets a hook live.
+// Started by a process that leaves at once, the worker is no descendant of the hook: a runtime that cancels a hook
+// ends all its descendants, even those in a group of their own.
+const LAUNCH = "require('node:child_process').spawn(process.execPath, process.argv.slice(1), { detached: true, stdio: 'ignore' }).unref()"
+
+// The review runs in a process of its own, which outlives the hook that started it: a review may take longer than an
+// agent runtime lets a hook live, and the owner may take the turn back while it runs.
 export class DetachedLauncher implements ReviewLauncher {
   private readonly worker: string
 
@@ -14,6 +18,6 @@ export class DetachedLauncher implements ReviewLauncher {
   }
 
   start(repo: Repository, sessionDir: string, content: string): void {
-    spawn(process.execPath, [this.worker, repo.top, sessionDir, content], { detached: true, stdio: 'ignore' }).unref()
+    spawn(process.execPath, ['-e', LAUNCH, this.worker, repo.top, sessionDir, content], { detached: true, stdio: 'ignore' }).unref()
   }
 }
