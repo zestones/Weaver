@@ -6,6 +6,7 @@ import { OwnerRequest } from '../../unit-of-work/owner/owner-request.ts'
 import { Answer } from '../exchange/answer.ts'
 import { MaintenanceNotice } from '../exchange/maintenance-notice.ts'
 import type { Turn } from '../exchange/turn.ts'
+import { CheckBriefing } from '../on-demand/check-briefing.ts'
 import type { Moment } from './moment.ts'
 
 export class OnRequest implements Moment {
@@ -15,8 +16,8 @@ export class OnRequest implements Moment {
     const prompt = turn.event.prompt ?? ''
     const request = new OwnerRequest(prompt)
     const session = turn.session()
-    const maintenance = new MaintenanceNotice(session).briefing
-    const briefed = Answer.adding([new FlagBriefing().text, ...(maintenance === null ? [] : [maintenance])].join('\n\n'))
+    const told = [new FlagBriefing().text, new CheckBriefing(turn.declaration).text, new MaintenanceNotice(session).briefing]
+    const briefed = Answer.adding(told.flatMap((text) => (text === null ? [] : [text])).join('\n\n'))
 
     const ended = new TaskNotification(prompt).ended
 

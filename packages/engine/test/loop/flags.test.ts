@@ -5,8 +5,11 @@ import { join } from 'node:path'
 import { FlagText } from '@weaver/memory'
 import { afterAll, beforeEach, test } from 'vitest'
 import { FlagBriefing } from '../../src/flagging/briefing/flag-briefing.ts'
+import type { Declaration } from '../../src/declaration/content/declaration.ts'
+import { CheckBriefing } from '../../src/loop/on-demand/check-briefing.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import { cardsOf, FLAG_BODY, flagCommand, withRegistry } from '../fixtures/cards.ts'
+import { declarationOf } from '../fixtures/declaration.ts'
 import { git, makeRepo, SAMPLE_REPO } from '../fixtures/repo.ts'
 import {
   A_FILE,
@@ -16,6 +19,7 @@ import {
   eventsOf,
   FAILING,
   finishWith,
+  LINT,
   PASSING,
   prompt,
   refusalOf,
@@ -183,7 +187,8 @@ test('when Weaver cannot record a flag, the call is refused all the same and the
 })
 
 test('every request tells the agent about the command, beside what the owner is told of a mistyped directive', () => {
-  const briefing = { hookEventName: 'UserPromptSubmit', additionalContext: new FlagBriefing().text }
+  const told = [new FlagBriefing().text, new CheckBriefing(declaration()).text].join('\n\n')
+  const briefing = { hookEventName: 'UserPromptSubmit', additionalContext: told }
   const reviewed = declaration({ review: { runtime: 'codex' } })
   const mistyped = prompt(session, 'rename it #critcal', reviewed)
 
@@ -201,6 +206,23 @@ test('every request tells the agent about the command, beside what the owner is 
     ['rename it #critcal', 'rename it'],
     'only the owner’s words are requests',
   )
+})
+
+const toldOn = (text: string, project?: Declaration): string => {
+  const output = prompt(session, text, project).hookSpecificOutput
+
+  return output !== undefined && 'additionalContext' in output ? output.additionalContext : ''
+}
+
+test('in a project that declares checks, every request tells the agent how to hear them before its task ends', () => {
+  const { text } = new CheckBriefing(declaration({ checks: { lint: LINT, tests: { judge: ['true'], rules: { T1: 'The tests pass.' } } } }))
+
+  assert.match(text ?? '', /run `weaver check <name>\.\.\.` with your shell tool, or `weaver check` alone for all of them/)
+  assert.match(text ?? '', /without ending it and without counting as a refusal\. The checks of this project: lint, tests\./)
+  assert.match(text ?? '', /run the command in the background if your shell tool can/)
+  assert.match(toldOn('add it'), /The checks of this project: lint\./)
+  assert.equal(new CheckBriefing(declarationOf({})).text, null)
+  assert.doesNotMatch(toldOn('add it', declarationOf({})), /weaver check/)
 })
 
 test('what an agent is told says when to flag, how, that the refusal is expected and not to fix the thing in its task', () => {
