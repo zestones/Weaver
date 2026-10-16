@@ -324,6 +324,16 @@ test('the next reviewer of a file is told what its cards say, and a point that c
 
   prompt(later, 'touch it again')
   agentWrites(later, { [A_FILE]: 'export const a = 3\n' })
+
+  const asked = (await finishLater()).reason ?? ''
+
+  assert.match(
+    asked,
+    /\n- #1 two levels of abstraction in one function: your work changed src\/a\.ts\n/,
+    'the finding left is a card to write on',
+  )
+  assert.doesNotMatch(asked, /#2/, 'a suspicion is the owner’s alone')
+
   await finishLater()
 
   assert.match(

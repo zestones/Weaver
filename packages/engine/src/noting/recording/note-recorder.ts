@@ -41,12 +41,17 @@ export class NoteRecorder {
   record(request: NoteRequest, by: NoteAuthor): NoteAnswer {
     const note = new NoteText(request.words, request.body)
     const { card: number, conclusion, text } = note
-    // An agent that concludes owes a report, field by field. The owner writes what they want, and so does an agent
-    // that concludes nothing.
+    // An agent that concludes owes a report, field by field, and a fix only after what it looked into: the owner reads
+    // both to decide. The owner writes what they want, and so does an agent that concludes nothing.
     const owed = by.role === 'owner' || conclusion === null || text === '' ? [] : new NoteReport(conclusion, text).problems()
     const problems = [...note.problems(), ...owed]
 
     if (number === null || problems.length > 0) return this.unusable(problems)
+    if (by.role === 'author' && conclusion === 'fixed' && this.registry.find(number)?.isInvestigated === false) {
+      return this.unusable([
+        `Card ${String(number)} says nothing yet of what was looked into: a fix comes after the investigation. Write first what you ran and read, and what it showed, with confirmed, refuted or unsure, then the fix: both may go in one call, in that order.`,
+      ])
+    }
 
     try {
       const provenance = { ...by, commit: this.repo.head(), at: new Date().toISOString() }

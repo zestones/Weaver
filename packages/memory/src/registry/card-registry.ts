@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import type {
@@ -74,6 +74,11 @@ export class CardRegistry {
     })
     this.cards = new CardTable(this.db)
     this.turn = new WriterTurn(this.db)
+  }
+
+  // Whether a registry was ever made there: opening one makes it.
+  static isIn(stateDir: string): boolean {
+    return existsSync(join(stateDir, FILE))
   }
 
   close(): void {

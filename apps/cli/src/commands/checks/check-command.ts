@@ -43,11 +43,11 @@ export class CheckCommand implements Command {
     }
 
     const names = ChecksOnDemand.namesIn(args)
-    const agent = this.caller.agent()
     const checks = new ChecksOnDemand(project.repository)
-    const session = agent === null ? null : checks.sessionAsking(names, agent)
+    const session = checks.sessionAsking(names)
+    const agent = session === null ? this.caller.agent() : null
 
-    if (agent !== null && session === null) {
+    if (agent !== null) {
       this.screen.error(
         `Nothing was checked: Weaver's hook did not see this command go by, so it cannot tell whose work to check.`,
         `Run weaver check as a command of its own in a project wired for ${agent}: weaver doctor says what is missing.`,

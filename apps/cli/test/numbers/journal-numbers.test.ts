@@ -93,7 +93,11 @@ test('guards, maintenance, errors and sessions are counted as they were kept', (
   assert.deepEqual(figures.guards, { 'git-writes': { refused: 1, lifted: 1 }, 'weaver:declaration': { refused: 0, lifted: 1 } })
   assert.deepEqual(figures.maintenance, { turnedOn: 1, turnedOff: 1 })
   assert.deepEqual(figures.errors, { total: 1, byEvent: { Stop: 1 } })
-  assert.deepEqual(figures.sessions, { total: 2, byAgent: { claude: 1, codex: 1 } }, 'a line without a session is of no session')
+  assert.deepEqual(
+    figures.sessions,
+    { total: 2, byAgent: { claude: 1, codex: 1 }, continued: 0 },
+    'a line without a session is of no session',
+  )
   assert.deepEqual(figures.flags, { made: 1, alreadyKnown: 1 })
   assert.deepEqual(figures.units, { settled: 3, byVerdict: 1, withNoFile: 1, byOwner: 1 })
   assert.deepEqual(figures.byWeaver, { '0.3.0': 14, '0.2.0': 1 })
@@ -175,4 +179,16 @@ test('a period starts on a day or a number of days back, and holds what came sin
   assert.equal(Period.from('2026-10-01', now)?.holds(new Date('2026-09-30T23:59:59').toISOString()), false)
 
   for (const word of ['', 'yesterday', '7', '2026-13-45', '10-01']) assert.equal(Period.from(word, now), null, word)
+})
+
+test('a session the runtime went on with under a new id is one session, and its continuation is counted apart', () => {
+  const later = { ...BASE, at: '2026-10-12T11:00:00.000Z', session: 'two' } as const
+  const figures = new JournalNumbers([
+    { ...BASE, kind: 'turn', unit: 1, finished: true, held: 'cards' },
+    { ...later, kind: 'continue', from: 'one' },
+    { ...later, kind: 'turn', unit: 1, finished: true, held: null },
+  ]).figures
+
+  assert.deepEqual(figures.sessions, { total: 1, byAgent: { claude: 1 }, continued: 1 })
+  assert.equal(figures.turns.heldByCards, 1)
 })

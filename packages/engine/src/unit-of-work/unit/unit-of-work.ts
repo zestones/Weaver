@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { AttributionWindow, Change, ClosedWindow } from '../attribution/attribution-window.ts'
-import type { Intent, LiftedCall, ReturnedFile, UnitFile, UnitRecord } from './unit-record.ts'
+import type { Intent, LiftedCall, ReturnedFile, UnitCards, UnitFile, UnitRecord } from './unit-record.ts'
 
 type Files = Readonly<Record<string, UnitFile>>
 type Returned = Readonly<Record<string, ReturnedFile>>
@@ -22,6 +22,7 @@ export class UnitOfWork {
       unattributed: [],
       lifted: [],
       returned: {},
+      cards: { concerned: [], noted: [], asked: [] },
     })
   }
 
@@ -74,6 +75,17 @@ export class UnitOfWork {
     return this.record.lifted
   }
 
+  get cards(): UnitCards {
+    return this.record.cards
+  }
+
+  // The cards it is about that its agent wrote nothing on, and that the end of the task did not ask a note for yet.
+  get unnotedCards(): number[] {
+    const { concerned, noted, asked } = this.record.cards
+
+    return concerned.filter((card) => !noted.includes(card) && !asked.includes(card))
+  }
+
   get isEmpty(): boolean {
     return Object.keys(this.record.files).length === 0
   }
@@ -118,6 +130,22 @@ export class UnitOfWork {
     return new UnitOfWork({ ...this.record, check: { ...this.record.check, reminded: true } })
   }
 
+  withConcerned(cards: readonly number[]): UnitOfWork {
+    const { concerned } = this.record.cards
+
+    return this.withCards({ concerned: [...concerned, ...cards.filter((card) => !concerned.includes(card))] })
+  }
+
+  withNoted(card: number): UnitOfWork {
+    const { noted } = this.record.cards
+
+    return noted.includes(card) ? this : this.withCards({ noted: [...noted, card] })
+  }
+
+  withCardsAsked(cards: readonly number[]): UnitOfWork {
+    return this.withCards({ asked: [...this.record.cards.asked, ...cards] })
+  }
+
   withFiles(files: Files): UnitOfWork {
     return new UnitOfWork({ ...this.record, files: this.changed(files) })
   }
@@ -142,11 +170,29 @@ export class UnitOfWork {
     }
   }
 
+  // What a call changed, from what the files held before the session first touched them, as the end of the task will
+  // judge it. A file the call put back as it was holds no change any more.
+  sinceBase(changes: ReadonlyMap<string, Change>): Map<string, Change> {
+    return new Map(
+      [...changes].flatMap(([path, change]): [string, Change][] => {
+        const known = this.record.files[path] ?? this.record.returned[path]
+
+        if (known === undefined) return [[path, change]]
+
+        return known.base === change.after ? [] : [[path, { before: known.base, after: change.after }]]
+      }),
+    )
+  }
+
   successor(checked: Files): UnitOfWork {
     // A file the session changed again since the check stays, for the next unit.
     const kept = Object.entries(this.record.files).filter(([path, file]) => checked[path]?.last !== file.last)
 
     return new UnitOfWork({ ...UnitOfWork.fresh(this.number + 1).record, files: Object.fromEntries(kept) })
+  }
+
+  private withCards(cards: Partial<UnitCards>): UnitOfWork {
+    return new UnitOfWork({ ...this.record, cards: { ...this.record.cards, ...cards } })
   }
 
   private changed(files: Files): Record<string, UnitFile> {

@@ -8,15 +8,16 @@ export interface ValidationItem {
 }
 
 export interface Validation {
-  readonly file: string | null
+  // The files that wait for the same reasons; none for what is about the change as a whole.
+  readonly files: readonly string[]
   readonly reasons: readonly string[]
 }
 
 const SUBJECT_END = ': '
 
 // What waits for the owner, one entry for each file with every reason it waits: a file that several checks, rules or
-// guards name is read once, and what one rule says of several places of it in the same words is said once. What is
-// about no file comes last.
+// guards name is read once, and what one rule says of several places of it in the same words is said once. Files that
+// wait for the same reasons, as the files of a folder that moved do, are one entry. What is about no file comes last.
 export class ValidationList {
   readonly items: readonly ValidationItem[]
 
@@ -26,16 +27,48 @@ export class ValidationList {
 
   get entries(): Validation[] {
     const files = [...new Set(this.items.flatMap((item) => (item.file === null ? [] : [item.file])))]
-    const placed = files.map((file) => ({ file, reasons: this.reasons(this.items.filter((item) => item.file === file)) }))
-    const unplaced = this.items.filter((item) => item.file === null).map((item) => ({ file: null, reasons: [this.reason(item)] }))
+    const placed = new Map<string, { files: string[]; reasons: string[] }>()
 
-    return [...placed, ...unplaced]
+    for (const file of files) {
+      const reasons = this.reasons(this.items.filter((item) => item.file === file))
+      const same = placed.get(reasons.join('\n'))
+
+      if (same === undefined) placed.set(reasons.join('\n'), { files: [file], reasons })
+      else same.files.push(file)
+    }
+
+    const unplaced = this.items.filter((item) => item.file === null).map((item) => ({ files: [], reasons: [this.reason(item)] }))
+
+    return [...placed.values(), ...unplaced]
+  }
+
+  // Each file that waits, and each point about no file.
+  get count(): number {
+    return this.entries.reduce((count, { files }) => count + Math.max(files.length, 1), 0)
   }
 
   lines(): string[] {
-    return this.entries.flatMap(({ file, reasons }) =>
-      file === null ? reasons.map((reason) => `- ${reason}`) : [`- ${file}`, ...reasons.map((reason) => `  - ${reason}`)],
+    return this.entries.flatMap(({ files, reasons }) =>
+      files.length === 0 ? reasons.map((reason) => `- ${reason}`) : [`- ${this.named(files)}`, ...reasons.map((reason) => `  - ${reason}`)],
     )
+  }
+
+  // Several files are named from the folder they share.
+  private named(files: readonly string[]): string {
+    const [first = ''] = files
+
+    if (files.length === 1) return first
+
+    const folders = files.map((file) => file.split('/').slice(0, -1))
+    const [one = []] = folders
+    const apart = one.findIndex((part, depth) => folders.some((folder) => folder[depth] !== part))
+    const shared = one
+      .slice(0, apart === -1 ? one.length : apart)
+      .map((part) => `${part}/`)
+      .join('')
+    const where = shared === '' ? '' : ` under ${shared}`
+
+    return `${String(files.length)} files${where}: ${files.map((file) => file.slice(shared.length)).join(', ')}`
   }
 
   private reasons(items: readonly ValidationItem[]): string[] {
@@ -55,16 +88,16 @@ export class ValidationList {
 
     const subjects = items.map((item) => item.message.slice(0, item.message.length - (tails[0] ?? '').length - SUBJECT_END.length))
 
-    return [`${this.named(first.rule)}${String(items.length)} places: ${tails[0] ?? ''} (${subjects.join(', ')})`]
+    return [`${this.ruled(first.rule)}${String(items.length)} places: ${tails[0] ?? ''} (${subjects.join(', ')})`]
   }
 
   private reason(item: ValidationItem): string {
     const line = item.line === null ? '' : `line ${String(item.line)}: `
 
-    return `${this.named(item.rule)}${line}${item.message}`
+    return `${this.ruled(item.rule)}${line}${item.message}`
   }
 
-  private named(rule: string): string {
+  private ruled(rule: string): string {
     return rule === '' ? '' : `${rule}, `
   }
 

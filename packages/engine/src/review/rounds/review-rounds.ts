@@ -6,7 +6,7 @@ import type { Finding } from '../../declaration/rules/finding.ts'
 import type { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
-import { AuthorAnswers } from '../answers/author-answers.ts'
+import { AuthorAnswers, type SinceReview } from '../answers/author-answers.ts'
 import { ReviewCards } from '../cards/review-cards.ts'
 import type { ReviewLauncher } from '../launching/review-launcher.ts'
 import { ReviewOutcome } from '../results/review-outcome.ts'
@@ -218,9 +218,9 @@ export class ReviewRounds {
 
   private answered(store: ReviewStore, content: string, record: ReviewRecord, work: ReviewedWork, policy: ReviewPolicy): UnitReview {
     const outcome = new ReviewOutcome(record.outcome ?? { runtime: record.assignment.runtime, seconds: 0 })
-    const unchanged = this.unchangedSince(record, work.session)
+    const since = this.since(record, work)
     const given = new AuthorAnswers(work.lastMessage)
-    const problems = given.problems(outcome.findings, unchanged)
+    const problems = given.problems(outcome.findings, since)
     const about = { content, outcome, round: work.unit.reviewRounds, maxRefusals: policy.maxRefusals }
 
     if (problems.length > 0 && record.asked < ANSWER_REMINDERS) {
@@ -229,7 +229,7 @@ export class ReviewRounds {
       return new UnitReview({ ...about, standing: 'answers-wanted', problems })
     }
 
-    const answers = given.taken(outcome.findings, unchanged)
+    const answers = given.taken(outcome.findings, since)
 
     store.keep(content, { ...record, answers })
 
@@ -256,13 +256,19 @@ export class ReviewRounds {
 
   private earlierLines(record: ReviewRecord, work: ReviewedWork): string[] {
     const outcome = new ReviewOutcome(record.outcome ?? { runtime: record.assignment.runtime, seconds: 0 })
-    const answers = new AuthorAnswers(work.lastMessage).taken(outcome.findings, this.unchangedSince(record, work.session))
+    const answers = new AuthorAnswers(work.lastMessage).taken(outcome.findings, this.since(record, work))
 
     return outcome.lines().map((line, index) => {
       const answer = answers.find((each) => each.finding === index + 1)
 
       return answer === undefined ? `${line} (no answer)` : `${line} (answered ${answer.status.replace('-', ' ')}: ${answer.why})`
     })
+  }
+
+  private since(record: ReviewRecord, { session, unit }: ReviewedWork): SinceReview {
+    const unchanged = this.unchangedSince(record, session)
+
+    return { unchanged, changed: Object.keys(unit.files).filter((path) => !unchanged.has(path)) }
   }
 
   // The files that hold what the review saw in them.

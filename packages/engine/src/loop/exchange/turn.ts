@@ -18,8 +18,8 @@ export class Turn {
   }
 
   session(): Session | null {
-    const { sessionId } = this.event
+    const { sessionId, transcriptPath } = this.event
 
-    return sessionId === null ? null : new Session(this.repo, sessionId, this.agent.name)
+    return sessionId === null ? null : Session.met(this.repo, sessionId, this.agent.name, transcriptPath)
   }
 }

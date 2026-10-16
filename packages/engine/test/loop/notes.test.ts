@@ -103,7 +103,7 @@ test('a call that writes on several cards, and flags too, is answered for each: 
 })
 
 test('a call the hook sees twice writes one note', () => {
-  const call = note('1 fixed', FIX)
+  const call = note('1 confirmed')
 
   assert.equal(refusalOf(session, call), WRITTEN(1))
   assert.equal(refusalOf(session, call), '[weaver] This note is already on card 1. Go on with your task.')
@@ -149,6 +149,23 @@ test('an agent that concludes owes a report: one that leaves a field out is refu
     'an agent that looked into a card and then fixed it writes both reports, in one call if it wants',
   )
   assert.equal(cardsOf(session.repo)[0]?.standing, 'raw (fixed)')
+})
+
+test('an agent writes a fix on a card only after what it looked into, which an earlier note may have said', () => {
+  const unusable = `[weaver] The note was not written: Card 1 says nothing yet of what was looked into: a fix comes after the investigation. Write first what you ran and read, and what it showed, with confirmed, refuted or unsure, then the fix: both may go in one call, in that order.\n\n${NoteText.FORMAT}`
+
+  assert.equal(refusalOf(session, note('1 fixed', FIX)), unusable)
+  assert.equal(refusalOf(session, note('1', 'refresh() looks unused.\n')), WRITTEN(1))
+  assert.equal(refusalOf(session, note('1 fixed', FIX)), unusable, 'a note that concludes nothing is no investigation')
+  assert.equal(refusalOf(session, note('1 unsure')), WRITTEN(1))
+  assert.equal(refusalOf(session, note('1 fixed', FIX)), WRITTEN(1))
+
+  withRegistry(session.repo, (registry) => {
+    registry.closeCard(1, 'fixed', null)
+    registry.reopen(1, 'it came back')
+  })
+
+  assert.equal(refusalOf(session, note('1 fixed', FIX.replace('42', '43'))), unusable, 'a card opened again is looked into anew')
 })
 
 test('a note that cannot be used is not written, and the agent reads what is wrong and the format', () => {

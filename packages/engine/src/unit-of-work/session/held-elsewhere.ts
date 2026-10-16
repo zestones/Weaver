@@ -6,6 +6,10 @@ import { SessionStore } from './session-store.ts'
 // The files another session of the repository is working on: in its unit of work, and not as HEAD holds them. A
 // command that cannot say what it writes is charged with what changed while it ran, but never with these.
 export class HeldElsewhere {
+  // A session not at work for this long holds nothing: it was left, as one is for a new conversation. Its end of turn
+  // may run a review this long without a word to its state.
+  static readonly LEFT_AFTER_MS = 3 * 60 * 60 * 1000
+
   private readonly repo: Repository
   private readonly root: string
   private readonly own: string
@@ -18,8 +22,13 @@ export class HeldElsewhere {
 
   among(paths: readonly string[]): ReadonlySet<string> {
     const others = existsSync(this.root) ? readdirSync(this.root).filter((id) => id !== this.own) : []
+    const left = Date.now() - HeldElsewhere.LEFT_AFTER_MS
     const held = others.flatMap((id) => {
-      const files = new SessionStore(join(this.root, id), '').load()?.unit.files ?? {}
+      const store = new SessionStore(join(this.root, id), '')
+
+      if ((store.changedAt()?.getTime() ?? 0) < left) return []
+
+      const files = store.load()?.unit.files ?? {}
 
       return paths.flatMap((path) => {
         const file = files[path]

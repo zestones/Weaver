@@ -9,18 +9,18 @@ Weaver knows no rule by itself. Everything it enforces is declared by the superv
 
 ## What it does
 
-| What                            | How                                                                                                                                                                                            |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Knows who changed what          | Each request you send opens a unit of work. The files an agent changes join it, tool call by tool call: the diff Weaver checks and reviews is that agent's own.                                |
-| Refuses before a tool runs      | The project declares guards: paths an agent may not write, commands it may not run. A refusal carries the sentence of the project that says why.                                               |
-| Warns right after a call        | A check may run a fast command on the files a call just changed. What it finds is told to the agent at once and holds nothing: the verdict comes when the task ends.                           |
-| Checks when a task ends         | The project's programs judge the change: the compiler, the linter, scripts of its own. A check may repair first, then judge. A failure sends the agent back to work.                           |
-| Has another agent review        | The rules no program can judge go to a reviewer, Claude Code or Codex, that only reads or that experiments in a throwaway copy of the project. The agent answers each finding.                 |
-| Keeps what agents discover      | An agent flags what it comes across and its task does not settle. A writer turns the flag into a card. You read the cards and decide: fixed, left as it is, or an issue.                       |
-| Leaves the deciding to you      | An agent cannot close a card, change one, or unplug Weaver: the commands that decide refuse to run under an agent. Weaver also guards its own configuration, its state and the hooks.          |
-| Steps aside when you say so     | `weaver maintenance on` lifts the guards for one session, when you want its agent to do what they forbid. Its work is still checked, and what the guards would have refused is listed for you. |
-| Says whether it is really alive | `weaver doctor` checks the configuration, the hook, and each runtime. It asks Codex whether it runs the hooks, since Codex may hold them and work without Weaver, without a word.              |
-| Keeps count of its own work     | Each run of the hook, each check, each warning, each review and each end of turn leaves a line in a journal. `weaver stats` counts them, and leaves what the numbers mean to you.              |
+| What                            | How                                                                                                                                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Knows who changed what          | Each request you send opens a unit of work. The files an agent changes join it, tool call by tool call: the diff Weaver checks and reviews is that agent's own.                                                                 |
+| Refuses before a tool runs      | The project declares guards: paths an agent may not write, commands it may not run. A refusal carries the sentence of the project that says why.                                                                                |
+| Warns right after a call        | A check may run a fast command on the files a call just changed, against what they held before the agent's work. What it finds is told to the agent at once and holds nothing: the verdict comes when the task ends.            |
+| Checks when a task ends         | The project's programs judge the change: the compiler, the linter, scripts of its own. A check may repair first, then judge. A failure sends the agent back to work.                                                            |
+| Has another agent review        | The rules no program can judge go to a reviewer, Claude Code or Codex, that only reads or that experiments in a throwaway copy of the project. The agent answers each finding.                                                  |
+| Keeps what agents discover      | An agent flags what it comes across and its task does not settle. A writer turns the flag into a card. An agent that settles a card writes on it what it did. You read the cards and decide: fixed, left as it is, or an issue. |
+| Leaves the deciding to you      | An agent cannot close a card, change one, or unplug Weaver: the commands that decide refuse to run under an agent. Weaver also guards its own configuration, its state and the hooks.                                           |
+| Steps aside when you say so     | `weaver maintenance on` lifts the guards for one session, when you want its agent to do what they forbid. Its work is still checked, and what the guards would have refused is listed for you.                                  |
+| Says whether it is really alive | `weaver doctor` checks the configuration, the hook, and each runtime. It asks Codex whether it runs the hooks, since Codex may hold them and work without Weaver, without a word.                                               |
+| Keeps count of its own work     | Each run of the hook, each check, each warning, each review and each end of turn leaves a line in a journal. `weaver stats` counts them, and leaves what the numbers mean to you.                                               |
 
 ## How it plugs in
 
@@ -47,7 +47,7 @@ A turn starts with your request and ends when the agent stops. In between, Weave
 
 A task is finished when the last message of the agent carries the headings the project's finish skill lists. Until then the unit of work stays open, and the agent is pointed to the skill once a request.
 
-A call is charged with what it changed. An edit is charged with its file, and a command whose words say what it writes, `sed -i`, `cp`, a redirection, with those files. A command whose words do not say all it writes, such as a script, an interpreter or a tool Weaver does not know, is charged with everything that changed while it ran, except the files another session is working on: those stay that session's, and the report lists them. A file the agent writes back as it was leaves the unit, and keeps the base it had: a call that ends late never gives it another.
+A call is charged with what it changed. An edit is charged with its file, and a command whose words say what it writes, `sed -i`, `cp`, a redirection, with those files. A command whose words do not say all it writes, such as a script, an interpreter or a tool Weaver does not know, is charged with everything that changed while it ran, except the files another session is working on: those stay that session's, and the report lists them. A session not at work for three hours holds none: it was left. When Claude Code goes on with a session under a new id, as it does when it sends one to the background, the new id takes over the unit of work, the maintenance and what the session waits for. A file the agent writes back as it was leaves the unit, and keeps the base it had: a call that ends late never gives it another.
 
 Every rule of a project has one of three levels, which says who judges it and what a failure does:
 
@@ -60,12 +60,13 @@ Every rule of a project has one of three levels, which says who judges it and wh
 A few things the diagram leaves out:
 
 - **A review is due** when a rule of level `llm` applies to the change, the project declares a reviewer, and your request does not say `#no-review`. `#review` in a request runs again a review that broke or that you stopped, and `#critical` gives the review to the runtime that did not write the change.
-- **A finding needs an answer, not obedience.** The agent writes `F1 fixed: …` or `F1 not fixed: …` in its final message. An answer `fixed` is refused while the file has not changed. What it does not fix waits for you, with its reason.
+- **A finding needs an answer, not obedience.** The agent writes `F1 fixed: …` or `F1 not fixed: …` in its final message. An answer `fixed` is refused while the file has not changed, unless it names another file that did, as a test added for a finding about the code. What it does not fix waits for you, with its reason.
 - **A suspicion is for you alone.** For a rule about what the code does, a finding must carry the experiment that shows it. Without one it is a suspicion: you read it, the agent never does.
 - **A review never holds a turn hostage.** One that outlasts its wait goes on by itself, and its findings come at the next end of turn. So does one you send a message over while the end of the turn waits for it: the message is taken at once in Claude Code, and once the review is over in Codex, which hands it over only then. Interrupting the end of the turn, with Escape or Ctrl+C, stops the review with it. One that breaks is listed for you.
 - **A check never runs twice on the same files.** Each one keeps what it said of the two trees it judged. An end of turn that finds nothing changed since gives the same verdict at once and says so, which costs nothing when the agent finishes again without a change, or after a review it only answered.
 - **An agent hears a check without ending its task.** `weaver check backend` runs that check on its unit of work as the end of the task would, and counts as no refusal; the end of the task then gives its verdict again if nothing changed. Every request tells the agent so, with the names of the project's checks.
 - **An agent that waits for its own work is left to wait.** While a command it sent to the background or a watch it started has not ended, it may stop without its final sections: it is not reminded, and its runtime wakes it when the task ends.
+- **The cards a task is about are written on.** A call that changes the files of a card that waits tells the agent of the card, once. When the agent says it has finished, the cards it read or whose files it changed, and that it wrote nothing on, are listed for it once, before its work is checked: it writes what it looked into and what it changed on each one its task settled, and says which ones its task leaves as they were.
 - **Every limit is written in the project**: how many times the checks may refuse, how long they may run, how long the warnings of a call may take, how long a review may take.
 
 ## What agents discover: flags and cards
@@ -98,7 +99,7 @@ weaver close 12 fixed        # or wontfix, issue or invalid, with a reason
 
 `weaver ui` is where you go through the cards: the list on the left, under the level the project grades its cards with, what narrows it at the top, and the card you are on in the middle, with its flag one key away, and what was looked into, fixed and noted on it since, each on a side of its own. A key writes a note on the card, another changes its labels, another closes it, with the reason taken from what the agent that fixed it reported as changed. The closed cards stand under how they were closed, fixed, wontfix, issue or invalid, and the search reads the reason they were closed for and the issue they became. It does what the commands do and nothing they cannot: a script, or an agent that reads, still has every one of them. Three families of labels are known by their name, when a project declares them: `level` grades the cards, its values gravest first, and a card has one; `type` says what kind of thing a card is, and a card has one; `area` says where it is, and the list says it under each title. It draws in the colours of Weaver, and so asks for a terminal that knows sixteen million colours.
 
-The cards are a backlog, not a pile to empty: a card may stay open as long as you like, read or not. When one is worth your time, ask an agent to verify it or to fix it. The agent reads the card with `weaver cards 12`, which tells it how to answer, and writes what it found on the card: `weaver note 12 confirmed` when what the card says is true, `refuted` when it is not, `unsure` when it could not tell, `fixed` when it fixed it. A note that concludes is a report: what was run, what was only read and what that shows for an investigation; what was changed, how it was checked and what is left for a fix. The hook takes that call as it takes a flag, and refuses a report that leaves a field out. The list then says how the card stands, `open (confirmed)`, and what was found stays with the card, in the issue it may become too. You write on a card with the same command, and a card whose flag proved not to be true closes as `invalid`.
+The cards are a backlog, not a pile to empty: a card may stay open as long as you like, read or not. When one is worth your time, ask an agent to verify it or to fix it. The agent reads the card with `weaver cards 12`, which tells it how to answer, and writes what it found on the card, which Weaver reminds it of before its work is checked: `weaver note 12 confirmed` when what the card says is true, `refuted` when it is not, `unsure` when it could not tell, `fixed` when it fixed it. A note that concludes is a report: what was run, what was only read and what that shows for an investigation; what was changed, how it was checked and what is left for a fix. The hook takes that call as it takes a flag, and refuses a report that leaves a field out, or a fix written on a card where nothing says yet what was looked into: the investigation comes first, in the same call if the agent wants. The list then says how the card stands, `open (confirmed)`, and what was found stays with the card, in the issue it may become too. You write on a card with the same command, and a card whose flag proved not to be true closes as `invalid`.
 
 `weaver cards` is what an agent runs in a conversation as well, to read the registry. Closing a card, correcting it or tying two cards together is yours: those commands refuse to run under an agent. The [memory design](_docs/memory.md) says the rest.
 
@@ -168,13 +169,13 @@ A warning is the same check run early on a few files: it stands behind the same 
 
 A command that needs more than the names of the files reads what Weaver sets in its environment:
 
-| Variable             | Given to          | What it holds                                                                                                                   |
-| -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `WEAVER_UNIT_DIFF`   | `repair`, `judge` | A JSON file: the files the unit of work changed, each with its status and the line ranges it added.                             |
-| `WEAVER_BASE_TREE`   | `repair`, `judge` | The git tree the unit is checked against: the working tree, with each file of the unit as it was before the agent changed it.   |
-| `WEAVER_HEAD_TREE`   | `repair`, `judge` | The git tree of the working tree now.                                                                                           |
-| `WEAVER_CALL_DIFF`   | `warn`            | A JSON file: the files the call changed, each with its status and the blobs it held `before` and holds `after`.                 |
-| `WEAVER_GIT_OBJECTS` | all three         | The object store that holds those trees and blobs: git reads them with it as `GIT_OBJECT_DIRECTORY`, over the repository's own. |
+| Variable             | Given to          | What it holds                                                                                                                             |
+| -------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `WEAVER_UNIT_DIFF`   | `repair`, `judge` | A JSON file: the files the unit of work changed, each with its status and the line ranges it added.                                       |
+| `WEAVER_BASE_TREE`   | `repair`, `judge` | The git tree the unit is checked against: the working tree, with each file of the unit as it was before the agent changed it.             |
+| `WEAVER_HEAD_TREE`   | `repair`, `judge` | The git tree of the working tree now.                                                                                                     |
+| `WEAVER_CALL_DIFF`   | `warn`            | A JSON file: the files the call changed, each with its status, the blob it held `before` the session's work and the one it holds `after`. |
+| `WEAVER_GIT_OBJECTS` | all three         | The object store that holds those trees and blobs: git reads them with it as `GIT_OBJECT_DIRECTORY`, over the repository's own.           |
 
 ## Try it
 
@@ -231,7 +232,7 @@ Weaver writes what it does in a journal, one line for each event, under `.git/we
 | `hook`        | One run of the hook: the event, the tool, the subagent that made the call, and the time it took from the start of its process.                                        |
 | `touch`       | The files a call changed.                                                                                                                                             |
 | `warn`        | The checks that ran right after a call: how each ended, in how long, and which ones told the agent something.                                                         |
-| `turn`        | One end of turn: whether the agent said it had finished, and what held it back, the checks, a review or the reminder.                                                 |
+| `turn`        | One end of turn: whether the agent said it had finished, and what held it back, the checks, a review, the reminder or the notes it owed on cards.                     |
 | `check`       | One verdict: the files and the lines of the unit of work, what a repair rewrote, the time, and each check with its status and its time, or the verdict it gave again. |
 | `asked`       | Checks run by `weaver check`: whose unit of work, the files, and each check with its status and its time.                                                             |
 | `review`      | One review: the runtime and the model, the rules given, the findings and the rule of each, the time and the cost.                                                     |
@@ -242,6 +243,7 @@ Weaver writes what it does in a journal, one line for each event, under `.git/we
 | `maintenance` | Maintenance turned on or off for a session.                                                                                                                           |
 | `flag`        | A flag an agent made, and the card it became.                                                                                                                         |
 | `head-moved`  | A call that moved `HEAD`.                                                                                                                                             |
+| `continue`    | A session the runtime went on with under a new id, and the one it continues.                                                                                          |
 | `error`       | Weaver could not do its work: a hook that failed, a configuration it could not read.                                                                                  |
 
 `weaver stats` counts these lines and the cards of the registry: how many, how long, how often. `--since 2026-10-01` or `--since 7d` starts the count on a day, and `--json` gives the same figures to a program. It states what was kept and concludes nothing: what the numbers mean is yours to work out, with the lines themselves at hand.

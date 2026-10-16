@@ -8,7 +8,7 @@ export interface Transaction<Value> {
   readonly value: Value
 }
 
-const VERSION = 7
+const VERSION = 8
 const LOCK_WAIT_MS = 5000
 const LOCK_POLL_MS = 20
 
@@ -36,13 +36,16 @@ export class SessionStore {
     return existsSync(this.path) ? statSync(this.path).mtime : null
   }
 
+  // A change that gives back the record it was given writes nothing: when the state last changed is when the session
+  // was last at work, and another process looking at it is not.
   transact<Value>(change: (record: SessionRecord) => Transaction<Value>): Transaction<Value> {
     this.acquire()
 
     try {
-      const result = change(this.load() ?? this.fresh())
+      const latest = this.load() ?? this.fresh()
+      const result = change(latest)
 
-      this.save(result.record)
+      if (result.record !== latest) this.save(result.record)
 
       return result
     } finally {

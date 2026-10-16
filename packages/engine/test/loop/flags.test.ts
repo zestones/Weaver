@@ -235,7 +235,11 @@ test('what an agent is told says when to flag, how, that the refusal is expected
   assert.match(text, /Weaver takes the call before it runs and answers in its place/)
   assert.match(text, /That message is the answer, not a failure, so do not run the command again\./)
   assert.match(text, /make it in a task that only reads too/)
-  assert.match(text, /When the owner names a card, read it with `weaver cards <number>`; `weaver cards` lists the ones that wait\.$/)
+  assert.match(text, /When the owner names a card, read it with `weaver cards <number>`; `weaver cards` lists the ones that wait\./)
+  assert.match(
+    text,
+    /When your task settles a card or finds more on it, write on the card what you looked into and what you changed, with `weaver note <number>`[^\n]*asks for these notes before it checks your work\.$/,
+  )
   assert.match(
     text,
     /Do not fix what you flag in the task, unless the task cannot go on without it: flag it then with `Did: fixed in the task`\.\n/,

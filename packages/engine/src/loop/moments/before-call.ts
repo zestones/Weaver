@@ -5,6 +5,7 @@ import { FlagRecorder, type FlagAnswer } from '../../flagging/recording/flag-rec
 import type { ToolCall } from '../../agents/tool-calls/tool-call.ts'
 import { ProjectGuards } from '../../guards/deciding/project-guards.ts'
 import type { Refusal } from '../../guards/results/refusal.ts'
+import { CardReading } from '../../noting/calls/card-reading.ts'
 import { NoteCall } from '../../noting/calls/note-call.ts'
 import { NoteRecorder, type NoteAuthor } from '../../noting/recording/note-recorder.ts'
 import { UnitLines } from '../../unit-of-work/diff/unit-lines.ts'
@@ -48,6 +49,11 @@ export class BeforeCall implements Moment {
 
       if (command === ChecksOnDemand.COMMAND) session?.asked(ChecksOnDemand.namesIn(words))
     }
+
+    const read = CardReading.among(call).map((reading) => reading.card)
+
+    // A card the agent reads is one its task may settle: the end of the task asks what it did about it.
+    if (read.length > 0) session?.concerned(read)
 
     const writes = call.writes(turn.repo.top, turn.declaration.scripts)
 

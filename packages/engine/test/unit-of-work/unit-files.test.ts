@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
+import { ChecksOnDemand } from '../../src/loop/on-demand/checks-on-demand.ts'
+import { HeldElsewhere } from '../../src/unit-of-work/session/held-elsewhere.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import type { EventOf } from '../../src/unit-of-work/journal/journal-event.ts'
 import { SAMPLE_REPO, git, makeRepo, writeFiles } from '../fixtures/repo.ts'
@@ -225,6 +227,24 @@ test('a script is never charged with a file another session works on, unless tha
 
   assert.deepEqual(unitFiles(session), [A_FILE, 'src/c.ts'])
   assert.deepEqual(stateOf(session)?.unit.unattributed, [B_FILE])
+})
+
+test('a session left for hours holds no file, however others look at it: a script of another session is charged with it', () => {
+  const left = new Session(session.repo, 'left', 'claude')
+
+  prompt(left, 'change b')
+  agentWrites(left, { [B_FILE]: 'export const b = 30\n' })
+
+  const hoursAgo = new Date(Date.now() - HeldElsewhere.LEFT_AFTER_MS - 60_000)
+
+  utimesSync(join(left.dir, 'state.json'), hoursAgo, hoursAgo)
+  assert.equal(new ChecksOnDemand(session.repo).sessionAsking(['lint']), null, 'the owner runs weaver check meanwhile')
+  prompt(session, 'extract it')
+  agentRuns(session, 'python3 tools/extract.py', () => {
+    writeFiles(session.repo.top, { [B_FILE]: 'export const b = 31\n' })
+  })
+
+  assert.deepEqual(unitFiles(session), [B_FILE])
 })
 
 test('a script the project declares as a generator is charged with what it wrote', () => {

@@ -94,7 +94,7 @@ export class Report {
 
   summary(reportPath: string): string {
     const { outcomes, diff, unattributed } = this.verdict
-    const waiting = this.verdict.toValidate().entries.length
+    const waiting = this.verdict.toValidate().count
     const ran = outcomes.filter((outcome) => outcome.ran).length
     const parts =
       diff.files.length === 0

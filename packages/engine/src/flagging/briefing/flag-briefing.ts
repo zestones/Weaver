@@ -10,6 +10,6 @@ export class FlagBriefing {
     '',
     'Run the command with your shell tool, as it is written. Weaver takes the call before it runs and answers in its place: what you read back is a message of its hook that gives the number of the flag. That message is the answer, not a failure, so do not run the command again. Name the flag by its number in your final message. Do not fix what you flag in the task, unless the task cannot go on without it: flag it then with `Did: fixed in the task`.',
     '',
-    'A flag becomes a card that waits for the owner. When the owner names a card, read it with `weaver cards <number>`; `weaver cards` lists the ones that wait.',
+    'A flag becomes a card that waits for the owner. When the owner names a card, read it with `weaver cards <number>`; `weaver cards` lists the ones that wait. When your task settles a card or finds more on it, write on the card what you looked into and what you changed, with `weaver note <number>`: the card shows how. A final message is read once; the owner decides on a card from what is written on it. Weaver names the cards whose files your calls change, and asks for these notes before it checks your work.',
   ].join('\n')
 }

@@ -74,9 +74,9 @@ test('weaver stats counts what the journal and the registry hold, as a program r
   const { since, journal, cards } = await figures()
 
   assert.equal(since, null)
-  assert.deepEqual(journal.sessions, { total: 1, byAgent: { claude: 1 } })
+  assert.deepEqual(journal.sessions, { total: 1, byAgent: { claude: 1 }, continued: 0 })
   assert.deepEqual(journal.requests, { total: 1, directives: { '#review': 1 } })
-  assert.deepEqual(journal.turns, { total: 2, finished: 2, heldByChecks: 1, heldByReview: 0, heldByReminder: 0 })
+  assert.deepEqual(journal.turns, { total: 2, finished: 2, heldByChecks: 1, heldByReview: 0, heldByReminder: 0, heldByCards: 0 })
   assert.deepEqual(
     [
       journal.verdicts.total,
@@ -134,7 +134,9 @@ test('weaver stats prints the same numbers for its owner, and concludes nothing'
   assert.ok(lines.includes('Requests                  1 (#review 1)'))
   assert.ok(lines.includes('Calls                     2 changed files, 0 moved HEAD'))
   assert.ok(
-    lines.includes('Ends of turn              2: the agent said it had finished 2; held by the checks 1, by a review 0, by the reminder 0'),
+    lines.includes(
+      'Ends of turn              2: the agent said it had finished 2; held by the checks 1, by a review 0, by the reminder 0, for notes on cards 0',
+    ),
   )
   assert.ok(lines.includes('Verdicts                  2: 1 passed, 1 failed'))
   assert.ok(lines.includes('  lines added             median 1, largest 3'))

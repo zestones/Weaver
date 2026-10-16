@@ -157,6 +157,12 @@ test('a check that warns is given what the call changed, each file with what it 
 
   assert.match(told(write({ 'src/a.js': 'export const a = 2\n' })), /M src\/a\.js: \[export const a = 1\] became \[export const a = 2\]/)
   assert.match(told(write({ 'src/d.js': 'export const d = 4\n' })), /A src\/d\.js: \[nothing\] became \[export const d = 4\]/)
+  assert.match(
+    told(write({ 'src/a.js': 'export const a = 3\n' })),
+    /M src\/a\.js: \[export const a = 1\] became \[export const a = 3\]/,
+    'a file is told from what it held before the session first changed it, as the end of the task judges it',
+  )
+  assert.deepEqual(write({ 'src/a.js': 'export const a = 1\n' }), {}, 'a file put back as it was holds no change to warn of')
   assert.deepEqual(
     readdirSync(join(repo.top, '.git/weaver/sessions/session-1')).filter((name) => name.startsWith('call-diff')),
     [],

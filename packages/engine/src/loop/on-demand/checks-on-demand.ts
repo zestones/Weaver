@@ -46,11 +46,12 @@ export class ChecksOnDemand {
     return words.filter((word) => !word.startsWith('-'))
   }
 
-  // The session of the agent whose hook saw it run `weaver check` with these names; null when no hook did.
-  sessionAsking(names: readonly string[], agent: string): Session | null {
+  // The session whose hook saw its agent run `weaver check` with these names; null when no hook did. What the hook saw
+  // tells whose command it is better than the processes do: a runtime may run its commands under any name.
+  sessionAsking(names: readonly string[]): Session | null {
     const since = new Date(Date.now() - ASKED_WITHIN_MS).toISOString()
 
-    return new RepositorySessions(this.repo).all().find((session) => session.agent === agent && session.takeAsked(names, since)) ?? null
+    return new RepositorySessions(this.repo).all().find((session) => session.takeAsked(names, since)) ?? null
   }
 
   // A check runs after the one it waits for, which runs too. Without a name, every check runs.

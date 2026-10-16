@@ -49,7 +49,8 @@ export interface JournalFigures {
   readonly to: string | null
   readonly lines: number
   readonly byWeaver: Counts
-  readonly sessions: { readonly total: number; readonly byAgent: Counts }
+  // A session the runtime went on with under a new id is counted once, and its continuations apart.
+  readonly sessions: { readonly total: number; readonly byAgent: Counts; readonly continued: number }
   readonly requests: { readonly total: number; readonly directives: Counts }
   readonly turns: {
     readonly total: number
@@ -57,6 +58,7 @@ export interface JournalFigures {
     readonly heldByChecks: number
     readonly heldByReview: number
     readonly heldByReminder: number
+    readonly heldByCards: number
   }
   // One verdict is one run of the checks at the end of a task.
   readonly verdicts: {
@@ -142,9 +144,14 @@ export class JournalNumbers {
   private sessions(): JournalFigures['sessions'] {
     const agents = new Map<string, string>()
 
-    for (const { session, agent } of this.events) if (session !== null && !agents.has(session)) agents.set(session, agent ?? 'unknown')
+    const continued = this.of('continue')
+    const went = new Set(continued.flatMap(({ session }) => (session === null ? [] : [session])))
 
-    return { total: agents.size, byAgent: this.counted([...agents.values()]) }
+    for (const { session, agent } of this.events) {
+      if (session !== null && !went.has(session) && !agents.has(session)) agents.set(session, agent ?? 'unknown')
+    }
+
+    return { total: agents.size, byAgent: this.counted([...agents.values()]), continued: continued.length }
   }
 
   private turns(): JournalFigures['turns'] {
@@ -157,6 +164,7 @@ export class JournalNumbers {
       heldByChecks: held('checks'),
       heldByReview: held('review'),
       heldByReminder: held('reminder'),
+      heldByCards: held('cards'),
     }
   }
 

@@ -4,7 +4,8 @@ import type { Repository } from '../../lib/git/repository.ts'
 import type { ChangedPath } from '../../lib/git/tree-diff.ts'
 import type { Change } from '../attribution/attribution-window.ts'
 
-// What one tool call changed, as the checks that warn right after it are told of it.
+// The files one tool call changed, as the checks that warn right after it are told of them: from what they held before
+// the session first touched them, as the end of the task judges them.
 export class CallDiff {
   readonly repo: Repository
   private readonly dir: string
@@ -33,7 +34,7 @@ export class CallDiff {
     return [...this.changes].map(([path, change]) => ({ status: this.statusOf(change), path, oldPath: path }))
   }
 
-  // Each file comes with what it held before the call and what it holds now, as blobs of the store.
+  // Each file comes with what it held before the session's work and what it holds now, as blobs of the store.
   environment(): NodeJS.ProcessEnv {
     const files = [...this.changes].map(([path, change]) => ({ status: this.statusOf(change), path, ...change }))
 

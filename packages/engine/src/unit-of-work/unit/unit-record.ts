@@ -40,6 +40,15 @@ interface CheckProgress {
   readonly reviewing: string | null
 }
 
+// The cards of the owner the unit of work is about: those its agent read, and those whose files its calls changed.
+export interface UnitCards {
+  readonly concerned: readonly number[]
+  // Those its agent wrote a note on.
+  readonly noted: readonly number[]
+  // Those the end of the task already asked a note for.
+  readonly asked: readonly number[]
+}
+
 export interface UnitRecord {
   readonly number: number
   readonly openedAt: string
@@ -49,4 +58,5 @@ export interface UnitRecord {
   readonly unattributed: readonly string[]
   readonly lifted: readonly LiftedCall[]
   readonly returned: Readonly<Record<string, ReturnedFile>>
+  readonly cards: UnitCards
 }

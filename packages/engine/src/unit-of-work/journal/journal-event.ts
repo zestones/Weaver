@@ -83,7 +83,7 @@ interface TurnEvent {
   readonly kind: 'turn'
   readonly unit: number
   readonly finished: boolean
-  readonly held: 'checks' | 'review' | 'reminder' | null
+  readonly held: 'checks' | 'review' | 'reminder' | 'cards' | null
 }
 
 // What the owner asked, as the unit of work keeps it, and where the runtime writes the transcript of the session.
@@ -182,6 +182,12 @@ interface NoteEvent {
   readonly conclusion: string | null
 }
 
+// The runtime went on with a session under a new id: this one took over the state of the one it continues.
+interface ContinueEvent {
+  readonly kind: 'continue'
+  readonly from: string
+}
+
 export type EventBody =
   | TouchEvent
   | CheckEvent
@@ -200,5 +206,6 @@ export type EventBody =
   | AnswerEvent
   | FlagEvent
   | NoteEvent
+  | ContinueEvent
 export type JournalEvent = EventBase & EventBody
 export type EventOf<Kind extends EventBody['kind']> = Extract<JournalEvent, { kind: Kind }>

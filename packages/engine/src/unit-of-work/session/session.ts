@@ -9,6 +9,7 @@ import type { OwnerRequest } from '../owner/owner-request.ts'
 import { Reconciliation } from '../owner/reconciliation.ts'
 import { UnitOfWork } from '../unit/unit-of-work.ts'
 import type { LiftedCall, UnitFile } from '../unit/unit-record.ts'
+import { ContinuedSession } from './continued-session.ts'
 import { HeldElsewhere } from './held-elsewhere.ts'
 import type { SessionRecord } from './session-record.ts'
 import { SessionStore, type Transaction } from './session-store.ts'
@@ -26,7 +27,7 @@ export class Session {
 
   constructor(repo: Repository, sessionId: string, agent: string) {
     this.repo = repo
-    this.dir = join(Session.rootIn(repo), sessionId.replace(/[^\w.-]/g, '_'))
+    this.dir = Session.dirOf(repo, sessionId)
     this.id = basename(this.dir)
     this.agent = agent
     this.store = new SessionStore(this.dir, agent)
@@ -34,8 +35,22 @@ export class Session {
     mkdirSync(this.dir, { recursive: true })
   }
 
+  // The session as a hook meets it: one the runtime went on with under a new id first takes over the state it left.
+  static met(repo: Repository, sessionId: string, agent: string, transcript: string | null): Session {
+    const continued = new ContinuedSession(Session.rootIn(repo), Session.dirOf(repo, sessionId), sessionId, transcript).takeOver()
+    const session = new Session(repo, sessionId, agent)
+
+    if (continued !== null) session.log({ kind: 'continue', from: continued })
+
+    return session
+  }
+
   static rootIn(repo: Repository): string {
     return join(repo.gitDir, 'weaver', 'sessions')
+  }
+
+  private static dirOf(repo: Repository, sessionId: string): string {
+    return join(Session.rootIn(repo), sessionId.replace(/[^\w.-]/g, '_'))
   }
 
   state(): SessionRecord | null {
@@ -212,8 +227,34 @@ export class Session {
     this.log({ kind: 'flag', unit: unit.number, card, known })
   }
 
+  // A note that concludes nothing is free text: the card is still owed a report.
   noted(card: number, conclusion: string | null): void {
-    this.log({ kind: 'note', unit: this.unit().number, card, conclusion })
+    const { unit } = this.store.update((latest) =>
+      conclusion === null ? latest : { ...latest, unit: new UnitOfWork(latest.unit).withNoted(card).record },
+    )
+
+    this.log({ kind: 'note', unit: unit.number, card, conclusion })
+  }
+
+  // The unit of work is about the cards its agent reads, and those whose files its calls change. Gives those it was
+  // not about yet.
+  concerned(cards: readonly number[]): number[] {
+    return this.store.transact((latest) => {
+      const unit = new UnitOfWork(latest.unit)
+      const added = cards.filter((card) => !unit.cards.concerned.includes(card))
+
+      return { record: added.length === 0 ? latest : { ...latest, unit: unit.withConcerned(added).record }, value: added }
+    }).value
+  }
+
+  // The cards of the unit its agent wrote nothing on: the end of the task asks once for their notes.
+  askNotes(): number[] {
+    return this.store.transact((latest) => {
+      const unit = new UnitOfWork(latest.unit)
+      const unnoted = unit.unnotedCards
+
+      return { record: unnoted.length === 0 ? latest : { ...latest, unit: unit.withCardsAsked(unnoted).record }, value: unnoted }
+    }).value
   }
 
   takeFlags(): readonly number[] {

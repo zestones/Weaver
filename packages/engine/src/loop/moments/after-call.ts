@@ -1,9 +1,11 @@
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
+import { WaitingCards } from '../../noting/cards/waiting-cards.ts'
 import { CallDiff } from '../../unit-of-work/diff/call-diff.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import { CallWarning } from '../../verdict/call-warning.ts'
 import { Answer } from '../exchange/answer.ts'
+import { CardNotice } from '../exchange/card-notice.ts'
 import { HeadAlert } from '../exchange/head-alert.ts'
 import type { Turn } from '../exchange/turn.ts'
 import type { Moment } from './moment.ts'
@@ -34,14 +36,42 @@ export class AfterCall implements Moment {
 
     const touches = session.closeCall(callId)
     const alert = new HeadAlert(touches).text
-    const changes = new Map(touches.flatMap((touch) => [...touch.changes]))
+    const changes = session.unit().sinceBase(new Map(touches.flatMap((touch) => [...touch.changes])))
     const call = CallDiff.of(session.repo, session.dir, callId, changes, turn.declaration.exclude)
+    const notice = this.cardNotice(
+      session,
+      touches.flatMap((touch) => touch.paths),
+    )
 
-    if (call.isEmpty || !this.checks.warns(turn.declaration)) return Answer.silent().after(alert)
+    if (call.isEmpty || !this.checks.warns(turn.declaration)) return this.told([notice]).after(alert)
 
     return this.warning(session, turn.declaration, call, turn.event.call?.name ?? '').then((warning) =>
-      (warning === null ? Answer.silent() : Answer.telling(this.event, warning)).after(alert),
+      this.told([warning, notice]).after(alert),
     )
+  }
+
+  private told(texts: readonly (string | null)[]): Answer {
+    const said = texts.flatMap((text) => (text === null ? [] : [text]))
+
+    return said.length === 0 ? Answer.silent() : Answer.telling(this.event, said.join('\n\n'))
+  }
+
+  // The agent is told once of each card whose files its calls change. Cards are a help: failing to read them never
+  // changes the answer to the call.
+  private cardNotice(session: Session, changed: readonly string[]): string | null {
+    if (changed.length === 0) return null
+
+    try {
+      const cards = new WaitingCards(session.repo).naming(changed)
+      const told = cards.length === 0 ? [] : session.concerned(cards.map((card) => card.number))
+
+      return new CardNotice(
+        cards.filter((card) => told.includes(card.number)),
+        changed,
+      ).text
+    } catch {
+      return null
+    }
   }
 
   // What the checks that warn found on what the call changed. The agent is told and not held: the edit is made, and

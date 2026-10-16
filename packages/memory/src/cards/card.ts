@@ -61,6 +61,15 @@ export class Card {
     return reopened === null && flag?.fields.did === 'fixed' ? { as: 'fixed', by: provenance } : null
   }
 
+  // Whether a note says what was looked into since the card was last opened again: confirmed, refuted or unsure.
+  get isInvestigated(): boolean {
+    const reopened = this.record.history.findLast((event) => event.action === 'reopened')?.at ?? null
+
+    return this.record.notes.some(
+      ({ conclusion, provenance }) => conclusion !== null && conclusion !== 'fixed' && (reopened === null || provenance.at > reopened),
+    )
+  }
+
   oneLine(): string {
     const [first, ...others] = this.places
     const place = first === undefined ? [] : [`${PlaceText.write(first)}${others.length === 0 ? '' : ` +${String(others.length)}`}`]

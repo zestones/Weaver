@@ -119,6 +119,23 @@ test('an agent checks its own unit of work without ending its task, and the end 
   assert.match(refused.reason ?? '', /Not run again, since nothing they read changed after their last run: syntax\./)
 })
 
+test('a check the hook saw go by is the agent’s, even when its processes do not tell the runtime that started it', async () => {
+  await hook('UserPromptSubmit', { prompt: 'add b' })
+  await agentWrites('src/b.js', 'export const b = 2\n')
+  write('src/owner.js', 'export const mine = ;\n')
+  calls += 1
+  await hook('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'weaver check syntax' }, tool_use_id: `call-${String(calls)}` })
+
+  const asked = await weaver(top, ['check', 'syntax'])
+
+  assert.equal(asked.status, 0)
+  assert.equal(asked.lines[0], '1 changed file of the unit of work 1 of this session')
+  assert.deepEqual(
+    askedEvents().map(({ unit, files }) => ({ unit, files })),
+    [{ unit: 1, files: 1 }],
+  )
+})
+
 test('a check the hook did not see go by checks nothing, and a name the project does not declare is said', async () => {
   const unseen = await weaver(top, ['check'], { under: 'claude' })
 

@@ -72,10 +72,11 @@ export class StatsPage {
 
   private activity(): Block[] {
     const { sessions, requests, calls, turns } = this.figures.journal
-    const held = `held by the checks ${String(turns.heldByChecks)}, by a review ${String(turns.heldByReview)}, by the reminder ${String(turns.heldByReminder)}`
+    const held = `held by the checks ${String(turns.heldByChecks)}, by a review ${String(turns.heldByReview)}, by the reminder ${String(turns.heldByReminder)}, for notes on cards ${String(turns.heldByCards)}`
+    const continued = sessions.continued === 0 ? '' : `; ${String(sessions.continued)} went on under a new id`
 
     return [
-      this.row('Sessions', this.withDetail(sessions.total, sessions.byAgent)),
+      this.row('Sessions', `${this.withDetail(sessions.total, sessions.byAgent)}${continued}`),
       this.row('Requests', this.withDetail(requests.total, requests.directives)),
       this.row('Calls', `${String(calls.changingFiles)} changed files, ${String(calls.movingHead)} moved HEAD`),
       this.row('Ends of turn', `${String(turns.total)}: the agent said it had finished ${String(turns.finished)}; ${held}`),

@@ -41,7 +41,9 @@ export class ProcessCaller implements Caller {
 
   private agentOf({ name, command }: RunningProcess): string | null {
     const [program = '', script = ''] = command.map((word) => basename(word))
-    const names = [name, program, INTERPRETERS.has(program) ? script.replace(/\.[cm]?js$/, '') : null]
+    // A runtime that updates itself runs a file named after its version, from the folder of its versions.
+    const [, versioned = null] = /\/([^/]+)\/versions\/[^/]+$/.exec(command[0] ?? '') ?? []
+    const names = [name, program, versioned, INTERPRETERS.has(program) ? script.replace(/\.[cm]?js$/, '') : null]
 
     return AGENTS.find((agent) => names.includes(agent)) ?? null
   }

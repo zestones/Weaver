@@ -56,6 +56,16 @@ test('an agent among the ancestors is found by the name of its process, however 
   )
 })
 
+test('a runtime that runs a file named after its version is found by the folder of its versions', () => {
+  assert.equal(
+    callerIn([
+      [40, 30, 'bash', '/bin/bash', '-c', 'weaver check backend'],
+      [30, 1, '2.1.301', '/home/owner/.local/share/claude/versions/2.1.301', '--session-id', '6863887f', '--resume'],
+    ]),
+    'claude',
+  )
+})
+
 test('in the sandbox of Codex, where the runtime is the first process, it is found there', () => {
   assert.equal(
     callerIn([

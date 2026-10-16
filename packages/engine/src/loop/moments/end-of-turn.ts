@@ -4,6 +4,7 @@ import { CheckMemory } from '../../checks/results/check-memory.ts'
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import { WriterStart } from '../../flagging/writing/writer-start.ts'
+import { WaitingCards } from '../../noting/cards/waiting-cards.ts'
 import type { Repository } from '../../lib/git/repository.ts'
 import { ReviewCards } from '../../review/cards/review-cards.ts'
 import type { ReviewRounds } from '../../review/rounds/review-rounds.ts'
@@ -15,6 +16,7 @@ import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
 import { Report } from '../../verdict/report.ts'
 import { UnitVerdict } from '../../verdict/unit-verdict.ts'
 import { Answer } from '../exchange/answer.ts'
+import { CardNotesWanted } from '../exchange/card-notes-wanted.ts'
 import { FlaggedNotice } from '../exchange/flagged-notice.ts'
 import { HeadAlert } from '../exchange/head-alert.ts'
 import { MaintenanceNotice } from '../exchange/maintenance-notice.ts'
@@ -82,6 +84,11 @@ export class EndOfTurn implements Moment {
 
     if (unit.isEmpty && this.reviews.follows(session, declaration, unit)) return this.check(turn, declaration, unit, lastMessage)
     if (!finished) return unit.isEmpty ? this.ended(turn, null, Answer.empty()) : this.pending(turn, declaration)
+
+    const notes = unit.isEmpty ? null : this.notesWanted(session, unit)
+
+    if (notes !== null) return this.ended(turn, 'cards', Answer.blocking(notes))
+
     // What maintenance let through waits for the owner in a report, even when no file changed.
     if (!unit.isEmpty || unit.lifted.length > 0) return this.check(turn, declaration, unit, lastMessage)
     if (!unit.hasRequests) return this.ended(turn, null, Answer.empty())
@@ -90,6 +97,18 @@ export class EndOfTurn implements Moment {
     session.settle({})
 
     return this.ended(turn, null, this.over(session, Answer.empty()))
+  }
+
+  // Before its work is checked, the agent writes on the cards its task is about what it did about them. Cards are a
+  // help: failing to read them never holds the end of a task.
+  private notesWanted(session: Session, unit: UnitOfWork): string | null {
+    try {
+      const asked = session.askNotes()
+
+      return asked.length === 0 ? null : new CardNotesWanted(new WaitingCards(session.repo).among(asked), Object.keys(unit.files)).text
+    } catch {
+      return null
+    }
   }
 
   // Each end of turn is kept, with what held the agent back if anything did.
