@@ -18,7 +18,7 @@ export class NoteCall {
   // Every note of a call: an agent that looked into several cards writes on each in one call.
   static among(call: ToolCall): NoteCall[] {
     return WeaverCommand.among(call.commands())
-      .filter(({ words }) => words[0] === COMMAND)
+      .filter((weaver) => weaver.words[0] === COMMAND && !weaver.asksHelp)
       .map((weaver) => new NoteCall(weaver))
   }
 }

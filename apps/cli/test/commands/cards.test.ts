@@ -257,7 +257,7 @@ test('an agent that reads a card is told how to write on it what it finds, and t
     '',
     '---',
     '',
-    '[weaver] If the owner asked you to verify or to fix what this card says, report on the card when you are done, with the commands below: what you looked into, and what you fixed if you did. Weaver answers in their place, as it does for a flag, and refuses a report that leaves a field out.',
+    '[weaver] When your task settles this card or finds more on it, write it on the card with the commands below: what you looked into, then what you changed if you fixed it. Weaver answers in their place, as for a flag. The cards about the same files may share its cause: `weaver cards --file <path>`.',
     '',
     "weaver note 1 confirmed|refuted|unsure <<'EOF'",
     'Ran: what you ran, and what it showed.',
@@ -273,6 +273,11 @@ test('an agent that reads a card is told how to write on it what it finds, and t
     '',
     'The first reports an investigation: confirmed when what the card says is true, refuted when it is not, unsure when you could not tell. The second reports a fix. When you looked into the card and then fixed it, write both, in that order. Each keyword starts a line. A field may span lines, and may say that there is nothing to say. Without a word, a note concludes nothing and is free text.',
   ])
+  assert.equal(
+    (await weaver(top, ['cards'], { under: 'claude' })).lines.at(-1),
+    'Read one with weaver cards <number>, and write on it with weaver note <number>: closing it is the owner’s.',
+    'an agent is not sent to a command of the owner',
+  )
   assert.equal((await weaver(top, ['cards', '1'])).lines.join('\n'), card.join('\n'), 'the owner reads the card alone')
   assert.equal(
     (await weaver(top, ['cards', '2'], { under: 'claude' })).lines.join('\n'),

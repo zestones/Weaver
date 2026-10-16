@@ -175,7 +175,14 @@ test('a commit made by the agent itself settles nothing: its files are still che
 
   await finishWith(session, checks)
 
+  const output = answer.body?.hookSpecificOutput
+
   assert.match(answer.body?.systemMessage ?? '', /HEAD moved while the Bash call ran, by the call or by the owner meanwhile/)
+  assert.match(
+    output !== undefined && 'additionalContext' in output ? output.additionalContext : '',
+    /Commits are the owner's/,
+    'the agent hears it too',
+  )
   assert.deepEqual(checks.seen, [[A_FILE]])
   assert.deepEqual(
     settles().map(({ by }) => by),

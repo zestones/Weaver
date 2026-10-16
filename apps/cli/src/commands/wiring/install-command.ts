@@ -5,6 +5,7 @@ import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
+import type { RuntimeSettings } from '../../runtimes/runtime-settings.ts'
 import type { Command } from '../line/command.ts'
 
 export class InstallCommand implements Command {
@@ -14,7 +15,8 @@ export class InstallCommand implements Command {
   readonly ownerOnly = true
   readonly help = {
     group: 'Set up',
-    description: 'Put Weaver on this project: the hooks of the agent runtimes, and a starter configuration if there is none.',
+    description:
+      'Put Weaver on this project: the hooks of the agent runtimes, the guide they read as a skill, and a starter configuration if there is none.',
     words: [['[claude] [codex]', 'The agent runtimes to wire; both when none is named']],
     examples: ['weaver install', 'weaver install claude'],
   } as const
@@ -70,10 +72,26 @@ export class InstallCommand implements Command {
       if (skill.create()) this.screen.done(`${skill.path} created: ${skill.purpose} Adapt it to your project.`)
     }
 
+    // The guide is written from the configuration, which a first install has just created.
+    for (const runtime of runtimes) this.guide(project, runtime)
+
     this.screen.line()
     this.screen.hint(this.wired())
 
     return 0
+  }
+
+  private guide(project: Project, runtime: RuntimeSettings): void {
+    const guide = project.guide(runtime.guide)
+
+    if (guide === null) return
+
+    guide.write()
+    this.screen.done(`${runtime.label}: the guide of Weaver written to ${guide.path}`)
+
+    if (!project.ignores(guide.path)) {
+      this.screen.alert(`${guide.path} is not ignored by git, and Weaver writes it again with each update: add it to .gitignore.`, 1)
+    }
   }
 
   // The hooks name paths of this machine: the file that holds them is not to be shared. null when git neither

@@ -75,6 +75,7 @@ test('after install everything is alive; a runtime left out is only noted', asyn
     '  ✓ The finish skill: .weaver/skills/wv-finish.md',
     `  ✓ The hook starts: ${link.hook}`,
     '  ✓ Claude Code: wired in .claude/settings.local.json',
+    '  ✓ Claude Code: the guide of Weaver in .claude/skills/weaver/SKILL.md',
     '  - Codex: not wired',
     '  - An agent started outside these runtimes is not supervised',
   ])
@@ -135,9 +136,11 @@ test('Codex is asked whether it runs the hooks it was wired with: the ones of an
   const { status, lines } = await doctor({ executions: codexHolding(['runs', 'runs', 'runs', 'runs']) })
 
   assert.equal(status, 0, lines.join('\n'))
-  assert.deepEqual(lines.slice(-4), [
+  assert.deepEqual(lines.slice(-6), [
     '  ✓ Claude Code: wired in .claude/settings.local.json',
+    '  ✓ Claude Code: the guide of Weaver in .claude/skills/weaver/SKILL.md',
     '  ✓ Codex: wired in .codex/hooks.json',
+    '  ✓ Codex: the guide of Weaver in .agents/skills/weaver/SKILL.md',
     '  ✓ Codex runs these hooks',
     '  - An agent started outside these runtimes is not supervised',
   ])
@@ -165,7 +168,10 @@ test('hooks that wait for the owner’s approval, that are turned off, or that C
   const approve = 'until you approve them, and asks again whenever one changes: open Codex in this folder and approve them with /hooks.'
 
   assert.equal(waiting.status, 1)
-  assert.deepEqual(waiting.lines.slice(-3, -1), ['  ✓ Codex: wired in .codex/hooks.json', `  X Codex does not run these hooks ${approve}`])
+  assert.deepEqual(waiting.lines.slice(-3, -1), [
+    '  ✓ Codex: the guide of Weaver in .agents/skills/weaver/SKILL.md',
+    `  X Codex does not run these hooks ${approve}`,
+  ])
   assert.equal(mixed.status, 1)
   assert.deepEqual(mixed.lines.slice(-4, -1), [
     '  X Codex loads only 3 of these 4 hooks: /hooks, in Codex, shows the ones it holds.',
@@ -306,6 +312,7 @@ test('a writer that starts, with its skill, is alive, and the cards that wait ar
     '  ✓ The registry: 2 cards wait for you',
     `  ✓ The hook starts: ${link.hook}`,
     '  ✓ Claude Code: wired in .claude/settings.local.json',
+    '  ✓ Claude Code: the guide of Weaver in .claude/skills/weaver/SKILL.md',
     '  - Codex: not wired',
     '  - An agent started outside these runtimes is not supervised',
   ])
@@ -393,5 +400,27 @@ test('a project whose configuration lacks migrations is told which, and that not
   assert.equal(
     lines[0],
     '  X .weaver/ is 1 migration behind this Weaver (0002-check-commands): nothing is checked until weaver update brings it up to date.',
+  )
+})
+
+test('a guide that is missing, or that another Weaver or another configuration wrote, is a problem', async () => {
+  await weaver(top, ['install', 'claude'])
+  writeFileSync(join(top, '.claude/skills/weaver/SKILL.md'), '# An older guide\n')
+
+  const stale = await doctor()
+
+  assert.equal(stale.status, 1)
+  assert.ok(
+    stale.lines.includes(
+      '  X Claude Code: the guide in .claude/skills/weaver/SKILL.md is not the one of this Weaver and this configuration. Run weaver update.',
+    ),
+  )
+
+  rmSync(join(top, '.claude/skills/weaver/SKILL.md'))
+
+  assert.ok(
+    (await doctor()).lines.includes(
+      '  X Claude Code: no guide of Weaver in .claude/skills/weaver/SKILL.md, which tells its agents how to work here. Run weaver update.',
+    ),
   )
 })

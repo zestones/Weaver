@@ -15,6 +15,7 @@ import type { EngineLink } from '../link/engine-link.ts'
 import { Counted } from '../output/counted.ts'
 import { CardSkill } from '../skills/card-skill.ts'
 import { FinishSkill } from '../skills/finish-skill.ts'
+import { GuideSkill } from '../skills/guide-skill.ts'
 import type { ProjectSkill } from '../skills/project-skill.ts'
 import { ReviewSkill } from '../skills/review-skill.ts'
 
@@ -147,6 +148,13 @@ export class Project {
     const writer = this.readableDeclaration()?.writer
 
     return writer?.skill == null ? null : new CardSkill(this.top, writer.skill, writer.sections)
+  }
+
+  // The guide of Weaver at the place one runtime reads it; null while the project declares nothing Weaver reads.
+  guide(path: string): GuideSkill | null {
+    const declaration = this.readableDeclaration()
+
+    return declaration === null ? null : new GuideSkill(this.top, path, declaration)
   }
 
   skills(): ProjectSkill[] {

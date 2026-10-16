@@ -9,6 +9,7 @@ import { Screen } from '../../output/screen.ts'
 import { ReleaseChannel } from '../../releases/release-channel.ts'
 import { CloseCommand } from '../changes/close-command.ts'
 import { CheckCommand } from '../checks/check-command.ts'
+import { GuideCommand } from '../guide/guide-command.ts'
 import { LabelCommand } from '../changes/label-command.ts'
 import { ReopenCommand } from '../changes/reopen-command.ts'
 import { RetitleCommand } from '../changes/retitle-command.ts'
@@ -133,6 +134,7 @@ export class CommandLine {
       new VersionCommand(this.output),
       new MaintenanceCommand(this.cwd, this.output),
       new CheckCommand(this.cwd, this.output, this.caller),
+      new GuideCommand(this.cwd, this.output),
       new StatsCommand(this.cwd, this.output),
       new CardsCommand(this.cwd, this.output, this.caller),
       new UiCommand(this.cwd, this.output),

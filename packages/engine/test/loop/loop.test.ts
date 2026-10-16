@@ -387,7 +387,7 @@ test('a word of the owner that is almost a directive is said back at once, in a 
   assert.equal(hook('UserPromptSubmit', { prompt: 'rename it #critical' }).systemMessage, undefined)
 })
 
-test('an agent is told of the flag command with its request, flags through a call that never runs, and the owner reads of it', () => {
+test('an agent is told of the flag command with its request, and of the guide that says how; it flags through a call that never runs, and the owner reads of it', () => {
   const flag = JSON.parse(readFileSync(join(import.meta.dirname, '../payloads/claude-flag-chained.json'), 'utf8')) as Record<
     string,
     unknown
@@ -395,7 +395,10 @@ test('an agent is told of the flag command with its request, flags through a cal
   const told = hook('UserPromptSubmit', { prompt: 'read src/a.js' }).hookSpecificOutput
 
   assert.equal(told?.hookEventName, 'UserPromptSubmit')
-  assert.match(told?.additionalContext ?? '', /flag it with the shell command below[^]*\nweaver flag <file>\[:<line>\] \.\.\. <<'EOF'\n/)
+  assert.match(
+    told?.additionalContext ?? '',
+    /\n- something your task does not settle: `weaver flag` it;\n[^]*\nHow to do each, and what is the owner’s alone: `weaver guide`\.$/,
+  )
 
   writeFiles(repo.top, { 'src/one.js': 'export const one = 1\n' })
 

@@ -1,5 +1,6 @@
 export { Loop } from './loop/dispatch/loop.ts'
 export { ChecksOnDemand } from './loop/on-demand/checks-on-demand.ts'
+export { WeaverGuide } from './guidance/guide/weaver-guide.ts'
 export type { AskedVerdict } from './loop/on-demand/checks-on-demand.ts'
 export type { CheckOutcome } from './checks/results/check-outcome.ts'
 export { Answer } from './loop/exchange/answer.ts'

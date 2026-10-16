@@ -26,7 +26,7 @@ test('without a command, weaver says what it is, how it is typed and what it can
   assert.match(lines[0] ?? '', /^Weaver supervises the coding agents that work in a project/)
   assert.deepEqual(listedUnder(lines, 'USAGE'), ['weaver <command> [arguments]'])
   assert.deepEqual(listedUnder(lines, 'SET UP'), ['install', 'update', 'uninstall', 'doctor', 'version'])
-  assert.deepEqual(listedUnder(lines, 'SUPERVISION'), ['maintenance', 'check', 'stats'])
+  assert.deepEqual(listedUnder(lines, 'SUPERVISION'), ['maintenance', 'check', 'guide', 'stats'])
   assert.deepEqual(listedUnder(lines, 'CARDS'), [
     'cards',
     'ui',

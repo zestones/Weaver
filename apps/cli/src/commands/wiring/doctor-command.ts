@@ -49,7 +49,7 @@ export class DoctorCommand implements Command {
     const project = Project.locate(this.cwd)
     const runtimes = new RuntimeCatalog().settings(project.top, this.link, [])
     const held = await Promise.all(runtimes.map((runtime) => this.held(runtime, project.top)))
-    const wired = runtimes.flatMap((runtime, index) => [this.runtime(runtime), ...(held[index] ?? [])])
+    const wired = runtimes.flatMap((runtime, index) => [this.runtime(runtime), ...this.guide(project, runtime), ...(held[index] ?? [])])
     const sections: readonly (readonly [string, readonly Finding[]])[] = [
       ['Project', [this.configuration(project), ...this.warnings(project), ...this.finishSkill(project)]],
       ['Review', this.review(project)],
@@ -318,6 +318,28 @@ export class DoctorCommand implements Command {
     const whose = wired === null || wired === own.tag ? 'point somewhere else' : `are those of Weaver ${wired}, and this is ${own.tag}`
 
     return { state: 'problem', text: `${runtime.label}: the hooks in ${runtime.file} ${whose}. Run weaver update.` }
+  }
+
+  // An agent learns how to work under Weaver from the guide its runtime lists: one that says what an earlier Weaver
+  // did, or what the project declared before, misleads it.
+  private guide(project: Project, runtime: RuntimeSettings): Finding[] {
+    const guide = runtime.wiring() === 'absent' ? null : project.guide(runtime.guide)
+
+    if (guide === null) return []
+
+    const state = guide.state()
+
+    if (state === 'current') return [{ state: 'ok', text: `${runtime.label}: the guide of Weaver in ${guide.path}` }]
+
+    return [
+      {
+        state: 'problem',
+        text:
+          state === 'absent'
+            ? `${runtime.label}: no guide of Weaver in ${guide.path}, which tells its agents how to work here. Run weaver update.`
+            : `${runtime.label}: the guide in ${guide.path} is not the one of this Weaver and this configuration. Run weaver update.`,
+      },
+    ]
   }
 
   // A runtime may hold hooks and not run them, without a word: it alone says. Nothing is said of a runtime that has

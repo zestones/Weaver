@@ -2,6 +2,7 @@ import { basename } from 'node:path'
 import type { ShellCommand } from '../../lib/shell/syntax/command.ts'
 
 const PROGRAMS: ReadonlySet<string> = new Set(['weaver', 'weaver.js'])
+const HELP: ReadonlySet<string> = new Set(['--help', '-h'])
 const NODE = 'node'
 const TABS_STRIPPED = '<<-'
 
@@ -14,6 +15,11 @@ export class WeaverCommand {
   private constructor(command: ShellCommand, words: readonly string[]) {
     this.command = command
     this.words = words
+  }
+
+  // A command asked how it is used shows its help, and does nothing else.
+  get asksHelp(): boolean {
+    return this.words.some((word) => HELP.has(word))
   }
 
   // What the command is given to read in a heredoc; null when none follows it.

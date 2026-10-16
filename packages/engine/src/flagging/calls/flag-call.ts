@@ -21,7 +21,7 @@ export class FlagCall {
   // Every flag of a call: an agent that found several things may flag them in one call.
   static among(call: ToolCall): FlagCall[] {
     return WeaverCommand.among(call.commands())
-      .filter(({ words }) => words[0] === COMMAND)
+      .filter((weaver) => weaver.words[0] === COMMAND && !weaver.asksHelp)
       .map((weaver) => new FlagCall(weaver))
   }
 }

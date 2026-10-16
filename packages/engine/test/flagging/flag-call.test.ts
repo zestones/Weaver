@@ -87,3 +87,8 @@ test('a flag runs where the commands before it left the shell, and through the w
   assert.deepEqual(flagIn(`timeout 5 env A=1 weaver flag one.js <<'EOF'\n${BODY}EOF`)?.body, BODY)
   assert.deepEqual(flagIn(`pnpm exec weaver flag one.js <<'EOF'\n${BODY}EOF`)?.places, ['one.js'])
 })
+
+test('a command asked how it is used is no flag: it shows its help', () => {
+  assert.equal(flagIn('weaver flag --help'), null)
+  assert.equal(flagIn('weaver help flag'), null)
+})

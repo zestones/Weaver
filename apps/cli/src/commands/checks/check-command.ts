@@ -37,7 +37,7 @@ export class CheckCommand implements Command {
     const declaration = project.declaration()
 
     if (declaration === null) {
-      this.screen.error('Nothing to check: this project declares nothing for Weaver.', 'weaver install sets it up.')
+      this.screen.error('Nothing to check: this project declares nothing for Weaver.', 'Its owner puts Weaver on it with weaver install.')
 
       return 1
     }

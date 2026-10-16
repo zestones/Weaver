@@ -173,7 +173,7 @@ export class UpdateCommand implements Command {
       return 1
     }
 
-    const changed = [this.configuration(project, dryRun), this.hooks(project, dryRun)].includes(true)
+    const changed = [this.configuration(project, dryRun), this.hooks(project, dryRun), this.guides(project, dryRun)].includes(true)
 
     if (!changed) this.screen.done(`This project is up to date with Weaver ${own.tag}.`)
     if (dryRun && changed) this.screen.hint('Dry run: nothing was written.')
@@ -214,5 +214,26 @@ export class UpdateCommand implements Command {
     }
 
     return stale.length > 0
+  }
+
+  // The guide of each runtime that is wired says what this release does, with what the project declares now.
+  private guides(project: Project, dryRun: boolean): boolean {
+    const wired = new RuntimeCatalog().settings(project.top, this.link, []).filter((runtime) => runtime.wiring() !== 'absent')
+    const behind = wired.flatMap((runtime) => {
+      const guide = project.guide(runtime.guide)
+      const state = guide?.state() ?? 'current'
+
+      return guide === null || state === 'current' ? [] : [{ runtime, guide, again: state === 'stale' }]
+    })
+
+    for (const { runtime, guide, again } of behind) {
+      if (!dryRun) guide.write()
+
+      const done = `${dryRun ? 'would be written' : 'written'}${again ? ' again in' : ' to'}`
+
+      this.told(`${runtime.label}: the guide of Weaver ${done} ${guide.path}`, dryRun)
+    }
+
+    return behind.length > 0
   }
 }

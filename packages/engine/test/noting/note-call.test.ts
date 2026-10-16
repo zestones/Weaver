@@ -47,3 +47,8 @@ test('a command that only names a note is not one', () => {
     assert.equal(noteIn(command), null, command)
   }
 })
+
+test('a command asked how it is used is no note: it shows its help', () => {
+  assert.equal(noteIn('weaver note --help'), null)
+  assert.equal(noteIn('weaver note -h && weaver close --help'), null)
+})

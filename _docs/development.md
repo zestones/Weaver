@@ -109,6 +109,15 @@ Use explicit types at public boundaries, type-only imports and checked asynchron
 
 Formatting uses two spaces, single quotes, no semicolons, LF endings and preserved Markdown paragraphs. Keep generated files and temporary fixtures out of version control. Documentation and code are written in English.
 
+### What agents are told
+
+How to work under Weaver is written once, in the guide, `packages/engine/src/guidance/guide/`: what Weaver does around an agent, each command with when and how to use it, and what is the owner's. Two other places speak to an agent, and neither repeats it:
+
+- the briefing of each request, `guidance/briefing/`, gives one line for each moment a command is for, and points to the guide;
+- a hook says what its moment needs: what happened and what to do now. It may give the exact form of the command to type then, such as the format of a flag or of a note, which is defined once beside its parser.
+
+A command an agent should use gets its line in the briefing and its part of the guide, and a hook only when a moment calls for it. A test fails when the guide names a command `weaver` does not have.
+
 ### Classes
 
 The source of a package is object-oriented. Behavior lives in classes: a module declares no function at its top level, a file holds one class and is named after it in kebab-case, and a class that only groups static functions is not a class. Use an interface for a contract several classes fulfil, and an abstract class where they share a skeleton and differ in one step; do not inherit only to share code. A callback written where it is passed, as in `files.map((file) => file.path)`, is not a function declaration.

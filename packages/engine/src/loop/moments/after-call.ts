@@ -43,10 +43,11 @@ export class AfterCall implements Moment {
       touches.flatMap((touch) => touch.paths),
     )
 
-    if (call.isEmpty || !this.checks.warns(turn.declaration)) return this.told([notice]).after(alert)
+    // A moved HEAD is the agent's to hear as much as the owner's: a commit it made settles nothing.
+    if (call.isEmpty || !this.checks.warns(turn.declaration)) return this.told([notice, alert]).after(alert)
 
     return this.warning(session, turn.declaration, call, turn.event.call?.name ?? '').then((warning) =>
-      this.told([warning, notice]).after(alert),
+      this.told([warning, notice, alert]).after(alert),
     )
   }
 

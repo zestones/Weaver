@@ -149,13 +149,14 @@ export class CardsCommand implements Command {
     }
   }
 
-  // An agent that reads a card is told how to write on it: what it finds would otherwise stay in its conversation.
+  // An agent that reads a card is told how to write on it, at the moment it reads it: what it finds would otherwise stay
+  // in its conversation.
   private answering(card: Card): string[] {
     if (this.caller.agent() === null || card.state === 'merged') return []
 
     return [
       '---',
-      `[weaver] If the owner asked you to verify or to fix what this card says, report on the card when you are done, with the commands below: what you looked into, and what you fixed if you did. Weaver answers in their place, as it does for a flag, and refuses a report that leaves a field out.\n\n${NoteText.formatFor(String(card.number))}`,
+      `[weaver] When your task settles this card or finds more on it, write it on the card with the commands below: what you looked into, then what you changed if you fixed it. Weaver answers in their place, as for a flag. The cards about the same files may share its cause: \`weaver cards --file <path>\`.\n\n${NoteText.formatFor(String(card.number))}`,
     ]
   }
 
@@ -209,7 +210,11 @@ export class CardsCommand implements Command {
       }
 
       this.screen.line()
-      this.screen.hint(`Read one with weaver cards <number>, and close it with weaver close <number> ${Card.CLOSINGS.join('|')} [reason].`)
+      this.screen.hint(
+        this.caller.agent() === null
+          ? `Read one with weaver cards <number>, and close it with weaver close <number> ${Card.CLOSINGS.join('|')} [reason].`
+          : 'Read one with weaver cards <number>, and write on it with weaver note <number>: closing it is the owner’s.',
+      )
 
       return 0
     } finally {

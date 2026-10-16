@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
@@ -24,17 +24,23 @@ beforeEach(() => {
 test('uninstall removes the files it had created, and leaves the rules and the records', async () => {
   await weaver(top, ['install'])
   mkdirSync(join(top, '.git/weaver'), { recursive: true })
+  mkdirSync(join(top, '.agents/skills/mine'), { recursive: true })
+  writeFileSync(join(top, '.agents/skills/mine/SKILL.md'), '---\nname: mine\n---\n')
 
   const { status, lines } = await weaver(top, ['uninstall'])
 
   assert.equal(status, 0)
   assert.equal(existsSync(join(top, CLAUDE)), false)
   assert.equal(existsSync(join(top, CODEX)), false)
+  assert.equal(existsSync(join(top, '.claude/skills/weaver')), false, 'the folder of the guide goes with it')
+  assert.equal(existsSync(join(top, '.agents/skills/mine/SKILL.md')), true, 'a skill of the owner stays')
   assert.equal(existsSync(join(top, CONFIG)), true)
   assert.equal(existsSync(join(top, '.git/weaver')), true)
   assert.deepEqual(lines, [
     `✓ Claude Code: hooks removed from ${CLAUDE}`,
+    '✓ Claude Code: the guide of Weaver removed from .claude/skills/weaver/SKILL.md',
     `✓ Codex: hooks removed from ${CODEX}`,
+    '✓ Codex: the guide of Weaver removed from .agents/skills/weaver/SKILL.md',
     '',
     ".weaver/ and .git/weaver/ are left: they hold your rules and Weaver's records.",
   ])

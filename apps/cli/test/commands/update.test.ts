@@ -184,6 +184,7 @@ test('with the latest release, update brings the project up to date itself: its 
     '    project/checks.json: `verify` is now `judge`, in 1 place',
     '    settings.json: checks.warnTimeoutSeconds added, at 30: the seconds the checks that warn are given after one call',
     '✓ Claude Code: hooks written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
+    '✓ Claude Code: the guide of Weaver written to .claude/skills/weaver/SKILL.md',
   ])
   assert.deepEqual(DeclarationFolder.in(top).load()?.checks[0]?.repair, ['npx', 'prettier', '--write', '{files}'])
   assert.deepEqual(
@@ -195,6 +196,20 @@ test('with the latest release, update brings the project up to date itself: its 
     '✓ Weaver v9.9.9 is the latest release.',
     '✓ This project is up to date with Weaver v9.9.9.',
   ])
+})
+
+test('update writes the guide of a wired runtime again once the project declares something else', async () => {
+  await weaver(top, ['install', 'claude'])
+  writeConfig(top, { checks: { lint: { cwd: '.', reads: 'exit', timeoutSeconds: 60, judge: ['true'], rules: { L1: 'The code lints.' } } } })
+
+  const { lines } = await weaver(top, ['update'], { channel: channel('9.9.9') })
+
+  assert.deepEqual(lines.slice(1), ['✓ Claude Code: the guide of Weaver written again in .claude/skills/weaver/SKILL.md'])
+  assert.match(
+    readFileSync(join(top, '.claude/skills/weaver/SKILL.md'), 'utf8'),
+    /\n- `lint`: runs on any change; it may take up to 1 min\.\n/,
+  )
+  assert.equal(existsSync(join(top, '.agents/skills/weaver')), false, 'a runtime that is not wired gets no guide')
 })
 
 test('a dry run says what an update would do and writes nothing, in the project or on the machine', async () => {

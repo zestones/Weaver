@@ -143,6 +143,7 @@ test('the commands of Weaver that decide or change are the owner’s, however an
     ['uninstall', 'uninstall'],
     ['update --dry-run', 'update'],
     ['maintenance on 3f2a91c0', 'maintenance'],
+    ['ui', 'ui'],
     ['cards reopen 12', 'cards reopen'],
     ['cards retitle 12 "A better title"', 'cards retitle'],
     ['cards label 12 type:bug', 'cards label'],
@@ -156,7 +157,7 @@ test('the commands of Weaver that decide or change are the owner’s, however an
     for (const program of ['weaver', '/opt/weaver/bin/weaver', 'node /opt/weaver/dist/bin/weaver.js', 'cd src && timeout 30 weaver']) {
       assert.equal(
         refusal(`${program} ${words}`),
-        `[weaver weaver:owner-command] Running \`weaver ${named}\` is refused. Deciding on a card, plugging Weaver in or out and lifting its guards are the owner's, from a terminal of their own.`,
+        `[weaver weaver:owner-command] Running \`weaver ${named}\` is refused. Deciding on a card, plugging Weaver in or out and lifting its guards are the owner's, from a terminal of their own. Say in your final message what you need them to run.`,
         `${program} ${words}`,
       )
     }

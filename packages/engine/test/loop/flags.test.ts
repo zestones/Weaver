@@ -4,12 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FlagText } from '@weaver/memory'
 import { afterAll, beforeEach, test } from 'vitest'
-import { FlagBriefing } from '../../src/flagging/briefing/flag-briefing.ts'
-import type { Declaration } from '../../src/declaration/content/declaration.ts'
-import { CheckBriefing } from '../../src/loop/on-demand/check-briefing.ts'
+import { RequestBriefing } from '../../src/guidance/briefing/request-briefing.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import { cardsOf, FLAG_BODY, flagCommand, withRegistry } from '../fixtures/cards.ts'
-import { declarationOf } from '../fixtures/declaration.ts'
 import { git, makeRepo, SAMPLE_REPO } from '../fixtures/repo.ts'
 import {
   A_FILE,
@@ -19,7 +16,6 @@ import {
   eventsOf,
   FAILING,
   finishWith,
-  LINT,
   PASSING,
   prompt,
   refusalOf,
@@ -186,63 +182,24 @@ test('when Weaver cannot record a flag, the call is refused all the same and the
   assert.deepEqual(flagsOf(), [])
 })
 
-test('every request tells the agent about the command, beside what the owner is told of a mistyped directive', () => {
-  const told = [new FlagBriefing().text, new CheckBriefing(declaration()).text].join('\n\n')
-  const briefing = { hookEventName: 'UserPromptSubmit', additionalContext: told }
+test('every request briefs the agent, beside what the owner is told of a mistyped directive; what the runtime says between two requests is not briefed', () => {
+  const briefing = { hookEventName: 'UserPromptSubmit', additionalContext: new RequestBriefing(declaration()).text }
   const reviewed = declaration({ review: { runtime: 'codex' } })
   const mistyped = prompt(session, 'rename it #critcal', reviewed)
 
   assert.deepEqual(prompt(session, 'rename it'), { hookSpecificOutput: briefing })
   assert.deepEqual(mistyped, {
-    hookSpecificOutput: briefing,
+    hookSpecificOutput: { ...briefing, additionalContext: new RequestBriefing(reviewed).text },
     systemMessage: '[weaver] #critcal is not a directive: did you mean #critical?',
   })
-  assert.deepEqual(prompt(session, 'look for the callers of getToken', reviewed, { agent_id: 'a406db5d5f6bb15fe' }), {
+  assert.deepEqual(prompt(session, 'look for the callers of getToken', undefined, { agent_id: 'a406db5d5f6bb15fe' }), {
     hookSpecificOutput: briefing,
   })
-  assert.deepEqual(prompt(session, '<task-notification>done</task-notification>'), { hookSpecificOutput: briefing })
+  assert.deepEqual(prompt(session, '<task-notification>done</task-notification>'), {})
   assert.deepEqual(
     stateOf(session)?.unit.intents.map((intent) => intent.text),
     ['rename it #critcal', 'rename it'],
     'only the owner’s words are requests',
-  )
-})
-
-const toldOn = (text: string, project?: Declaration): string => {
-  const output = prompt(session, text, project).hookSpecificOutput
-
-  return output !== undefined && 'additionalContext' in output ? output.additionalContext : ''
-}
-
-test('in a project that declares checks, every request tells the agent how to hear them before its task ends', () => {
-  const { text } = new CheckBriefing(declaration({ checks: { lint: LINT, tests: { judge: ['true'], rules: { T1: 'The tests pass.' } } } }))
-
-  assert.match(text ?? '', /run `weaver check <name>\.\.\.` with your shell tool, or `weaver check` alone for all of them/)
-  assert.match(text ?? '', /without ending it and without counting as a refusal\. The checks of this project: lint, tests\./)
-  assert.match(text ?? '', /run the command in the background if your shell tool can/)
-  assert.match(toldOn('add it'), /The checks of this project: lint\./)
-  assert.equal(new CheckBriefing(declarationOf({})).text, null)
-  assert.doesNotMatch(toldOn('add it', declarationOf({})), /weaver check/)
-})
-
-test('what an agent is told says when to flag, how, that the refusal is expected and not to fix the thing in its task', () => {
-  const { text } = new FlagBriefing()
-
-  assert.match(text, /something that the owner will have to decide on later and that your task does not settle/)
-  assert.match(text, /Do not flag a matter of taste, what a linter catches, nor what the owner only has to check in your own change\./)
-  assert.match(text, /even when you also speak of it in your final message/)
-  assert.ok(text.includes(`\n\n${FlagText.FORMAT}\n\n`))
-  assert.match(text, /Weaver takes the call before it runs and answers in its place/)
-  assert.match(text, /That message is the answer, not a failure, so do not run the command again\./)
-  assert.match(text, /make it in a task that only reads too/)
-  assert.match(text, /When the owner names a card, read it with `weaver cards <number>`; `weaver cards` lists the ones that wait\./)
-  assert.match(
-    text,
-    /When your task settles a card or finds more on it, write on the card what you looked into and what you changed, with `weaver note <number>`[^\n]*asks for these notes before it checks your work\.$/,
-  )
-  assert.match(
-    text,
-    /Do not fix what you flag in the task, unless the task cannot go on without it: flag it then with `Did: fixed in the task`\.\n/,
   )
 })
 

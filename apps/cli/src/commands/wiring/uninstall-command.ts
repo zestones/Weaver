@@ -3,6 +3,7 @@ import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
+import { GuideSkill } from '../../skills/guide-skill.ts'
 import type { Command } from '../line/command.ts'
 
 export class UninstallCommand implements Command {
@@ -12,7 +13,7 @@ export class UninstallCommand implements Command {
   readonly ownerOnly = true
   readonly help = {
     group: 'Set up',
-    description: 'Unplug Weaver from this project: its hooks are removed, everything else is left as it is.',
+    description: 'Unplug Weaver from this project: its hooks and its guide are removed, everything else is left as it is.',
     words: [['[claude] [codex]', 'The agent runtimes to unplug; both when none is named']],
     examples: ['weaver uninstall', 'weaver uninstall codex'],
   } as const
@@ -32,6 +33,9 @@ export class UninstallCommand implements Command {
     for (const runtime of new RuntimeCatalog().settings(project.top, this.link, args)) {
       if (runtime.uninstall()) this.screen.done(`${runtime.label}: hooks removed from ${runtime.file}`)
       else this.screen.note(`${runtime.label}: no hook to remove`)
+
+      if (GuideSkill.remove(project.top, runtime.guide))
+        this.screen.done(`${runtime.label}: the guide of Weaver removed from ${runtime.guide}`)
     }
 
     this.screen.line()
