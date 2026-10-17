@@ -85,6 +85,13 @@ export class InstallCommand implements Command {
     const guide = project.guide(runtime.guide)
 
     if (guide === null) return
+    if (guide.state() === 'foreign') {
+      this.screen.alert(
+        `${runtime.label}: ${guide.path} is a skill named weaver that Weaver did not write: it is left as it is, and the guide was not written. Rename that skill, then run weaver install again.`,
+      )
+
+      return
+    }
 
     guide.write()
     this.screen.done(`${runtime.label}: the guide of Weaver written to ${guide.path}`)

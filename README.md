@@ -80,7 +80,7 @@ Weaver tells an agent three things, each in one place:
 | The briefing | With each request       | One line for each command, at its moment, and where the guide is.                                                                                                                                                                        |
 | The hooks    | When something happens  | What that moment needs, and nothing more: a refusal and its reason, a warning after a call, a card whose file a call changed, the notes a finished task owes, a failed check, a finding to answer.                                       |
 
-The guide is Weaver's, written with what the project declares: `weaver install` writes it where each runtime looks for skills, `.claude/skills/weaver/SKILL.md` for Claude Code and `.agents/skills/weaver/SKILL.md` for Codex; `weaver update` writes it again, and `weaver doctor` says when it is behind this Weaver or the configuration. Both files are written again by each update: git should ignore them.
+The guide is Weaver's, written with what the project declares: `weaver install` writes it where each runtime looks for skills, `.claude/skills/weaver/SKILL.md` for Claude Code and `.agents/skills/weaver/SKILL.md` for Codex; `weaver update` writes it again, and `weaver doctor` says when it is behind this Weaver or the configuration. Both files are written again by each update: git should ignore them. A skill named `weaver` that Weaver did not write is left as it is, and `weaver doctor` says so, as it does of a personal skill of that name, which Claude Code reads in place of the project's.
 
 ## What agents discover: flags and cards
 

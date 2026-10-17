@@ -223,7 +223,10 @@ export class UpdateCommand implements Command {
       const guide = project.guide(runtime.guide)
       const state = guide?.state() ?? 'current'
 
-      return guide === null || state === 'current' ? [] : [{ runtime, guide, again: state === 'stale' }]
+      if (state === 'foreign')
+        this.screen.alert(`${runtime.label}: ${runtime.guide} is a skill named weaver that Weaver did not write: it is left as it is.`)
+
+      return guide === null || state === 'current' || state === 'foreign' ? [] : [{ runtime, guide, again: state === 'stale' }]
     })
 
     for (const { runtime, guide, again } of behind) {

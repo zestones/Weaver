@@ -212,6 +212,21 @@ test('update writes the guide of a wired runtime again once the project declares
   assert.equal(existsSync(join(top, '.agents/skills/weaver')), false, 'a runtime that is not wired gets no guide')
 })
 
+test('update leaves a skill named weaver that Weaver did not write as it is, and says so', async () => {
+  const mine = '---\nname: weaver\n---\nMine.\n'
+
+  await weaver(top, ['install', 'claude'])
+  writeFileSync(join(top, '.claude/skills/weaver/SKILL.md'), mine)
+
+  const { lines } = await weaver(top, ['update'], { channel: channel('9.9.9') })
+
+  assert.ok(
+    lines.includes('! Claude Code: .claude/skills/weaver/SKILL.md is a skill named weaver that Weaver did not write: it is left as it is.'),
+    lines.join('\n'),
+  )
+  assert.equal(readFileSync(join(top, '.claude/skills/weaver/SKILL.md'), 'utf8'), mine)
+})
+
 test('a dry run says what an update would do and writes nothing, in the project or on the machine', async () => {
   firstFormatProject()
 

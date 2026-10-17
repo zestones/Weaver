@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ExecutionCatalog, ScriptedExecution, type AgentExecution, type RuntimeHook } from '@weaver/agent-sdk'
@@ -405,7 +405,9 @@ test('a project whose configuration lacks migrations is told which, and that not
 
 test('a guide that is missing, or that another Weaver or another configuration wrote, is a problem', async () => {
   await weaver(top, ['install', 'claude'])
-  writeFileSync(join(top, '.claude/skills/weaver/SKILL.md'), '# An older guide\n')
+  const guide = join(top, '.claude/skills/weaver/SKILL.md')
+
+  writeFileSync(guide, readFileSync(guide, 'utf8').replace('# Working under Weaver', '# Working under an older Weaver'))
 
   const stale = await doctor()
 
@@ -423,4 +425,33 @@ test('a guide that is missing, or that another Weaver or another configuration w
       '  X Claude Code: no guide of Weaver in .claude/skills/weaver/SKILL.md, which tells its agents how to work here. Run weaver update.',
     ),
   )
+})
+
+test('a skill named weaver that Weaver did not write, or a personal one Claude Code reads in place of the guide, is a problem', async () => {
+  await weaver(top, ['install', 'claude'])
+  writeFileSync(join(top, '.claude/skills/weaver/SKILL.md'), '---\nname: weaver\n---\nMine.\n')
+
+  assert.ok(
+    (await doctor()).lines.includes(
+      '  X Claude Code: .claude/skills/weaver/SKILL.md is a skill named weaver that Weaver did not write, so its agents get no guide. Rename that skill, then run weaver update.',
+    ),
+  )
+
+  const home = join(scratch, `home-${String(Date.now())}`)
+  const personal = join(home, '.claude/skills/weaver/SKILL.md')
+  const before = process.env.HOME
+
+  mkdirSync(join(home, '.claude/skills/weaver'), { recursive: true })
+  writeFileSync(personal, '---\nname: weaver\n---\nMine too.\n')
+  process.env.HOME = home
+
+  try {
+    assert.ok(
+      (await doctor()).lines.includes(
+        `  X Claude Code: the personal skill ${personal} has the name of the guide, and Claude Code reads it in its place. Rename it.`,
+      ),
+    )
+  } finally {
+    process.env.HOME = before
+  }
 })

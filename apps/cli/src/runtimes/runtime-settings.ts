@@ -47,6 +47,8 @@ export abstract class RuntimeSettings {
   abstract readonly file: string
   // Where the runtime finds the guide of Weaver, as a skill of the project.
   abstract readonly guide: string
+  // A personal skill of the same name, which the runtime reads in place of the guide; null where it does not say.
+  abstract readonly hidingGuide: string | null
   private readonly agent: Agent
   private readonly top: string
   private readonly link: EngineLink

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DeclarationFolder } from '@weaver/engine'
@@ -277,4 +277,27 @@ test('install leaves a project whose configuration is in another format to weave
     '  Run weaver update, which brings this project and Weaver to the same one.',
   ])
   assert.equal(existsSync(join(top, CLAUDE)), false)
+})
+
+test('a skill named weaver that Weaver did not write is left as it is: install writes no guide over it, and uninstall keeps it', async () => {
+  const mine = '---\nname: weaver\ndescription: How I weave my fabrics.\n---\n'
+
+  mkdirSync(join(top, '.claude/skills/weaver'), { recursive: true })
+  writeFileSync(join(top, CLAUDE_GUIDE), mine)
+
+  const { lines } = await weaver(top, ['install'])
+
+  assert.ok(
+    lines.includes(
+      `! Claude Code: ${CLAUDE_GUIDE} is a skill named weaver that Weaver did not write: it is left as it is, and the guide was not written. Rename that skill, then run weaver install again.`,
+    ),
+    lines.join('\n'),
+  )
+  assert.equal(readFileSync(join(top, CLAUDE_GUIDE), 'utf8'), mine)
+  assert.ok(existsSync(join(top, CODEX_GUIDE)), 'the guide of the other runtime is written')
+
+  await weaver(top, ['uninstall'])
+
+  assert.equal(readFileSync(join(top, CLAUDE_GUIDE), 'utf8'), mine)
+  assert.equal(existsSync(join(top, CODEX_GUIDE)), false)
 })

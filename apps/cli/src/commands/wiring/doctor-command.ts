@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import type { ExecutionCatalog, RuntimeHook } from '@weaver/agent-sdk'
 import { DeclarationParts, RepositorySessions, type Declaration, type ReviewPolicy, type ReviewerName } from '@weaver/engine'
 import { RegistryError, type Card } from '@weaver/memory'
@@ -327,19 +328,28 @@ export class DoctorCommand implements Command {
 
     if (guide === null) return []
 
+    const { hidingGuide } = runtime
+
+    if (hidingGuide !== null && existsSync(hidingGuide)) {
+      return [
+        {
+          state: 'problem',
+          text: `${runtime.label}: the personal skill ${hidingGuide} has the name of the guide, and ${runtime.label} reads it in its place. Rename it.`,
+        },
+      ]
+    }
+
     const state = guide.state()
 
     if (state === 'current') return [{ state: 'ok', text: `${runtime.label}: the guide of Weaver in ${guide.path}` }]
 
-    return [
-      {
-        state: 'problem',
-        text:
-          state === 'absent'
-            ? `${runtime.label}: no guide of Weaver in ${guide.path}, which tells its agents how to work here. Run weaver update.`
-            : `${runtime.label}: the guide in ${guide.path} is not the one of this Weaver and this configuration. Run weaver update.`,
-      },
-    ]
+    const texts: Readonly<Record<Exclude<typeof state, 'current'>, string>> = {
+      absent: `${runtime.label}: no guide of Weaver in ${guide.path}, which tells its agents how to work here. Run weaver update.`,
+      foreign: `${runtime.label}: ${guide.path} is a skill named weaver that Weaver did not write, so its agents get no guide. Rename that skill, then run weaver update.`,
+      stale: `${runtime.label}: the guide in ${guide.path} is not the one of this Weaver and this configuration. Run weaver update.`,
+    }
+
+    return [{ state: 'problem', text: texts[state] }]
   }
 
   // A runtime may hold hooks and not run them, without a word: it alone says. Nothing is said of a runtime that has
