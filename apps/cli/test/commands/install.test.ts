@@ -24,7 +24,6 @@ const CONFIG = '.weaver/settings.json'
 const SKILL = '.weaver/skills/wv-finish.md'
 const CLAUDE_GUIDE = '.claude/skills/weaver/SKILL.md'
 const CODEX_GUIDE = '.agents/skills/weaver/SKILL.md'
-const GUIDES = `${CLAUDE_GUIDE}\n${CODEX_GUIDE}\n`
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-install-'))
 const link = new EngineLink()
 let top: string
@@ -111,12 +110,10 @@ test('install says what to do of a hooks file git would share: ignore it, stop f
   assert.deepEqual(await advice(), [
     `  ! ${CLAUDE} is not ignored by git and names paths of this machine: add it to .gitignore.`,
     `  ! ${CODEX} is not ignored by git and names paths of this machine: add it to .gitignore.`,
-    `  ! ${CLAUDE_GUIDE} is not ignored by git, and Weaver writes it again with each update: add it to .gitignore.`,
-    `  ! ${CODEX_GUIDE} is not ignored by git, and Weaver writes it again with each update: add it to .gitignore.`,
   ])
 
   git('add', '-f', CLAUDE, CODEX)
-  writeFileSync(join(top, '.gitignore'), `.codex/\n${GUIDES}`)
+  writeFileSync(join(top, '.gitignore'), '.codex/\n')
 
   assert.deepEqual(await advice(), [
     `  ! ${CLAUDE} is followed by git and names paths of this machine: add it to .gitignore, then run \`git rm --cached ${CLAUDE}\`, which keeps the file.`,
@@ -124,7 +121,7 @@ test('install says what to do of a hooks file git would share: ignore it, stop f
   ])
 
   git('rm', '--cached', '-q', CLAUDE, CODEX)
-  writeFileSync(join(top, '.gitignore'), `.codex/\n.claude/settings.local.json\n${GUIDES}`)
+  writeFileSync(join(top, '.gitignore'), '.codex/\n.claude/settings.local.json\n')
 
   assert.deepEqual(await advice(), [], 'ignored and no longer followed: nothing is left to say')
   assert.equal(existsSync(join(top, CODEX)), true)

@@ -95,10 +95,6 @@ export class InstallCommand implements Command {
 
     guide.write()
     this.screen.done(`${runtime.label}: the guide of Weaver written to ${guide.path}`)
-
-    if (!project.ignores(guide.path)) {
-      this.screen.alert(`${guide.path} is not ignored by git, and Weaver writes it again with each update: add it to .gitignore.`, 1)
-    }
   }
 
   // The hooks name paths of this machine: the file that holds them is not to be shared. null when git neither
