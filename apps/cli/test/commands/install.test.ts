@@ -49,7 +49,7 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(Object.keys(claude.hooks), ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop'])
   assert.deepEqual(Object.keys(codex.hooks), ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'])
-  assert.equal(claude.hooks.PreToolUse?.[0]?.matcher, 'Bash|Monitor|PowerShell|Write|Edit|MultiEdit|NotebookEdit')
+  assert.equal(claude.hooks.PreToolUse?.[0]?.matcher, 'Bash|Monitor|PowerShell|Write|Edit|MultiEdit|NotebookEdit|Agent')
   assert.equal(codex.hooks.PostToolUse?.[0]?.matcher, 'Bash|Monitor|PowerShell|apply_patch')
   assert.equal(claude.hooks.UserPromptSubmit?.[0]?.matcher, undefined)
   assert.equal(claude.hooks.Stop?.[0]?.hooks[0]?.timeout, 3600)

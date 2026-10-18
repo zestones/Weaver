@@ -67,7 +67,7 @@ test('a call the runtime never ran gives no base when the turn ends: a file writ
   startTool(session, bashCall(`git show HEAD:${A_FILE} > /tmp/a.ts && cp /tmp/a.ts ${A_FILE}`))
   agentWrites(session, { [A_FILE]: 'export const a = 1\n' })
 
-  session.closeOpenCalls()
+  session.closeEndedCalls()
 
   assert.deepEqual(unitFiles(session), [])
 })
@@ -79,7 +79,7 @@ test('a command still running in the background when a file is written back give
   agentWrites(session, { [A_FILE]: 'export const a = 1\n' })
   agentWrites(session, { [B_FILE]: 'export const b = 2\n' })
 
-  session.closeOpenCalls()
+  session.closeEndedCalls()
 
   assert.deepEqual(unitFiles(session), [B_FILE])
   assert.equal(stateOf(session)?.unit.files[B_FILE]?.base, null)
@@ -288,10 +288,58 @@ test('a command run in the background keeps its window until the turn ends', () 
 
   assert.deepEqual(unitFiles(session), [], 'the call returned before its command wrote anything')
 
-  session.closeOpenCalls()
+  session.closeEndedCalls()
 
   assert.deepEqual(unitFiles(session), [A_FILE])
   assert.deepEqual(stateOf(session)?.pending, {})
+})
+
+test('a command run in the background keeps its window until its task ends, through the ends of turn before', () => {
+  const project = declaration({ scripts: { writers: ['npm run api:types'] } })
+
+  prompt(session, 'run the codegen in the background')
+  startTool(
+    session,
+    { ...bashCall('npm run api:types', { run_in_background: true }), tool_response: { backgroundTaskId: 'b1' } },
+    project,
+  )()
+  session.closeEndedCalls()
+  writeFiles(session.repo.top, { [A_FILE]: 'export const a = 3\n' })
+
+  assert.deepEqual(unitFiles(session), [], 'the task still runs at the end of the turn: its window waits for it')
+
+  session.endedInBackground('b1')
+
+  assert.deepEqual(unitFiles(session), [A_FILE])
+  assert.deepEqual(stateOf(session)?.pending, {})
+})
+
+test('the calls of a subagent sent to the background close at their own end, whatever the end of the turn sees meanwhile', () => {
+  prompt(session, 'fix it, then prove the test catches the old code')
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  startTool(session, {
+    tool_name: 'Agent',
+    tool_input: { prompt: 'prove it', run_in_background: 'true' },
+    tool_response: { isAsync: true, status: 'async_launched', agentId: 'a1' },
+  })()
+
+  const mutation = startTool(session, { ...bashCall('cp old.ts src/a.ts && npm test; cp new.ts src/a.ts'), agent_id: 'a1' })
+
+  writeFiles(session.repo.top, { [A_FILE]: 'export const a = 1\n' })
+  session.closeEndedCalls()
+  writeFiles(session.repo.top, { [A_FILE]: 'export const a = 2\n' })
+  mutation()
+
+  assert.deepEqual(unitFiles(session), [A_FILE], 'the old code the test ran against was never the file the unit holds')
+
+  const refused = startTool(session, { ...bashCall('python3 tools/gen.py'), agent_id: 'a1' })
+
+  writeFiles(session.repo.top, { 'src/b.ts': 'export const b = 1\n' })
+  session.endedInBackground('a1')
+
+  assert.deepEqual(unitFiles(session), [A_FILE, 'src/b.ts'], 'a call of the subagent that never ended closes with it')
+  assert.deepEqual(stateOf(session)?.pending, {})
+  assert.deepEqual(refused().body, null, 'its end, told late, finds nothing to close')
 })
 
 test("the session's own calls running side by side do not make its files foreign", () => {

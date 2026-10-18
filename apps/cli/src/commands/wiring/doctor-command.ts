@@ -316,7 +316,8 @@ export class DoctorCommand implements Command {
 
     const wired = runtime.wiredTag()
     const own = new OwnRelease()
-    const whose = wired === null || wired === own.tag ? 'point somewhere else' : `are those of Weaver ${wired}, and this is ${own.tag}`
+    const whose =
+      wired === null || wired === own.tag ? 'are not the ones this Weaver writes' : `are those of Weaver ${wired}, and this is ${own.tag}`
 
     return { state: 'problem', text: `${runtime.label}: the hooks in ${runtime.file} ${whose}. Run weaver update.` }
   }

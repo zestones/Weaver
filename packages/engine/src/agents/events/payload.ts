@@ -23,8 +23,9 @@ export class Payload {
     return typeof value === 'number' && Number.isFinite(value) ? value : null
   }
 
+  // A runtime may give a flag as the word `true`.
   flag(key: string): boolean {
-    return this.raw[key] === true
+    return this.raw[key] === true || this.raw[key] === 'true'
   }
 
   record(key: string): Payload {

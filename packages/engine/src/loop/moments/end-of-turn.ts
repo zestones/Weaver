@@ -50,7 +50,7 @@ export class EndOfTurn implements Moment {
 
     if (session === null) return Answer.empty()
 
-    const alert = new HeadAlert(session.closeOpenCalls())
+    const alert = new HeadAlert(session.closeEndedCalls())
     // Whatever the turn ends with, its flags are written up and the owner is told of them. The writer starts before
     // the checks and the review, which a runtime may cut short: it has all the flags of the turn by now.
     const unwritten = this.startWriter(turn.repo, turn.declaration)

@@ -90,7 +90,7 @@ test('hooks that point to a Weaver that is no longer there are a problem, and so
   const dead = await doctor({ link: moved })
 
   assert.equal(stale.status, 1)
-  assert.ok(stale.lines.includes('  X Codex: the hooks in .codex/hooks.json point somewhere else. Run weaver update.'))
+  assert.ok(stale.lines.includes('  X Codex: the hooks in .codex/hooks.json are not the ones this Weaver writes. Run weaver update.'))
   assert.equal(dead.status, 1)
   assert.ok(dead.lines.includes(`  X The hook does not start: ${moved.hook}. Build Weaver with pnpm build.`))
 })
@@ -454,4 +454,18 @@ test('a skill named weaver that Weaver did not write, or a personal one Claude C
   } finally {
     process.env.HOME = before
   }
+})
+
+test('hooks called for fewer tools than this Weaver reads are to be written again', async () => {
+  await weaver(top, ['install', 'claude'])
+
+  const settings = readFileSync(join(top, '.claude/settings.local.json'), 'utf8')
+
+  writeFileSync(join(top, '.claude/settings.local.json'), settings.replaceAll('|NotebookEdit|Agent', '|NotebookEdit'))
+
+  assert.ok(
+    (await doctor()).lines.includes(
+      '  X Claude Code: the hooks in .claude/settings.local.json are not the ones this Weaver writes. Run weaver update.',
+    ),
+  )
 })

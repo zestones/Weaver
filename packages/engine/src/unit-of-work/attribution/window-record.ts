@@ -10,4 +10,8 @@ export interface WindowRecord {
   readonly before: Readonly<Record<string, Blob>>
   readonly head: string | null
   readonly attribution: WriteScope
+  // The subagent that made the call; null for the agent itself.
+  readonly agent: string | null
+  // The task the call left running, once its runtime names it: the window closes when that task ends.
+  readonly task: string | null
 }

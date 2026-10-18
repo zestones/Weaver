@@ -9,6 +9,8 @@ export interface WatchedCall {
   readonly targets: readonly string[] | null
   readonly scope: WriteScope
   readonly untilStop: boolean
+  // The subagent that makes the call; null for the agent itself.
+  readonly agent: string | null
 }
 
 export interface Change {
@@ -45,6 +47,8 @@ export class AttributionWindow {
       before: Object.fromEntries(repo.hashPaths(call.targets ?? repo.dirtyPaths())),
       head: repo.head(),
       attribution: call.scope,
+      agent: call.agent,
+      task: null,
     })
   }
 
@@ -54,6 +58,18 @@ export class AttributionWindow {
 
   get openedAt(): string {
     return this.record.at
+  }
+
+  // Whether the call may still be running for one of these tasks: its own, or the one of the subagent that made it.
+  runsFor(tasks: ReadonlySet<string>): boolean {
+    const { task, agent } = this.record
+
+    return (task !== null && tasks.has(task)) || (agent !== null && tasks.has(agent))
+  }
+
+  // The paths a call that names its writes is about to change.
+  get claims(): string[] {
+    return this.record.exact ? Object.keys(this.record.before) : []
   }
 
   // `heldElsewhere` gives, among paths, those another session works on: a call that may have written anything is not

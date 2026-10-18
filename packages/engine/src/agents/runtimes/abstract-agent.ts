@@ -14,17 +14,21 @@ export abstract class AbstractAgent implements Agent {
   abstract readonly name: AgentName
   readonly events: readonly string[] = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop']
   protected abstract readonly editTools: readonly string[]
+  // The tools that may leave a task running that writes files, such as a subagent sent to the background.
+  protected readonly taskTools: readonly string[] = []
 
   get tools(): readonly string[] {
-    return [...SHELL_TOOLS, ...this.editTools]
+    return [...SHELL_TOOLS, ...this.editTools, ...this.taskTools]
   }
 
   read(payload: Payload): AgentEvent {
     const cwd = payload.text('cwd') ?? process.cwd()
     const tool = payload.text('tool_name')
     const response = payload.record('tool_response')
-    // A command sent to the background gives the id of its task, a watch the id of its own and how long it lasts.
-    const task = response.text('backgroundTaskId') ?? response.text('taskId')
+    // A command sent to the background gives the id of its task, a watch the id of its own and how long it lasts, and
+    // a subagent sent to the background its id, which its end names.
+    const task =
+      response.text('backgroundTaskId') ?? response.text('taskId') ?? (response.flag('isAsync') ? response.text('agentId') : null)
 
     return new AgentEvent({
       sessionId: payload.text('session_id'),

@@ -32,16 +32,15 @@ export class AfterCall implements Moment {
     const { background } = turn.event
 
     // Only the agent itself is told of the end of its tasks: a subagent's are its own.
-    if (background !== null && !turn.event.subagent) session.startedInBackground(background.id, background.timeoutMs)
+    if (background !== null && !turn.event.subagent) session.startedInBackground(background.id, background.timeoutMs, callId)
 
     const touches = session.closeCall(callId)
     const alert = new HeadAlert(touches).text
-    const changes = session.unit().sinceBase(new Map(touches.flatMap((touch) => [...touch.changes])))
+    // The agent is told of what its call changed, not of what another call of the session wrote meanwhile.
+    const own = new Map(touches.flatMap((touch) => [...touch.own]))
+    const changes = session.unit().sinceBase(own)
     const call = CallDiff.of(session.repo, session.dir, callId, changes, turn.declaration.exclude)
-    const notice = this.cardNotice(
-      session,
-      touches.flatMap((touch) => touch.paths),
-    )
+    const notice = this.cardNotice(session, [...own.keys()])
 
     // A moved HEAD is the agent's to hear as much as the owner's: a commit it made settles nothing.
     if (call.isEmpty || !this.checks.warns(turn.declaration)) return this.told([notice, alert]).after(alert)

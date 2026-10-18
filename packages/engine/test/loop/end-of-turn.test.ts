@@ -250,6 +250,29 @@ test('an agent that waits for a task it left running is not reminded how to end 
   assert.equal(checks.calls.count, 0)
 })
 
+test('an agent that waits for a subagent it sent to the background is not reminded, until the subagent ends', async () => {
+  const project = declaration({ finish: { headings: ['Request'] } })
+  const checks = stubChecks([PASSING])
+
+  prompt(session, 'measure it with a subagent', project)
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  startTool(
+    session,
+    {
+      tool_name: 'Agent',
+      tool_input: { prompt: 'measure', run_in_background: 'true' },
+      tool_response: { isAsync: true, status: 'async_launched', agentId: 'a1' },
+    },
+    project,
+  )()
+
+  assert.equal((await finishWith(session, checks, project, 'The subagent measures.')).decision, undefined)
+
+  prompt(session, '<task-notification>\n<task-id>a1</task-id>\n<status>completed</status>\n</task-notification>', project)
+
+  assert.equal((await finishWith(session, checks, project, 'It measured.')).decision, 'block')
+})
+
 test('a task whose end the runtime never tells is given up on once the time it was given has passed', async () => {
   const project = declaration({ finish: { headings: ['Request'] } })
 

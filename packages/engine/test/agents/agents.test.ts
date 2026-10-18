@@ -29,7 +29,7 @@ test('every event a runtime fires for Weaver is one the loop listens to, and its
       agent.name,
     )
 
-  assert.deepEqual(claude.tools, ['Bash', 'Monitor', 'PowerShell', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit'])
+  assert.deepEqual(claude.tools, ['Bash', 'Monitor', 'PowerShell', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Agent'])
   assert.deepEqual(codex.tools, ['Bash', 'Monitor', 'PowerShell', 'apply_patch'])
   assert.equal(codex.events.includes('PostToolUseFailure'), false)
 })
@@ -74,5 +74,25 @@ test('a call that leaves its command running says so; a tool that writes no file
   assert.equal(background('Bash', { command: 'npm run dev', run_in_background: true }), true)
   assert.equal(background('Monitor', { command: 'tail -f log' }), true)
   assert.equal(background('Bash', { command: 'npm test' }), false)
+  assert.equal(background('Bash', { command: 'npm run dev', run_in_background: 'true' }), true, 'a flag given as a word')
   assert.equal(writesOf(claude, 'Read', { file_path: '/repo/a.ts' }), null)
+})
+
+test('a subagent sent to the background is a task, named by its id, which only Claude Code has', () => {
+  const launched = claude.read(
+    new Payload({
+      cwd: TOP,
+      tool_name: 'Agent',
+      tool_input: { prompt: 'prove it', run_in_background: 'true' },
+      tool_response: { isAsync: true, status: 'async_launched', agentId: 'afe5f2db3c19e4655' },
+    }),
+  )
+  const waited = claude.read(
+    new Payload({ cwd: TOP, tool_name: 'Agent', tool_input: { prompt: 'look' }, tool_response: { agentId: 'a2' } }),
+  )
+
+  assert.deepEqual(launched.background, { id: 'afe5f2db3c19e4655', timeoutMs: null })
+  assert.equal(waited.background, null, 'a subagent the agent waits for leaves no task behind')
+  assert.ok(claude.tools.includes('Agent'))
+  assert.ok(!codex.tools.includes('Agent'))
 })

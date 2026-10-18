@@ -7,6 +7,7 @@ export interface TouchFields {
   readonly shown: readonly string[]
   readonly foreign: readonly string[]
   readonly headMoved: HeadMove | null
+  readonly others: readonly string[]
 }
 
 export class Touch {
@@ -16,6 +17,9 @@ export class Touch {
   readonly shown: readonly string[]
   readonly foreign: readonly string[]
   readonly headMoved: HeadMove | null
+  // Among its changes, the files another call of the session wrote while this one ran, as subagents side by side do:
+  // the unit holds them all, and that call is the one told of them.
+  readonly others: readonly string[]
 
   constructor(fields: TouchFields) {
     this.tool = fields.tool
@@ -23,10 +27,16 @@ export class Touch {
     this.shown = fields.shown
     this.foreign = fields.foreign
     this.headMoved = fields.headMoved
+    this.others = fields.others
   }
 
   get paths(): string[] {
     return [...this.changes.keys()]
+  }
+
+  // What the call itself changed, as it is told to the agent that made it.
+  get own(): Map<string, Change> {
+    return new Map([...this.changes].filter(([path]) => !this.others.includes(path)))
   }
 
   events(): EventBody[] {

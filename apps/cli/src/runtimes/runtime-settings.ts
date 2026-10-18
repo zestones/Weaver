@@ -81,15 +81,23 @@ export abstract class RuntimeSettings {
     return true
   }
 
+  // A hook is wired as this Weaver writes it: its command, and the tools it is called for.
   wiring(): Wiring {
-    const commands = Object.values(this.read().hooks ?? {})
-      .flatMap((groups) => groups.flatMap((group) => group.hooks ?? []))
-      .map((hook) => hook.command ?? '')
-      .filter((command) => this.link.owns(command))
+    const hooks = this.read().hooks ?? {}
+    const ours = (event: string): HookGroup[] =>
+      (hooks[event] ?? []).filter((group) => (group.hooks ?? []).some((hook) => this.link.owns(hook.command ?? '')))
 
-    if (commands.length === 0) return 'absent'
+    if (Object.keys(hooks).every((event) => ours(event).length === 0)) return 'absent'
 
-    return this.commands().every((command) => commands.includes(command)) ? 'installed' : 'stale'
+    const wired = this.agent.events.every((event) => {
+      const { matcher, hooks: [expected] = [] } = this.group(event)
+
+      return ours(event).some(
+        (group) => group.matcher === matcher && (group.hooks ?? []).some((hook) => hook.command === expected?.command),
+      )
+    })
+
+    return wired ? 'installed' : 'stale'
   }
 
   // The release whose hooks are wired here, by its tag; null when they are those of a checkout, or when none is.

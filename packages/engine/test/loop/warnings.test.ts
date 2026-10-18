@@ -170,6 +170,31 @@ test('a check that warns is given what the call changed, each file with what it 
   )
 })
 
+test('a command that may write anything is not warned of what another call of the session wrote while it ran', () => {
+  hook('UserPromptSubmit', { prompt: 'two subagents side by side' })
+
+  const call = (id: string, tool: Record<string, unknown>): Record<string, unknown> => ({ ...tool, tool_use_id: id })
+  const longRun = call('long-1', { tool_name: 'Bash', tool_input: { command: 'python3 tools/long.py' } })
+  const writeB = call('write-b', { tool_name: 'Write', tool_input: { file_path: join(repo.top, 'src/b.js'), content: 'x' } })
+
+  hook('PreToolUse', longRun)
+  hook('PreToolUse', writeB)
+  writeFiles(repo.top, { 'src/b.js': 'export const b = ;\n' })
+
+  assert.match(told(hook('PostToolUse', writeB)), /`syntax` warns/, 'the call that wrote it is told')
+  assert.deepEqual(hook('PostToolUse', longRun), {}, 'the command that ran meanwhile is not')
+
+  const otherRun = call('long-2', { tool_name: 'Bash', tool_input: { command: 'python3 tools/long.py' } })
+  const writeC = call('write-c', { tool_name: 'Write', tool_input: { file_path: join(repo.top, 'src/c.js'), content: 'x' } })
+
+  hook('PreToolUse', otherRun)
+  hook('PreToolUse', writeC)
+  writeFiles(repo.top, { 'src/c.js': 'export const c = ;\n' })
+
+  assert.deepEqual(hook('PostToolUse', otherRun), {}, 'a call still open names the file: it is that call’s')
+  assert.match(told(hook('PostToolUse', writeC)), /`syntax` warns/)
+})
+
 test('a warning that does not end in the time the settings give says nothing, and the call is answered', () => {
   writeDeclaration(repo.top, {
     ...DECLARATION,

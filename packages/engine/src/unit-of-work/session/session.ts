@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import type { Repository } from '../../lib/git/repository.ts'
-import { AttributionWindow, type WatchedCall } from '../attribution/attribution-window.ts'
+import { AttributionWindow, type Change, type WatchedCall } from '../attribution/attribution-window.ts'
 import { Touch } from '../attribution/touch.ts'
 import type { EventBody } from '../journal/journal-event.ts'
 import { Journal } from '../journal/journal.ts'
@@ -101,25 +101,36 @@ export class Session {
   // A task with no end in sight is given up on after this long, should the runtime never tell of its end.
   static readonly BACKGROUND_GIVEN_UP_MS = 12 * 60 * 60 * 1000
 
-  // `timeoutMs` is how long the runtime keeps the task, when it says.
-  startedInBackground(task: string, timeoutMs: number | null): void {
+  // `timeoutMs` is how long the runtime keeps the task, when it says. The window of the call that started it, when it
+  // has one, now waits for the task to end.
+  startedInBackground(task: string, timeoutMs: number | null, callId: string | null): void {
     const until = new Date(Date.now() + (timeoutMs ?? Session.BACKGROUND_GIVEN_UP_MS)).toISOString()
 
-    this.store.update((latest) => ({ ...latest, background: { ...latest.background, [task]: until } }))
+    this.store.update((latest) => {
+      const window = callId === null ? undefined : latest.pending[callId]
+      const waiting = callId !== null && window !== undefined ? { [callId]: { ...window, task } } : {}
+
+      return { ...latest, pending: { ...latest.pending, ...waiting }, background: { ...latest.background, [task]: until } }
+    })
   }
 
-  endedInBackground(task: string): void {
+  // What the task wrote is the agent's: the calls that waited for it close now, those of a subagent that ended too.
+  endedInBackground(task: string): Touch[] {
     this.store.update((latest) => ({
       ...latest,
       background: Object.fromEntries(Object.entries(latest.background).filter(([id]) => id !== task)),
     }))
+
+    return this.close((latest) =>
+      Object.entries(latest.pending)
+        .filter(([, window]) => new AttributionWindow(window).runsFor(new Set([task])))
+        .map(([id]) => id),
+    )
   }
 
   // Whether the agent waits for a task it left running: it may stop without ending its work, and resume at its end.
   get waitsInBackground(): boolean {
-    const now = new Date().toISOString()
-
-    return Object.values(this.state()?.background ?? {}).some((until) => until > now)
+    return this.running(this.state()).size > 0
   }
 
   asked(names: readonly string[]): void {
@@ -169,12 +180,18 @@ export class Session {
     return this.close((latest) => (latest.pending[callId]?.untilStop === true ? [] : [callId]))
   }
 
-  closeOpenCalls(): Touch[] {
-    return this.close((latest) =>
-      Object.entries(latest.pending)
+  // At the end of the agent's turn, the calls that will never be told of their end: one its runtime refused after the
+  // hook let it through, or one that failed where no hook follows a failure. A call still running for a task left in
+  // the background, a subagent's among them, closes when it ends, or when that task does.
+  closeEndedCalls(): Touch[] {
+    return this.close((latest) => {
+      const running = this.running(latest)
+
+      return Object.entries(latest.pending)
+        .filter(([, window]) => !new AttributionWindow(window).runsFor(running))
         .sort(([, older], [, newer]) => older.at.localeCompare(newer.at))
-        .map(([id]) => id),
-    )
+        .map(([id]) => id)
+    })
   }
 
   unit(): UnitOfWork {
@@ -185,7 +202,7 @@ export class Session {
 
   // The repairs of the project's checks run as one call of the session: what they rewrite stays the agent's work.
   async repair(repairs: () => Promise<void>): Promise<readonly string[]> {
-    this.watch(REPAIR, { tool: REPAIR, targets: null, scope: 'all', untilStop: false })
+    this.watch(REPAIR, { tool: REPAIR, targets: null, scope: 'all', untilStop: false, agent: null })
     await repairs()
 
     return this.closeCall(REPAIR).flatMap((touch) => touch.paths)
@@ -271,6 +288,13 @@ export class Session {
     this.log({ kind: 'settle', unit: next.unit.number - 1, files: Object.keys(checked).length, by: 'check', notes: [] })
   }
 
+  // The tasks left in the background that have not ended, nor outlived the time they were given.
+  private running(record: SessionRecord | null): Set<string> {
+    const now = new Date().toISOString()
+
+    return new Set(Object.entries(record?.background ?? {}).flatMap(([task, until]) => (until > now ? [task] : [])))
+  }
+
   private reconciled(change: (record: SessionRecord) => SessionRecord): SessionRecord {
     const { record, value: notes } = this.store.transact((latest) => {
       const { head, unit, notes } = new Reconciliation(this.repo, latest.head, new UnitOfWork(latest.unit)).apply()
@@ -311,6 +335,7 @@ export class Session {
     const window = new AttributionWindow(pending)
     const elsewhere = new HeldElsewhere(this.repo, dirname(this.dir), this.id)
     const closed = window.close(this.repo, (paths) => elsewhere.among(paths))
+    const others = this.writtenByOthers(latest, id, window, closed.charged)
     const { unit, foreign } = new UnitOfWork(latest.unit).charge(window, closed)
 
     return {
@@ -322,7 +347,24 @@ export class Session {
         head: closed.headMoved === null ? latest.head : closed.headMoved.to,
         unit: unit.record,
       },
-      value: new Touch({ tool: window.tool, changes: closed.charged, shown: closed.shown, foreign, headMoved: closed.headMoved }),
+      value: new Touch({ tool: window.tool, changes: closed.charged, shown: closed.shown, foreign, headMoved: closed.headMoved, others }),
     }
+  }
+
+  // A call that names its writes wrote them. One that may write anything did not write what another call of the
+  // session left in a file while it ran, nor what a call still open names.
+  private writtenByOthers(latest: SessionRecord, id: string, window: AttributionWindow, charged: ReadonlyMap<string, Change>): string[] {
+    if (window.record.exact) return []
+
+    const claimed = new Set(
+      Object.entries(latest.pending).flatMap(([other, record]) => (other === id ? [] : new AttributionWindow(record).claims)),
+    )
+
+    return [...charged].flatMap(([path, change]) => {
+      const file = latest.unit.files[path]
+      const written = file !== undefined && file.last === change.after && file.touchedAt > window.openedAt
+
+      return written || claimed.has(path) ? [path] : []
+    })
   }
 }
