@@ -8,6 +8,7 @@ import { FindingsCheck } from '../kinds/findings-check.ts'
 import type { CheckMemory } from '../results/check-memory.ts'
 import type { CheckOutcome } from '../results/check-outcome.ts'
 import type { CheckRunner } from './check-runner.ts'
+import type { CheckWatcher } from './check-watcher.ts'
 
 const MIN_TIMEOUT_MS = 1000
 
@@ -57,7 +58,13 @@ export class ProjectChecks implements CheckRunner {
     }
   }
 
-  async judge(declaration: Declaration, unit: UnitDiff, deadline: number, memory?: CheckMemory): Promise<CheckOutcome[]> {
+  async judge(
+    declaration: Declaration,
+    unit: UnitDiff,
+    deadline: number,
+    memory?: CheckMemory,
+    watcher?: CheckWatcher,
+  ): Promise<CheckOutcome[]> {
     const { parallel } = declaration.checkLimits
     const env = unit.environment()
     const checks = declaration.checks.map((declared) => this.checkOf(declaration, declared))
@@ -71,11 +78,13 @@ export class ProjectChecks implements CheckRunner {
 
         if (check === null) break
 
+        watcher?.started(check.id)
         running.set(
           check.id,
           this.start(check, done, unit, env, Math.max(MIN_TIMEOUT_MS, deadline - Date.now()), memory).then((outcome) => {
             done.set(check.id, outcome)
             running.delete(check.id)
+            watcher?.ended(outcome)
           }),
         )
       }

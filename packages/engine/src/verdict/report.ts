@@ -1,4 +1,5 @@
 import { counted } from '../lib/text/counted.ts'
+import { duration } from '../lib/text/duration.ts'
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Declaration } from '../declaration/content/declaration.ts'
@@ -8,8 +9,12 @@ import type { CheckOutcome } from '../checks/results/check-outcome.ts'
 import type { UnitReview } from '../review/rounds/unit-review.ts'
 import type { UnitVerdict } from './unit-verdict.ts'
 
+// An end of task this long says where its time went; so does a part of it this long, among the three longest.
+const SAID_FROM_MS = 10_000
+const SAID_PARTS = 3
+
 const ANSWER_HOW =
-  'Answer each finding in your final message, one line each: `F1 fixed: <what you changed>` or `F1 not fixed: <why>`. A finding answered `fixed` needs a change in its file. Then finish again.'
+  'Answer each finding in your final message, one line each: `F1 fixed: <what you changed>` or `F1 not fixed: <why>`. A finding answered `fixed` needs a change in its file, or names the file the fix is in. Then finish again.'
 // The name of a rule is a handle for the project: the owner reads what the rule asks.
 const IN_WORDS = 'When you speak of a rule to the owner, say what it asks: its name alone tells them nothing.'
 const HEADS: Readonly<Record<string, string>> = {
@@ -113,7 +118,30 @@ export class Report {
       )
     if (waiting > 0) parts.push(`${counted(waiting, 'item')} to validate.`)
 
-    return [...parts, `Report: ${reportPath}`].join(' ')
+    return [...parts, ...this.took(), `Report: ${reportPath}`].join(' ')
+  }
+
+  // Where the time of a long end of task went, the longest first: what to make shorter.
+  private took(): string[] {
+    const { outcomes, review, ms } = this.verdict
+
+    if (ms < SAID_FROM_MS) return []
+
+    const runs = outcomes
+      .filter((outcome) => outcome.ran && outcome.keptFrom === null)
+      .map((outcome) => ({ what: outcome.id, ms: outcome.ms }))
+    const reviewed =
+      review === null || review.outcome.seconds === 0
+        ? []
+        : [{ what: `the review by ${review.outcome.runtime}`, ms: review.outcome.seconds * 1000 }]
+    const longest = [...runs, ...reviewed]
+      .filter((part) => part.ms >= SAID_FROM_MS)
+      .sort((one, other) => other.ms - one.ms)
+      .slice(0, SAID_PARTS)
+
+    return [
+      `It took ${duration(ms)}${longest.length === 0 ? '' : `: ${longest.map((part) => `${part.what} ${duration(part.ms)}`).join(', ')}`}.`,
+    ]
   }
 
   private render(): string {

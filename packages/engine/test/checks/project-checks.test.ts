@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
@@ -7,6 +7,7 @@ import { CheckMemory } from '../../src/checks/results/check-memory.ts'
 import type { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
 import { ProjectChecks } from '../../src/checks/running/project-checks.ts'
 import type { Repository } from '../../src/lib/git/repository.ts'
+import { EndOfTaskProgress } from '../../src/loop/progress/end-of-task-progress.ts'
 import { TreeDiff } from '../../src/lib/git/tree-diff.ts'
 import { WorkingTreeSnapshot } from '../../src/lib/git/working-tree-snapshot.ts'
 import { UnitDiff } from '../../src/unit-of-work/diff/unit-diff.ts'
@@ -247,4 +248,49 @@ test('a check given the same two trees again gives its verdict again without run
   await judged()
 
   assert.equal(readFileSync(runs, 'utf8'), 'xx')
+})
+
+test('the end of a task keeps where its checks are, as they start and end, for whoever waits for it', async () => {
+  writeFiles(repo.top, { 'src/a.js': 'export const a = 2\n' })
+
+  const project = declarationOf({
+    checks: {
+      lint: { judge: ['true'], rules: gate('G1') },
+      tests: { judge: ['sleep', '1'], after: 'lint', rules: gate('G2') },
+      types: { judge: ['false'], rules: gate('G3') },
+    },
+  })
+  const dir = join(repo.gitDir, 'weaver', 'progress-test')
+
+  mkdirSync(dir, { recursive: true })
+
+  const progress = new EndOfTaskProgress(dir, 3, ['lint', 'tests', 'types'], false)
+  const seen: string[] = []
+  const watching = {
+    started: (id: string) => {
+      progress.started(id)
+      seen.push(`${id} ${EndOfTaskProgress.read(dir)?.checks.find((check) => check.id === id)?.status ?? ''}`)
+    },
+    ended: (outcome: CheckOutcome) => {
+      progress.ended(outcome)
+    },
+  }
+
+  await new ProjectChecks().judge(project, unitDiff(), project.checkLimits.deadlineFrom(Date.now()), undefined, watching)
+  progress.over('the checks send the agent back')
+
+  const kept = EndOfTaskProgress.read(dir)
+
+  assert.deepEqual(seen.sort(), ['lint running', 'tests running', 'types running'])
+  assert.deepEqual(
+    kept?.checks.map(({ id, status }) => [id, status]),
+    [
+      ['lint', 'pass'],
+      ['tests', 'pass'],
+      ['types', 'fail'],
+    ],
+  )
+  assert.ok((kept?.checks.find((check) => check.id === 'tests')?.ms ?? 0) >= 1000)
+  assert.deepEqual([kept?.unit, kept?.step, kept?.outcome, kept?.endedAt !== null], [3, 'over', 'the checks send the agent back', true])
+  assert.equal(kept !== null && EndOfTaskProgress.isCut(kept), false, 'its hook is this process, alive')
 })

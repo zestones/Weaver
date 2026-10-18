@@ -22,6 +22,7 @@ import { FlagCommand } from '../memory/flag-command.ts'
 import { NoteCommand } from '../memory/note-command.ts'
 import { StatsCommand } from '../numbers/stats-command.ts'
 import { MaintenanceCommand } from '../sessions/maintenance-command.ts'
+import { StatusCommand } from '../sessions/status-command.ts'
 import { UiCommand } from '../ui/ui-command.ts'
 import { DoctorCommand } from '../wiring/doctor-command.ts'
 import { InstallCommand } from '../wiring/install-command.ts'
@@ -133,6 +134,7 @@ export class CommandLine {
       new DoctorCommand(this.cwd, this.output, link, this.executions),
       new VersionCommand(this.output),
       new MaintenanceCommand(this.cwd, this.output),
+      new StatusCommand(this.cwd, this.output),
       new CheckCommand(this.cwd, this.output, this.caller),
       new GuideCommand(this.cwd, this.output),
       new StatsCommand(this.cwd, this.output),

@@ -16,6 +16,7 @@ Weaver knows no rule by itself. Everything it enforces is declared by the superv
 | Warns right after a call         | A check may run a fast command on the files a call just changed, against what they held before the agent's work. What it finds is told to the agent at once and holds nothing: the verdict comes when the task ends.                                                               |
 | Checks when a task ends          | The project's programs judge the change: the compiler, the linter, scripts of its own. A check may repair first, then judge. A failure sends the agent back to work.                                                                                                               |
 | Has another agent review         | The rules no program can judge go to a reviewer, Claude Code or Codex, that only reads or that experiments in a throwaway copy of the project. The agent answers each finding.                                                                                                     |
+| Says where a long end of task is | `weaver status --watch`, from a terminal of your own, follows the end of a task: each check as it runs, beside the time it usually takes in the project, then the review. A long one ends saying where its time went.                                                              |
 | Keeps what agents discover       | An agent flags what it comes across and its task does not settle. A writer turns the flag into a card. An agent that settles a card writes on it what it did. You read the cards and decide: fixed, left as it is, or an issue.                                                    |
 | Leaves the deciding to you       | An agent cannot close a card, change one, or unplug Weaver: the commands that decide refuse to run under an agent. Weaver also guards its own configuration, its state and the hooks.                                                                                              |
 | Steps aside when you say so      | `weaver maintenance on` lifts the guards for one session, when you want its agent to do what they forbid. Its work is still checked, and what the guards would have refused is listed for you.                                                                                     |
@@ -190,6 +191,21 @@ A command that needs more than the names of the files reads what Weaver sets in 
 | `WEAVER_CALL_DIFF`   | `warn`            | A JSON file: the files the call changed, each with its status, the blob it held `before` the session's work and the one it holds `after`. |
 | `WEAVER_GIT_OBJECTS` | all three         | The object store that holds those trees and blobs: git reads them with it as `GIT_OBJECT_DIRECTORY`, over the repository's own.           |
 
+The end of a task runs the checks, then the review, and may take long. `weaver status`, from a terminal of your own, says where it is: the checks that ended and how long each took, the one running and for how long, the ones still waiting, then the review, each beside the time it usually takes in the project. With no end of task running, it says how the last one ended, or that it was stopped before its end. `--watch` draws it again every second, until Ctrl+C.
+
+```sh
+$ weaver status
+Session 3f2a91c0 (claude) · unit 12 · running for 21 min 40 s, usually 28 min 3 s
+  Last asked: date the readings with the clock of the sensor
+  ✓ lint      14 s
+  ✓ types     1 min 2 s
+  * backend   18 min 3 s  usually 21 min 40 s
+  - frontend  waiting     usually 3 min 10 s
+  - review    waiting     usually 6 min 12 s
+```
+
+An end of task that took ten seconds or more ends saying where its time went, the three longest parts first: `It took 27 min 3 s: backend 21 min 40 s, the review by codex 4 min 2 s.`
+
 ## Try it
 
 You need Node.js 24 (24.13 or later), git, the GitHub CLI for the first install, and Claude Code or Codex.
@@ -220,6 +236,7 @@ Releases stay side by side, and a project runs the one that wired it until `weav
 | `weaver update [--dry-run] [--offline]`                           | Brings Weaver and the project up to date: the latest release, the migrations of `.weaver/`, the hooks, the guide.                                                                 |
 | `weaver doctor`                                                   | Checks the configuration, the hook, and each agent runtime with its guide.                                                                                                        |
 | `weaver maintenance [on\|off] [<session>]`                        | Lifts the guards of the project for one session of an agent, or puts them back; alone, says which sessions are in maintenance.                                                    |
+| `weaver status [--watch]`                                         | Says where the end of a task is while it runs, each check beside the time it usually takes here; with none running, how the last one ended.                                       |
 | `weaver check [<name>...]`                                        | Runs the checks of the project on the work in progress, without ending it: under an agent, its unit of work; from your terminal, what differs from HEAD.                          |
 | `weaver guide`                                                    | Prints the guide Weaver gives the agents of the project, as their runtimes read it.                                                                                               |
 | `weaver stats [--since <day>\|<n>d] [--json]`                     | Counts what Weaver kept of its work in the project: times, verdicts, warnings, reviews, cards.                                                                                    |

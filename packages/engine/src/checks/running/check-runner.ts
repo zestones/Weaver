@@ -3,6 +3,7 @@ import type { CallDiff } from '../../unit-of-work/diff/call-diff.ts'
 import type { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { CheckMemory } from '../results/check-memory.ts'
 import type { CheckOutcome } from '../results/check-outcome.ts'
+import type { CheckWatcher } from './check-watcher.ts'
 
 export interface CheckRunner {
   // Whether a check of the project warns right after a call, and what the ones concerned found on what the call
@@ -15,6 +16,13 @@ export interface CheckRunner {
   // The repairs and the checks share one time: `deadline` is the moment it ends.
   repair(declaration: Declaration, unit: UnitDiff, deadline: number): Promise<void>
 
-  // A check whose verdict `memory` holds for the same trees gives it again without running.
-  judge(declaration: Declaration, unit: UnitDiff, deadline: number, memory?: CheckMemory): Promise<readonly CheckOutcome[]>
+  // A check whose verdict `memory` holds for the same trees gives it again without running. `watcher` is told of each
+  // check as it starts and as it ends.
+  judge(
+    declaration: Declaration,
+    unit: UnitDiff,
+    deadline: number,
+    memory?: CheckMemory,
+    watcher?: CheckWatcher,
+  ): Promise<readonly CheckOutcome[]>
 }

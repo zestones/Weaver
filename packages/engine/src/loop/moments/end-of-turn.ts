@@ -21,6 +21,7 @@ import { FlaggedNotice } from '../exchange/flagged-notice.ts'
 import { HeadAlert } from '../exchange/head-alert.ts'
 import { MaintenanceNotice } from '../exchange/maintenance-notice.ts'
 import type { Turn } from '../exchange/turn.ts'
+import { EndOfTaskProgress } from '../progress/end-of-task-progress.ts'
 import type { Moment } from './moment.ts'
 
 const PENDING = '[weaver] Checks pending: the unit of work stays open until the agent reports it finished.'
@@ -147,14 +148,34 @@ export class EndOfTurn implements Moment {
     const { session } = turn
     const startedAt = Date.now()
     const deadline = declaration.checkLimits.deadlineFrom(startedAt)
+    // Whoever waits for the end of the task can read where it is: `weaver status`.
+    const progress = new EndOfTaskProgress(
+      session.dir,
+      finished.number,
+      finished.isEmpty ? [] : declaration.checks.map((check) => check.id),
+      declaration.review !== null,
+    )
+
+    if (!finished.isEmpty && this.checks.repairs(declaration)) progress.repairing()
+
     const repaired = finished.isEmpty ? [] : await this.repair(session, declaration, finished, deadline)
     const unit = repaired.length === 0 ? finished : session.unit()
     const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
-    const outcomes = unit.isEmpty ? [] : await this.checks.judge(declaration, diff, deadline, new CheckMemory(session.dir))
+
+    progress.checking()
+
+    const outcomes = unit.isEmpty ? [] : await this.checks.judge(declaration, diff, deadline, new CheckMemory(session.dir), progress)
     // The reviewer judges what the checks let through: a change they refuse will be rewritten anyway.
     const blocked = outcomes.some((outcome) => outcome.blocking)
     const candidates = outcomes.flatMap((outcome) => outcome.candidates)
+
+    if (!blocked) progress.reviewing()
+
     const review = blocked ? null : await this.reviews.next({ session, declaration, unit, diff, lastMessage, candidates })
+
+    if (!blocked)
+      progress.reviewed(review?.standing ?? 'none due', review === null || review.outcome.runtime === '' ? null : review.outcome.runtime)
+
     const verdict = new UnitVerdict({
       unit,
       maxRefusals: declaration.checkLimits.maxRefusals,
@@ -171,22 +192,36 @@ export class EndOfTurn implements Moment {
 
     for (const event of review?.events(unit.number) ?? []) session.log(event)
 
-    if (review?.holds === true) return this.ended(turn, 'review', Answer.blocking(report.reviewRefusal(review, reportPath)))
+    if (review?.holds === true) {
+      progress.over('the review sends the agent back')
+
+      return this.ended(turn, 'review', Answer.blocking(report.reviewRefusal(review, reportPath)))
+    }
+
     // The review goes on by itself: the unit stays open for it, and the agent is not kept waiting.
-    if (review?.standing === 'running') return this.ended(turn, null, Answer.saying(report.summary(reportPath)))
+    if (review?.standing === 'running') {
+      progress.over('passed; the review goes on by itself')
+
+      return this.ended(turn, null, Answer.saying(report.summary(reportPath)))
+    }
 
     if (verdict.passed) {
       session.settle(unit.files)
       if (review !== null) new ReviewCards(session.repo).open(review, session, unit, declaration)
+      progress.over('passed')
 
       return this.ended(turn, null, this.over(session, Answer.saying(report.summary(reportPath))))
     }
 
     if (!declaration.checkLimits.isExhaustedAfter(session.failRound())) {
+      progress.over('the checks send the agent back')
+
       return this.ended(turn, 'checks', Answer.blocking(report.refusal(reportPath)))
     }
 
     const given = `[weaver] The checks still fail after ${counted(declaration.checkLimits.maxRefusals, 'refusal')}; the agent may stop. Report: ${reportPath}`
+
+    progress.over('the checks still fail; the agent may stop')
 
     return this.ended(turn, null, this.over(session, Answer.saying(given)))
   }

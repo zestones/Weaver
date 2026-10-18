@@ -8,6 +8,10 @@ const DONE = '✓'
 const PROBLEM = 'X'
 const ALERT = '!'
 const NEUTRAL = '-'
+const RUNNING = '*'
+// What a terminal is told to give a watch a screen of its own, start again from a clear one, and give the screen back.
+const OWN_SCREEN = '\u001B[?1049h\u001B[?25l\u001B[H\u001B[2J'
+const SCREEN_BACK = '\u001B[?25h\u001B[?1049l'
 const INDENT = '  '
 const PAGE_MARGIN = '  '
 
@@ -48,6 +52,11 @@ export class Screen {
     this.marked(this.output.paint.dim(NEUTRAL), text, depth)
   }
 
+  // Something that has started and not ended.
+  running(text: string, depth = 0): void {
+    this.marked(this.output.paint.yellow(RUNNING), text, depth)
+  }
+
   // What comes second: an explanation, or the command to run next.
   hint(text: string, depth = 0): void {
     this.said(`${INDENT.repeat(depth)}${this.output.paint.dim(text)}`)
@@ -76,6 +85,20 @@ export class Screen {
     const lines = await drawn(paint, width - PAGE_MARGIN.length * 2)
 
     for (const line of ['', ...lines, '']) this.said(line === '' ? '' : `${PAGE_MARGIN}${line}`)
+  }
+
+  // Whether what is drawn can be drawn again in place: only for a person at a terminal.
+  get redraws(): boolean {
+    return this.output.paint.enabled && this.output.width !== null
+  }
+
+  // A watch draws on a screen of its own, from a clear one each time, and gives the owner's screen back when it ends.
+  cleared(): void {
+    this.output.say(OWN_SCREEN)
+  }
+
+  givenBack(): void {
+    this.output.say(SCREEN_BACK)
   }
 
   // Something to type, told apart from the sentence around it.

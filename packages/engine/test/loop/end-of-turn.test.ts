@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeEach, test } from 'vitest'
+import { afterAll, beforeEach, test, vi } from 'vitest'
 import { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
+import { EndOfTaskProgress } from '../../src/loop/progress/end-of-task-progress.ts'
+import type { ProgressRecord } from '../../src/loop/progress/progress-record.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import type { EventOf } from '../../src/unit-of-work/journal/journal-event.ts'
 import { SAMPLE_REPO, makeRepo, writeFiles } from '../fixtures/repo.ts'
@@ -159,6 +161,32 @@ test('a pass settles the unit: the next one starts empty, and a file changed dur
   assert.equal(stateOf(session)?.unit.number, 2)
   assert.deepEqual(unitFiles(session), [B_FILE])
   assert.deepEqual(stateOf(session)?.unit.intents, [])
+})
+
+test('the end of a task keeps where it is for whoever waits for it, and says where the time of a long one went', async () => {
+  prompt(session, 'change a')
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+
+  const seen: (ProgressRecord | null)[] = []
+  const checks = stubChecks([new CheckOutcome({ ...PASSING, ms: 21 * 60_000 + 40_000 })], () => {
+    seen.push(EndOfTaskProgress.read(session.dir))
+    vi.setSystemTime(Date.now() + 26 * 60_000)
+
+    return Promise.resolve()
+  })
+
+  vi.useFakeTimers({ toFake: ['Date'] })
+
+  const output = await finishWith(session, checks).finally(() => vi.useRealTimers())
+  const [during] = seen
+  const after = EndOfTaskProgress.read(session.dir)
+
+  assert.deepEqual(
+    [during?.step, during?.endedAt, during?.checks.map((check) => check.id), during?.review],
+    ['checks', null, ['lint'], null],
+  )
+  assert.deepEqual([after?.unit, after?.step, after?.outcome], [1, 'over', 'passed'])
+  assert.match(output.systemMessage ?? '', /\. It took 26 min \d+ s: lint 21 min 40 s\. Report: /)
 })
 
 test('with a finish skill, a turn that ends without its headings checks nothing; the agent is told once how to end, and where it is written', async () => {
