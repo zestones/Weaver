@@ -314,6 +314,24 @@ test('a command run in the background keeps its window until its task ends, thro
   assert.deepEqual(stateOf(session)?.pending, {})
 })
 
+test('a server left running in the background is looked at one turn at a time: a settled file never comes back with an old base', async () => {
+  const checks = stubChecks([PASSING])
+
+  prompt(session, 'start the dev server, then change a')
+  startTool(session, { ...bashCall('make dev-api', { run_in_background: true }), tool_response: { backgroundTaskId: 'server' } })()
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  await finishWith(session, checks)
+  prompt(session, 'now change b')
+  agentWrites(session, { [B_FILE]: 'export const b = 2\n' })
+  await finishWith(session, checks)
+
+  assert.deepEqual(checks.seen, [[A_FILE], [B_FILE]], 'what the first task settled is not checked again')
+
+  session.endedInBackground('server')
+
+  assert.deepEqual(unitFiles(session), [], 'nor charged again when the server ends')
+})
+
 test('the calls of a subagent sent to the background close at their own end, whatever the end of the turn sees meanwhile', () => {
   prompt(session, 'fix it, then prove the test catches the old code')
   agentWrites(session, { [A_FILE]: 'export const a = 2\n' })

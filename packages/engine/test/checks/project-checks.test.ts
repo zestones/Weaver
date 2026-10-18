@@ -148,6 +148,7 @@ test('a check that outlives its own timeout times out, and the check that reads 
   })
 
   assert.deepEqual([outcomes.slow?.status, outcomes.slow?.blocking], ['timeout', true])
+  assert.equal(outcomes.slow?.reason, 'It ran past its own limit of 1 s: `timeoutSeconds` of the check in .weaver/project/checks.json.')
   assert.deepEqual([outcomes.reader?.status, outcomes.reader?.reason], ['skip', 'slow did not finish'])
 })
 
@@ -160,6 +161,11 @@ test('the checks share one time: a check still running when it ends times out, w
   })
 
   assert.deepEqual([outcomes.slow?.status, outcomes.quick?.status], ['timeout', 'pass'])
+  assert.equal(
+    outcomes.slow?.reason,
+    'The time the checks share ran out before its own limit of 600 s: `checks.totalTimeoutSeconds` in .weaver/settings.json.',
+    'the limit that stopped it is the one named',
+  )
 })
 
 test('the repairs take their time from the one the checks share: out of time, a repair is not started', async () => {

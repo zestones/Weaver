@@ -180,18 +180,18 @@ export class Session {
     return this.close((latest) => (latest.pending[callId]?.untilStop === true ? [] : [callId]))
   }
 
-  // At the end of the agent's turn, the calls that will never be told of their end: one its runtime refused after the
-  // hook let it through, or one that failed where no hook follows a failure. A call still running for a task left in
-  // the background, a subagent's among them, closes when it ends, or when that task does.
+  // At the end of the agent's turn, every call is closed and charged with what it changed. One still running for a task
+  // left in the background, a subagent's among them, is watched again from there: it closes when it ends, or when that
+  // task does, and a server that never ends is looked at one turn at a time. The others will never be told of their
+  // end: refused by the runtime after the hook let them through, or failed where no hook follows a failure.
   closeEndedCalls(): Touch[] {
-    return this.close((latest) => {
-      const running = this.running(latest)
-
-      return Object.entries(latest.pending)
-        .filter(([, window]) => !new AttributionWindow(window).runsFor(running))
-        .sort(([, older], [, newer]) => older.at.localeCompare(newer.at))
-        .map(([id]) => id)
-    })
+    return this.close(
+      (latest) =>
+        Object.entries(latest.pending)
+          .sort(([, older], [, newer]) => older.at.localeCompare(newer.at))
+          .map(([id]) => id),
+      (latest, window) => window.runsFor(this.running(latest)),
+    )
   }
 
   unit(): UnitOfWork {
@@ -264,13 +264,17 @@ export class Session {
     }).value
   }
 
-  // The cards of the unit its agent wrote nothing on: the end of the task asks once for their notes.
-  askNotes(): number[] {
+  // The cards of the unit its agent wrote nothing on, and did not answer for in its final message: the end of the task
+  // asks once for their notes.
+  askNotes(answered: ReadonlySet<number>): number[] {
     return this.store.transact((latest) => {
       const unit = new UnitOfWork(latest.unit)
       const unnoted = unit.unnotedCards
 
-      return { record: unnoted.length === 0 ? latest : { ...latest, unit: unit.withCardsAsked(unnoted).record }, value: unnoted }
+      return {
+        record: unnoted.length === 0 ? latest : { ...latest, unit: unit.withCardsAsked(unnoted).record },
+        value: unnoted.filter((card) => !answered.has(card)),
+      }
     }).value
   }
 
@@ -307,16 +311,27 @@ export class Session {
     return record
   }
 
-  private close(ids: (record: SessionRecord) => readonly string[]): Touch[] {
+  // `goesOn` tells the windows to watch again once they are charged.
+  private close(
+    ids: (record: SessionRecord) => readonly string[],
+    goesOn: (record: SessionRecord, window: AttributionWindow) => boolean = () => false,
+  ): Touch[] {
     const { value: touches } = this.store.transact((latest) => {
       let record = latest
       const touches: Touch[] = []
 
       for (const id of ids(latest)) {
+        const pending = record.pending[id]
         const closed = this.closed(record, id)
 
         record = closed.record
         if (closed.value !== null) touches.push(closed.value)
+
+        const window = pending === undefined ? null : new AttributionWindow(pending)
+
+        if (window !== null && goesOn(latest, window)) {
+          record = { ...record, pending: { ...record.pending, [id]: window.reopened(this.repo).record } }
+        }
       }
 
       return { record, value: touches }

@@ -52,8 +52,9 @@ export class BeforeCall implements Moment {
 
     const read = CardReading.among(call).map((reading) => reading.card)
 
-    // A card the agent reads is one its task may settle: the end of the task asks what it did about it.
-    if (read.length > 0) session?.concerned(read)
+    // A card the agent reads is one its task may settle: the end of the task asks what it did about it. A subagent
+    // that reads one writes on it itself, if its work settles it.
+    if (read.length > 0 && !turn.event.subagent) session?.concerned(read)
 
     const writes = call.writes(turn.repo.top, turn.declaration.scripts)
 

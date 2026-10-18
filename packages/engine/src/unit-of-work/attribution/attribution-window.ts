@@ -67,6 +67,18 @@ export class AttributionWindow {
     return (task !== null && tasks.has(task)) || (agent !== null && tasks.has(agent))
   }
 
+  // The same call watched again from now: what it changed until now has been charged.
+  reopened(repo: Repository): AttributionWindow {
+    const { before, exact } = this.record
+
+    return new AttributionWindow({
+      ...this.record,
+      at: new Date().toISOString(),
+      before: Object.fromEntries(repo.hashPaths(exact ? Object.keys(before) : repo.dirtyPaths())),
+      head: repo.head(),
+    })
+  }
+
   // The paths a call that names its writes is about to change.
   get claims(): string[] {
     return this.record.exact ? Object.keys(this.record.before) : []

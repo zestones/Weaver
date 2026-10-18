@@ -103,3 +103,20 @@ test('a note that concludes nothing is free text: the card is still asked for it
 
   assert.match((await finishWith(session, stubChecks([PASSING]))).reason ?? '', /- #1 .+: you read it\n/)
 })
+
+test('a card the final message names is answered for, and a card a subagent only read is its own to write on', async () => {
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+
+  const checks = stubChecks([PASSING])
+
+  assert.equal((await finishWith(session, checks, undefined, '## Request\n\nDone. Card #1 is left as it was.\n')).decision, undefined)
+  assert.equal(checks.calls.count, 1)
+
+  prompt(session, 'have a subagent look at card 1, then change b')
+  refusalOf(session, { ...bashCall('weaver cards 1'), agent_id: 'a406db5d5f6bb15fe' })
+  edits(B_FILE, 'export const b = 2\n')
+
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
+  assert.deepEqual(held(), [null, null])
+})

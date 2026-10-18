@@ -85,7 +85,7 @@ export class EndOfTurn implements Moment {
     if (unit.isEmpty && this.reviews.follows(session, declaration, unit)) return this.check(turn, declaration, unit, lastMessage)
     if (!finished) return unit.isEmpty ? this.ended(turn, null, Answer.empty()) : this.pending(turn, declaration)
 
-    const notes = unit.isEmpty ? null : this.notesWanted(session, unit)
+    const notes = unit.isEmpty ? null : this.notesWanted(session, unit, lastMessage)
 
     if (notes !== null) return this.ended(turn, 'cards', Answer.blocking(notes))
 
@@ -99,11 +99,13 @@ export class EndOfTurn implements Moment {
     return this.ended(turn, null, this.over(session, Answer.empty()))
   }
 
-  // Before its work is checked, the agent writes on the cards its task is about what it did about them. Cards are a
-  // help: failing to read them never holds the end of a task.
-  private notesWanted(session: Session, unit: UnitOfWork): string | null {
+  // Before its work is checked, the agent writes on the cards its task is about what it did about them, or names them
+  // in its final message, as `#12`, for a card its task leaves as it was. Cards are a help: failing to read them never
+  // holds the end of a task.
+  private notesWanted(session: Session, unit: UnitOfWork, lastMessage: string | null): string | null {
     try {
-      const asked = session.askNotes()
+      const named = new Set([...(lastMessage ?? '').matchAll(/#(\d+)\b/g)].map(([, card]) => Number(card)))
+      const asked = session.askNotes(named)
 
       return asked.length === 0 ? null : new CardNotesWanted(new WaitingCards(session.repo).among(asked), Object.keys(unit.files)).text
     } catch {

@@ -1,5 +1,7 @@
 import { join, relative } from 'node:path'
 import type { DeclaredCheck } from '../../declaration/content/declared-check.ts'
+import { DeclarationFolder } from '../../declaration/reading/declaration-folder.ts'
+import { DeclarationParts } from '../../declaration/reading/declaration-parts.ts'
 import type { Rule } from '../../declaration/rules/rule.ts'
 import type { Repository } from '../../lib/git/repository.ts'
 import type { ChangedPath } from '../../lib/git/tree-diff.ts'
@@ -68,7 +70,9 @@ export abstract class Check {
     const result = await this.launch(this.declared.judge, files, unit.repo, env, this.within(timeoutMs))
 
     if (result === null) return this.skipped('the files it is about were all deleted')
-    if (result.code === TIMED_OUT) return this.outcome({ status: 'timeout', blocking: true, ms: result.ms, output: result.output })
+    if (result.code === TIMED_OUT) {
+      return this.outcome({ status: 'timeout', blocking: true, ms: result.ms, output: result.output, reason: this.cutBy(timeoutMs) })
+    }
 
     return this.read(result)
   }
@@ -113,6 +117,16 @@ export abstract class Check {
   // The time one run of `judge` or of `repair` has, within what is left for all the checks.
   private within(timeoutMs: number): number {
     return Math.min(timeoutMs, this.declared.timeoutSeconds * 1000)
+  }
+
+  // Which of the two limits stopped it, and where it is set: a check given more time than the checks share is cut by
+  // theirs.
+  private cutBy(timeoutMs: number): string {
+    const own = this.declared.timeoutSeconds
+
+    return own * 1000 <= timeoutMs
+      ? `It ran past its own limit of ${String(own)} s: \`timeoutSeconds\` of the check in ${DeclarationFolder.NAME}/${DeclarationParts.FILES.checks}.`
+      : `The time the checks share ran out before its own limit of ${String(own)} s: \`checks.totalTimeoutSeconds\` in ${DeclarationFolder.NAME}/${DeclarationParts.FILES.settings}.`
   }
 
   private concerned<File extends ChangedPath>(files: readonly File[]): File[] {

@@ -18,7 +18,7 @@ export class CardNotesWanted {
             '',
             NoteText.FORMAT,
             '',
-            'A card your task leaves as it was needs no note: say so in a line of your final message. Then end your task again with your final message. Weaver asks this once, and checks your work then.',
+            'A card your task leaves as it was needs no note: name it in your final message, as #12, and say so. Then end your task again with your final message. Weaver asks this once, and checks your work then.',
           ].join('\n')
   }
 

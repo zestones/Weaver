@@ -106,7 +106,7 @@ export class WeaverGuide {
       NoteText.FORMAT,
       '```',
       '',
-      'When a call changes a file of a card that waits, Weaver tells you. When you end your task, it asks once for the notes of the cards your task read or changed, before it checks your work.',
+      'When a call changes a file of a card that waits, Weaver tells you. When you end your task, it asks once for the notes of the cards your task read or changed, before it checks your work: a card your task leaves as it was is named in your final message instead, as `#12`.',
     ].join('\n')
   }
 

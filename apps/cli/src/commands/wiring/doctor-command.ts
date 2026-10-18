@@ -52,7 +52,7 @@ export class DoctorCommand implements Command {
     const held = await Promise.all(runtimes.map((runtime) => this.held(runtime, project.top)))
     const wired = runtimes.flatMap((runtime, index) => [this.runtime(runtime), ...this.guide(project, runtime), ...(held[index] ?? [])])
     const sections: readonly (readonly [string, readonly Finding[]])[] = [
-      ['Project', [this.configuration(project), ...this.warnings(project), ...this.finishSkill(project)]],
+      ['Project', [this.configuration(project), ...this.warnings(project), ...this.limits(project), ...this.finishSkill(project)]],
       ['Review', this.review(project)],
       ['Cards', [...this.writer(project), ...this.cards(project)]],
       ['Sessions', this.maintenance(project)],
@@ -118,6 +118,23 @@ export class DoctorCommand implements Command {
     } catch (error) {
       return { state: 'problem', text: this.sentence(error instanceof Error ? error.message : String(error)) }
     }
+  }
+
+  // A check given more time than the checks share at the end of a task is cut by their time, and its own file does not
+  // say so.
+  private limits(project: Project): Finding[] {
+    const declaration = project.readableDeclaration()
+
+    if (declaration === null) return []
+
+    const shared = declaration.checkLimits.totalTimeoutSeconds
+
+    return declaration.checks
+      .filter((check) => check.timeoutSeconds > shared)
+      .map((check) => ({
+        state: 'problem',
+        text: `\`${check.id}\` is given ${String(check.timeoutSeconds)} s, but the checks share ${String(shared)} s at the end of a task, which cuts it first: raise checks.totalTimeoutSeconds in ${DeclarationParts.FILES.settings}, or lower its timeoutSeconds in ${DeclarationParts.FILES.checks}.`,
+      }))
   }
 
   // A hook the runtime stops before its end says nothing: the warnings must end before the call is given up on.

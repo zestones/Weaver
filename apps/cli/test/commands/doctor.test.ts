@@ -469,3 +469,16 @@ test('hooks called for fewer tools than this Weaver reads are to be written agai
     ),
   )
 })
+
+test('a check given more time than the checks share is a problem: the time they share cuts it first', async () => {
+  writeConfig(top, {
+    settings: { ...SETTINGS, checks: { ...SETTINGS.checks, totalTimeoutSeconds: 1200 } },
+    checks: { backend: { cwd: '.', reads: 'exit', judge: ['true'], timeoutSeconds: 1500, rules: { B1: 'The backend holds.' } } },
+  })
+
+  assert.ok(
+    (await doctor()).lines.includes(
+      '  X `backend` is given 1500 s, but the checks share 1200 s at the end of a task, which cuts it first: raise checks.totalTimeoutSeconds in settings.json, or lower its timeoutSeconds in project/checks.json.',
+    ),
+  )
+})
