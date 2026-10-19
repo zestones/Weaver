@@ -76,6 +76,7 @@ test('after install everything is alive; a runtime left out is only noted', asyn
     `  ✓ The hook starts: ${link.hook}`,
     '  ✓ Claude Code: wired in .claude/settings.local.json',
     '  ✓ Claude Code: the guide of Weaver in .claude/skills/weaver/SKILL.md',
+    '  ✓ Claude Code: the end of a task shown in its chat, by the mod in .claude/skills/weaver-status',
     '  - Codex: not wired',
     '  - An agent started outside these runtimes is not supervised',
   ])
@@ -136,9 +137,10 @@ test('Codex is asked whether it runs the hooks it was wired with: the ones of an
   const { status, lines } = await doctor({ executions: codexHolding(['runs', 'runs', 'runs', 'runs']) })
 
   assert.equal(status, 0, lines.join('\n'))
-  assert.deepEqual(lines.slice(-6), [
+  assert.deepEqual(lines.slice(-7), [
     '  ✓ Claude Code: wired in .claude/settings.local.json',
     '  ✓ Claude Code: the guide of Weaver in .claude/skills/weaver/SKILL.md',
+    '  ✓ Claude Code: the end of a task shown in its chat, by the mod in .claude/skills/weaver-status',
     '  ✓ Codex: wired in .codex/hooks.json',
     '  ✓ Codex: the guide of Weaver in .agents/skills/weaver/SKILL.md',
     '  ✓ Codex runs these hooks',
@@ -313,6 +315,7 @@ test('a writer that starts, with its skill, is alive, and the cards that wait ar
     `  ✓ The hook starts: ${link.hook}`,
     '  ✓ Claude Code: wired in .claude/settings.local.json',
     '  ✓ Claude Code: the guide of Weaver in .claude/skills/weaver/SKILL.md',
+    '  ✓ Claude Code: the end of a task shown in its chat, by the mod in .claude/skills/weaver-status',
     '  - Codex: not wired',
     '  - An agent started outside these runtimes is not supervised',
   ])

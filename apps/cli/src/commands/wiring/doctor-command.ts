@@ -10,6 +10,7 @@ import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
 import { RuntimeSettings } from '../../runtimes/runtime-settings.ts'
+import { StatusMod } from '../../skills/status-mod.ts'
 import type { Command } from '../line/command.ts'
 
 interface Finding {
@@ -50,7 +51,12 @@ export class DoctorCommand implements Command {
     const project = Project.locate(this.cwd)
     const runtimes = new RuntimeCatalog().settings(project.top, this.link, [])
     const held = await Promise.all(runtimes.map((runtime) => this.held(runtime, project.top)))
-    const wired = runtimes.flatMap((runtime, index) => [this.runtime(runtime), ...this.guide(project, runtime), ...(held[index] ?? [])])
+    const wired = runtimes.flatMap((runtime, index) => [
+      this.runtime(runtime),
+      ...this.guide(project, runtime),
+      ...this.mod(project, runtime),
+      ...(held[index] ?? []),
+    ])
     const sections: readonly (readonly [string, readonly Finding[]])[] = [
       ['Project', [this.configuration(project), ...this.warnings(project), ...this.limits(project), ...this.finishSkill(project)]],
       ['Review', this.review(project)],
@@ -368,6 +374,25 @@ export class DoctorCommand implements Command {
     }
 
     return [{ state: 'problem', text: texts[state] }]
+  }
+
+  // Without the mod, the end of a task says nothing in the chat while it runs: only `weaver status` tells where it is.
+  private mod(project: Project, runtime: RuntimeSettings): Finding[] {
+    if (runtime.mod === null || runtime.wiring() === 'absent') return []
+
+    const mod = new StatusMod(project.top, runtime.mod)
+    const state = mod.state()
+
+    if (state === 'current')
+      return [{ state: 'ok', text: `${runtime.label}: the end of a task shown in its chat, by the mod in ${mod.path}` }]
+
+    const texts: Readonly<Record<Exclude<typeof state, 'current'>, string>> = {
+      absent: `${runtime.label}: no mod in ${mod.path} to show the end of a task in its chat. Run weaver update.`,
+      foreign: `${runtime.label}: ${mod.path} is a folder Weaver did not write, so the end of a task is not shown in its chat. Rename it, then run weaver update.`,
+      stale: `${runtime.label}: the mod in ${mod.path} is not the one of this Weaver. Run weaver update.`,
+    }
+
+    return [{ state: 'note', text: texts[state] }]
   }
 
   // A runtime may hold hooks and not run them, without a word: it alone says. Nothing is said of a runtime that has

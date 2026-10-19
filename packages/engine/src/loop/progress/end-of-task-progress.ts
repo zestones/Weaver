@@ -4,25 +4,40 @@ import type { CheckWatcher } from '../../checks/running/check-watcher.ts'
 import type { CheckOutcome } from '../../checks/results/check-outcome.ts'
 import { isAlive } from '../../lib/process/alive.ts'
 import type { CheckProgressRecord, ProgressRecord, ReviewProgressRecord } from './progress-record.ts'
+import type { UsualTimes } from './usual-times.ts'
 
 const FILE = 'progress.json'
 
+// What an end of task is to do, as it starts.
+export interface EndOfTaskPlan {
+  readonly unit: number
+  // The ids of the checks to run, in the order they are declared.
+  readonly checks: readonly string[]
+  readonly reviewed: boolean
+  readonly usual: UsualTimes
+}
+
 // What an end of task is doing while the owner waits for it, kept in the session's folder at each step: the checks
-// that ended and how, the one running and since when, then the review. `weaver status` reads it.
+// that ended and how, the one running and since when, then the review, each beside the time it usually takes. `weaver
+// status` reads it, and so does what shows it in the agent's chat.
 export class EndOfTaskProgress implements CheckWatcher {
   private readonly file: string
   private record: ProgressRecord
 
-  // `checks` are the ids of the checks to run, in the order they are declared.
-  constructor(dir: string, unit: number, checks: readonly string[], reviewed: boolean) {
+  constructor(dir: string, plan: EndOfTaskPlan) {
+    const { unit, checks, reviewed, usual } = plan
+
     this.file = join(dir, FILE)
     this.record = {
       unit,
       pid: process.pid,
       startedAt: new Date().toISOString(),
+      usualMs: usual.whole,
       step: 'checks',
-      checks: checks.map((id) => ({ id, status: 'waiting', startedAt: null, ms: null, kept: false })),
-      review: reviewed ? { status: 'waiting', startedAt: null, endedAt: null, standing: null, reviewer: null } : null,
+      checks: checks.map((id) => ({ id, status: 'waiting', startedAt: null, ms: null, kept: false, usualMs: usual.check(id) })),
+      review: reviewed
+        ? { status: 'waiting', startedAt: null, endedAt: null, standing: null, reviewer: null, usualMs: usual.review }
+        : null,
       endedAt: null,
       outcome: null,
     }

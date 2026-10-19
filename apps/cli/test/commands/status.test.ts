@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { stripVTControlCharacters } from 'node:util'
-import { EndOfTaskProgress, Loop } from '@weaver/engine'
+import { EndOfTaskProgress, Journal, Loop, Repository, UsualTimes } from '@weaver/engine'
 import { afterAll, beforeAll, test } from 'vitest'
 import { makeProject, SETTINGS, weaver, writeConfig, writeJson } from '../fixtures/project.ts'
 
@@ -12,6 +12,8 @@ const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-status-'))
 const top = makeProject(join(scratch, 'project'))
 const SESSION = '3f2a91c0-5b7e-4c1d-9a44-0d6f2e8b1c73'
 const DIR = join(top, '.git/weaver/sessions', SESSION)
+// What an end of task reads of the journal of the project as it starts.
+const usual = (): UsualTimes => new UsualTimes(new Journal(Repository.locate(top) ?? assert.fail('the project is a repository')).read())
 const MOMENT = String.raw`\d{4}-\d{2}-\d{2} \d{2}:\d{2}`
 const SECONDS = String.raw`\d+ s`
 
@@ -59,7 +61,7 @@ test('weaver status says how the last end of task ended, step by step', async ()
 test('an end of task that runs says each check, how long it has run, and how long it usually takes here', async () => {
   await hook('UserPromptSubmit', { prompt: 'add c\nwith a second line' })
 
-  const progress = new EndOfTaskProgress(DIR, 2, ['syntax', 'types'], true)
+  const progress = new EndOfTaskProgress(DIR, { unit: 2, checks: ['syntax', 'types'], reviewed: true, usual: usual() })
 
   progress.started('syntax')
 
@@ -72,7 +74,7 @@ test('an end of task that runs says each check, how long it has run, and how lon
 })
 
 test('an end of task whose hook is gone was stopped before its end: what it had not done is said not to have run', async () => {
-  const progress = new EndOfTaskProgress(DIR, 3, ['syntax', 'types'], true)
+  const progress = new EndOfTaskProgress(DIR, { unit: 3, checks: ['syntax', 'types'], reviewed: true, usual: usual() })
 
   progress.started('syntax')
 

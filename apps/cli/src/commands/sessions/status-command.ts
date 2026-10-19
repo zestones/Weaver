@@ -1,5 +1,4 @@
-import { EndOfTaskProgress, Journal, RepositorySessions, type ProgressRecord, type Session } from '@weaver/engine'
-import { UsualTimes } from '../../numbers/usual-times.ts'
+import { EndOfTaskProgress, RepositorySessions, type ProgressRecord, type Session } from '@weaver/engine'
 import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
 import { EndOfTaskPage } from '../../progress/end-of-task-page.ts'
@@ -43,24 +42,22 @@ export class StatusCommand implements Command {
       return 2
     }
 
-    const repo = Project.locate(this.cwd).repository
-    const sessions = new RepositorySessions(repo)
-    const usual = new UsualTimes(new Journal(repo).read())
+    const sessions = new RepositorySessions(Project.locate(this.cwd).repository)
 
     // A program reads one answer: only a person at a terminal is drawn a watch.
-    if (args.includes(WATCH) && this.screen.redraws) await this.watch(sessions, usual)
+    if (args.includes(WATCH) && this.screen.redraws) await this.watch(sessions)
 
-    this.print(sessions, usual, false)
+    this.print(sessions, false)
 
     return 0
   }
 
   // Until the owner stops it; the screen is then theirs again, with where the end of the task was.
-  private async watch(sessions: RepositorySessions, usual: UsualTimes): Promise<void> {
+  private async watch(sessions: RepositorySessions): Promise<void> {
     await new Promise<void>((stopped) => {
       const draw = (): void => {
         this.screen.cleared()
-        this.print(sessions, usual, true)
+        this.print(sessions, true)
       }
       const timer = setInterval(draw, EVERY_MS)
 
@@ -74,7 +71,7 @@ export class StatusCommand implements Command {
   }
 
   // The ends of task running now, or the last one when none runs.
-  private print(sessions: RepositorySessions, usual: UsualTimes, watching: boolean): void {
+  private print(sessions: RepositorySessions, watching: boolean): void {
     const now = Date.now()
     const ends = this.endsOfTask(sessions)
     const running = ends.filter(({ record }) => record.endedAt === null && !EndOfTaskProgress.isCut(record))
@@ -84,7 +81,7 @@ export class StatusCommand implements Command {
 
     shown.forEach(({ session, record }, index) => {
       if (index > 0) this.screen.line()
-      new EndOfTaskPage(session, record, usual, now).print(this.screen)
+      new EndOfTaskPage(session, record, now).print(this.screen)
     })
 
     this.screen.line()

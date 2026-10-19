@@ -8,6 +8,7 @@ import type { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
 import { ProjectChecks } from '../../src/checks/running/project-checks.ts'
 import type { Repository } from '../../src/lib/git/repository.ts'
 import { EndOfTaskProgress } from '../../src/loop/progress/end-of-task-progress.ts'
+import { UsualTimes } from '../../src/loop/progress/usual-times.ts'
 import { TreeDiff } from '../../src/lib/git/tree-diff.ts'
 import { WorkingTreeSnapshot } from '../../src/lib/git/working-tree-snapshot.ts'
 import { UnitDiff } from '../../src/unit-of-work/diff/unit-diff.ts'
@@ -264,7 +265,7 @@ test('the end of a task keeps where its checks are, as they start and end, for w
 
   mkdirSync(dir, { recursive: true })
 
-  const progress = new EndOfTaskProgress(dir, 3, ['lint', 'tests', 'types'], false)
+  const progress = new EndOfTaskProgress(dir, { unit: 3, checks: ['lint', 'tests', 'types'], reviewed: false, usual: new UsualTimes([]) })
   const seen: string[] = []
   const watching = {
     started: (id: string) => {

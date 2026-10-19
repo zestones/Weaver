@@ -11,6 +11,7 @@ import type { ReviewRounds } from '../../review/rounds/review-rounds.ts'
 import { AgentReviewer } from '../../review/running/agent-reviewer.ts'
 import { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { EventOf } from '../../unit-of-work/journal/journal-event.ts'
+import { Journal } from '../../unit-of-work/journal/journal.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
 import { Report } from '../../verdict/report.ts'
@@ -22,6 +23,7 @@ import { HeadAlert } from '../exchange/head-alert.ts'
 import { MaintenanceNotice } from '../exchange/maintenance-notice.ts'
 import type { Turn } from '../exchange/turn.ts'
 import { EndOfTaskProgress } from '../progress/end-of-task-progress.ts'
+import { UsualTimes } from '../progress/usual-times.ts'
 import type { Moment } from './moment.ts'
 
 const PENDING = '[weaver] Checks pending: the unit of work stays open until the agent reports it finished.'
@@ -149,12 +151,12 @@ export class EndOfTurn implements Moment {
     const startedAt = Date.now()
     const deadline = declaration.checkLimits.deadlineFrom(startedAt)
     // Whoever waits for the end of the task can read where it is: `weaver status`.
-    const progress = new EndOfTaskProgress(
-      session.dir,
-      finished.number,
-      finished.isEmpty ? [] : declaration.checks.map((check) => check.id),
-      declaration.review !== null,
-    )
+    const progress = new EndOfTaskProgress(session.dir, {
+      unit: finished.number,
+      checks: finished.isEmpty ? [] : declaration.checks.map((check) => check.id),
+      reviewed: declaration.review !== null,
+      usual: new UsualTimes(new Journal(session.repo).read()),
+    })
 
     if (!finished.isEmpty && this.checks.repairs(declaration)) progress.repairing()
 

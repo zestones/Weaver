@@ -17,6 +17,8 @@ Use the Node.js version in `.node-version` and the pnpm version recorded in `pac
 | `pnpm format:check` | Check formatting without writing.                                                 |
 | `pnpm check`        | Run formatting, builds, types, lint, unused-code analysis and tests sequentially. |
 
+The mod that shows the end of a task in the chat of Claude Code, `apps/cli/mods/weaver-status/`, runs inside Claude Code against the types its build writes: `claude plugin validate apps/cli/mods/weaver-status` and `claude plugin test apps/cli/mods/weaver-status` check it, on a workstation where Claude Code is installed. Its `types/index.d.ts` repeats the shape of `progress.json`, `packages/engine/src/loop/progress/progress-record.ts`: a change of one is a change of the other.
+
 `pnpm check` is the one command that judges the repository, on a workstation and in the [CI](#continuous-integration-and-releases). Recursive package commands use one workspace slot. Each package must configure its own test runner with one worker and no parallel test files. These limits reduce concurrent work; they are not a hard memory quota.
 
 Knip discovers workspace packages from `pnpm-workspace.yaml` and tooling entry points through its plugins. `knip.json` declares the root project files without treating every file as an entry point. Add actual executable entry points when applications are implemented; do not hide unused code or dependencies with blanket exclusions.
@@ -127,6 +129,8 @@ A package's `lib/` folder is the exception. It holds pure transformations and pl
 Shapes written to disk or read from another program, such as a saved state or a line of a journal, are interfaces without methods. The classes that give them behavior are built from them.
 
 The interface of `weaver ui`, under `apps/cli/src/ui/`, is the second exception. It is drawn with [Ink](https://github.com/vadimdemedes/ink), which is React in a terminal, and a component of React is a function: the `.tsx` files hold components, one that is exported in each, with the small ones only it uses beside it. Nothing else is a function there. What the screen shows and what each key does is `model/ui-model.ts`, a class; each box is a class under `forms/`; and what is done to a card goes through `cards/card-desk.ts`, which the commands go through too. A component draws what the model holds and hands it the keys: it decides nothing. Ink and React are loaded by `weaver ui` alone, as the parser of Markdown is loaded to draw a card.
+
+The mod of Claude Code, under `apps/cli/mods/weaver-status/`, is the third exception. Claude Code takes `$`, its interface to the session, only in a function declared at the top of a module: what calls `$` is such functions in `hooks/register.tsx`, and what is shown is worked out by a class, `hooks/end-of-task-view.ts`.
 
 ### Folders
 

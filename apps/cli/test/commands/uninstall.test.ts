@@ -33,12 +33,14 @@ test('uninstall removes the files it had created, and leaves the rules and the r
   assert.equal(existsSync(join(top, CLAUDE)), false)
   assert.equal(existsSync(join(top, CODEX)), false)
   assert.equal(existsSync(join(top, '.claude/skills/weaver')), false, 'the folder of the guide goes with it')
+  assert.equal(existsSync(join(top, '.claude/skills/weaver-status')), false, 'and so does the mod')
   assert.equal(existsSync(join(top, '.agents/skills/mine/SKILL.md')), true, 'a skill of the owner stays')
   assert.equal(existsSync(join(top, CONFIG)), true)
   assert.equal(existsSync(join(top, '.git/weaver')), true)
   assert.deepEqual(lines, [
     `✓ Claude Code: hooks removed from ${CLAUDE}`,
     '✓ Claude Code: the guide of Weaver removed from .claude/skills/weaver/SKILL.md',
+    '✓ Claude Code: the mod that shows the end of a task removed from .claude/skills/weaver-status',
     `✓ Codex: hooks removed from ${CODEX}`,
     '✓ Codex: the guide of Weaver removed from .agents/skills/weaver/SKILL.md',
     '',

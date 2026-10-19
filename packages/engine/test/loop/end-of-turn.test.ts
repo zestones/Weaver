@@ -187,6 +187,25 @@ test('the end of a task keeps where it is for whoever waits for it, and says whe
   )
   assert.deepEqual([after?.unit, after?.step, after?.outcome], [1, 'over', 'passed'])
   assert.match(output.systemMessage ?? '', /\. It took 26 min \d+ s: lint 21 min 40 s\. Report: /)
+
+  prompt(session, 'change a again')
+  agentWrites(session, { [A_FILE]: 'export const a = 3\n' })
+  await finishWith(
+    session,
+    stubChecks([PASSING], () => {
+      seen.push(EndOfTaskProgress.read(session.dir))
+
+      return Promise.resolve()
+    }),
+  )
+
+  const next = seen.at(-1)
+
+  assert.deepEqual(
+    [next?.unit, Math.round((next?.usualMs ?? 0) / 60_000), next?.checks.map(({ id, usualMs }) => [id, usualMs])],
+    [2, 26, [['lint', 21 * 60_000 + 40_000]]],
+    'the next one knows how long the parts of the last took',
+  )
 })
 
 test('with a finish skill, a turn that ends without its headings checks nothing; the agent is told once how to end, and where it is written', async () => {

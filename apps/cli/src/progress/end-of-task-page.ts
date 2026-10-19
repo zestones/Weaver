@@ -1,5 +1,4 @@
 import { EndOfTaskProgress, type CheckProgressRecord, type ProgressRecord, type ReviewProgressRecord, type Session } from '@weaver/engine'
-import type { UsualTimes } from '../numbers/usual-times.ts'
 import { Duration } from '../output/duration.ts'
 import { LocalMoment } from '../output/local-moment.ts'
 import type { Screen } from '../output/screen.ts'
@@ -35,14 +34,12 @@ const STANDINGS: Readonly<Record<string, readonly [Mark, string]>> = {
 export class EndOfTaskPage {
   private readonly session: Session
   private readonly record: ProgressRecord
-  private readonly usual: UsualTimes
   private readonly now: number
   private readonly cut: boolean
 
-  constructor(session: Session, record: ProgressRecord, usual: UsualTimes, now: number) {
+  constructor(session: Session, record: ProgressRecord, now: number) {
     this.session = session
     this.record = record
-    this.usual = usual
     this.now = now
     this.cut = EndOfTaskProgress.isCut(record)
   }
@@ -63,13 +60,14 @@ export class EndOfTaskPage {
   }
 
   private standing(): string {
-    const { startedAt, endedAt, outcome } = this.record
-    const whole = this.usual.whole
+    const { startedAt, endedAt, outcome, usualMs } = this.record
 
     if (endedAt !== null) return `ended ${new LocalMoment(endedAt).text} after ${this.between(startedAt, endedAt)}: ${outcome ?? ''}`
     if (this.cut) return `stopped before its end; it started ${new LocalMoment(startedAt).text}`
 
-    return `running for ${this.between(startedAt)}${whole === null ? '' : `, usually ${new Duration(whole).text}`}`
+    const usually = this.usually(usualMs)
+
+    return `running for ${this.between(startedAt)}${usually === '' ? '' : `, ${usually}`}`
   }
 
   private repairs(): Step[] {
@@ -82,8 +80,8 @@ export class EndOfTaskPage {
     const { id: name } = check
     const took = check.ms === null ? '' : new Duration(check.ms).text
 
-    if (check.status === 'waiting') return this.waiting(name, this.usual.check(name))
-    if (check.status === 'running') return this.running(name, check.startedAt, this.usual.check(name))
+    if (check.status === 'waiting') return this.waiting(name, check.usualMs)
+    if (check.status === 'running') return this.running(name, check.startedAt, check.usualMs)
     if (check.status === 'pass') return { mark: 'done', name, time: took, said: check.kept ? 'given again: nothing it reads changed' : '' }
     if (check.status === 'skip') return { mark: 'note', name, time: 'skipped', said: '' }
 
@@ -94,8 +92,8 @@ export class EndOfTaskPage {
     const review: ReviewProgressRecord | null = this.record.review
 
     if (review === null) return []
-    if (review.status === 'waiting') return [this.waiting(REVIEW, this.usual.review)]
-    if (review.status === 'running') return [this.running(REVIEW, review.startedAt, this.usual.review)]
+    if (review.status === 'waiting') return [this.waiting(REVIEW, review.usualMs)]
+    if (review.status === 'running') return [this.running(REVIEW, review.startedAt, review.usualMs)]
 
     const [mark, said] = STANDINGS[review.standing ?? ''] ?? ['note', review.standing ?? '']
     const name = review.reviewer === null ? REVIEW : `${REVIEW} by ${review.reviewer}`
@@ -120,8 +118,9 @@ export class EndOfTaskPage {
     return { mark: 'running', name, time: startedAt === null ? '' : this.between(startedAt), said: this.usually(usual) }
   }
 
+  // Weaver 0.9.4 kept no usual time.
   private usually(ms: number | null): string {
-    return ms === null ? '' : `usually ${new Duration(ms).text}`
+    return typeof ms === 'number' ? `usually ${new Duration(ms).text}` : ''
   }
 
   private between(from: string, to: string | null = null): string {

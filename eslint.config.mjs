@@ -61,7 +61,9 @@ const layerRules = Object.entries(LAYERS).flatMap(([root, layers]) =>
 )
 
 export default defineConfig(
-  globalIgnores(['**/node_modules/**', '**/dist/**', '**/coverage/**', '.cache/**', 'legacy/**']),
+  // A mod runs inside Claude Code, against the types its build writes: `claude plugin validate` and `claude plugin test`
+  // check it.
+  globalIgnores(['**/node_modules/**', '**/dist/**', '**/coverage/**', '.cache/**', 'legacy/**', 'apps/cli/mods/**']),
   {
     files: ['**/*.{js,mjs}'],
     extends: [js.configs.recommended],

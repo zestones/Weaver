@@ -9,6 +9,7 @@ import { Project } from '../../project/project.ts'
 import type { ReleaseChannel } from '../../releases/release-channel.ts'
 import type { PublishedRelease } from '../../releases/release-source.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
+import { StatusMod } from '../../skills/status-mod.ts'
 import type { Command } from '../line/command.ts'
 
 const DRY_RUN = '--dry-run'
@@ -173,7 +174,12 @@ export class UpdateCommand implements Command {
       return 1
     }
 
-    const changed = [this.configuration(project, dryRun), this.hooks(project, dryRun), this.guides(project, dryRun)].includes(true)
+    const changed = [
+      this.configuration(project, dryRun),
+      this.hooks(project, dryRun),
+      this.guides(project, dryRun),
+      this.mods(project, dryRun),
+    ].includes(true)
 
     if (!changed) this.screen.done(`This project is up to date with Weaver ${own.tag}.`)
     if (dryRun && changed) this.screen.hint('Dry run: nothing was written.')
@@ -235,6 +241,31 @@ export class UpdateCommand implements Command {
       const done = `${dryRun ? 'would be written' : 'written'}${again ? ' again in' : ' to'}`
 
       this.told(`${runtime.label}: the guide of Weaver ${done} ${guide.path}`, dryRun)
+    }
+
+    return behind.length > 0
+  }
+
+  // Each runtime that is wired gets the mod of this release: a project wired before Weaver had one gets it too.
+  private mods(project: Project, dryRun: boolean): boolean {
+    const wired = new RuntimeCatalog().settings(project.top, this.link, []).filter((runtime) => runtime.wiring() !== 'absent')
+    const behind = wired.flatMap((runtime) => {
+      if (runtime.mod === null) return []
+
+      const mod = new StatusMod(project.top, runtime.mod)
+      const state = mod.state()
+
+      if (state === 'foreign') this.screen.alert(`${runtime.label}: ${mod.path} is a folder Weaver did not write: it is left as it is.`)
+
+      return state === 'current' || state === 'foreign' ? [] : [{ runtime, mod, again: state === 'stale' }]
+    })
+
+    for (const { runtime, mod, again } of behind) {
+      if (!dryRun) mod.write()
+
+      const done = `${dryRun ? 'would be written' : 'written'}${again ? ' again in' : ' to'}`
+
+      this.told(`${runtime.label}: the mod that shows the end of a task in its chat ${done} ${mod.path}`, dryRun)
     }
 
     return behind.length > 0

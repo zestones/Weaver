@@ -49,6 +49,8 @@ export abstract class RuntimeSettings {
   abstract readonly guide: string
   // A personal skill of the same name, which the runtime reads in place of the guide; null where it does not say.
   abstract readonly hidingGuide: string | null
+  // Where the runtime loads the mod that shows the end of a task in its chat; null for a runtime that loads none.
+  abstract readonly mod: string | null
   private readonly agent: Agent
   private readonly top: string
   private readonly link: EngineLink

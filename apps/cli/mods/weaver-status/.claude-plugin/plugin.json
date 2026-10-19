@@ -1,0 +1,7 @@
+{
+  "name": "weaver-status",
+  "version": "0.1.0",
+  "description": "Shows in the chat where the end of a task of Weaver is while it runs. Weaver writes this folder with each install and update.",
+  "author": { "name": "Weaver" },
+  "types": "./types/index.d.ts"
+}

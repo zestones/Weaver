@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DeclarationFolder } from '@weaver/engine'
@@ -24,6 +24,7 @@ const CONFIG = '.weaver/settings.json'
 const SKILL = '.weaver/skills/wv-finish.md'
 const CLAUDE_GUIDE = '.claude/skills/weaver/SKILL.md'
 const CODEX_GUIDE = '.agents/skills/weaver/SKILL.md'
+const MOD = '.claude/skills/weaver-status'
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-install-'))
 const link = new EngineLink()
 let top: string
@@ -101,6 +102,29 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
       'the guide, with what the project declares',
     )
   }
+})
+
+test('install gives Claude Code the mod that shows the end of a task in its chat, never over a folder of the owner', async () => {
+  const { lines } = await weaver(top, ['install'])
+
+  assert.ok(lines.includes(`✓ Claude Code: the end of a task shown in its chat, by the mod in ${MOD}`), lines.join('\n'))
+  assert.match(readFileSync(join(top, MOD, '.claude-plugin/plugin.json'), 'utf8'), /"name": "weaver-status"/)
+  assert.match(readFileSync(join(top, MOD, 'hooks/hooks.json'), 'utf8'), /"\.\/register\.tsx"/)
+  assert.equal(existsSync(join(top, MOD, 'tests')), false, 'its tests stay with Weaver')
+  assert.equal(existsSync(join(top, '.agents/skills/weaver-status')), false, 'Codex loads no mod')
+
+  rmSync(join(top, MOD), { recursive: true })
+  mkdirSync(join(top, MOD))
+  writeFileSync(join(top, MOD, 'mine.md'), 'Mine.\n')
+
+  const again = await weaver(top, ['install'])
+
+  assert.ok(
+    again.lines.some((line) => line.startsWith(`! Claude Code: ${MOD} is a folder Weaver did not write`)),
+    again.lines.join('\n'),
+  )
+  await weaver(top, ['uninstall'])
+  assert.deepEqual(readdirSync(join(top, MOD)), ['mine.md'])
 })
 
 test('install says what to do of a hooks file git would share: ignore it, stop following it, or both', async () => {

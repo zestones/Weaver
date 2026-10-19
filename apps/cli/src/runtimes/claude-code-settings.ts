@@ -9,4 +9,6 @@ export class ClaudeCodeSettings extends RuntimeSettings {
   override readonly guide = '.claude/skills/weaver/SKILL.md'
   // Claude Code prefers a personal skill to one of the project that has its name.
   override readonly hidingGuide = join(homedir(), '.claude/skills/weaver/SKILL.md')
+  // Claude Code loads a plugin it finds among the skills of a project it trusts.
+  override readonly mod = '.claude/skills/weaver-status'
 }

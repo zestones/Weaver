@@ -6,6 +6,7 @@ import { Screen } from '../../output/screen.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
 import type { RuntimeSettings } from '../../runtimes/runtime-settings.ts'
+import { StatusMod } from '../../skills/status-mod.ts'
 import type { Command } from '../line/command.ts'
 
 export class InstallCommand implements Command {
@@ -16,7 +17,7 @@ export class InstallCommand implements Command {
   readonly help = {
     group: 'Set up',
     description:
-      'Put Weaver on this project: the hooks of the agent runtimes, the guide they read as a skill, and a starter configuration if there is none.',
+      'Put Weaver on this project: the hooks of the agent runtimes, the guide they read as a skill, the mod that shows the end of a task in the chat of Claude Code, and a starter configuration if there is none.',
     words: [['[claude] [codex]', 'The agent runtimes to wire; both when none is named']],
     examples: ['weaver install', 'weaver install claude'],
   } as const
@@ -74,6 +75,7 @@ export class InstallCommand implements Command {
 
     // The guide is written from the configuration, which a first install has just created.
     for (const runtime of runtimes) this.guide(project, runtime)
+    for (const runtime of runtimes) this.mod(project, runtime)
 
     this.screen.line()
     this.screen.hint(this.wired())
@@ -95,6 +97,23 @@ export class InstallCommand implements Command {
 
     guide.write()
     this.screen.done(`${runtime.label}: the guide of Weaver written to ${guide.path}`)
+  }
+
+  private mod(project: Project, runtime: RuntimeSettings): void {
+    if (runtime.mod === null) return
+
+    const mod = new StatusMod(project.top, runtime.mod)
+
+    if (mod.state() === 'foreign') {
+      this.screen.alert(
+        `${runtime.label}: ${mod.path} is a folder Weaver did not write: it is left as it is, and the end of a task is not shown in the chat. Rename it, then run weaver install again.`,
+      )
+
+      return
+    }
+
+    mod.write()
+    this.screen.done(`${runtime.label}: the end of a task shown in its chat, by the mod in ${mod.path}`)
   }
 
   // The hooks name paths of this machine: the file that holds them is not to be shared. null when git neither

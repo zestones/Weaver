@@ -185,6 +185,7 @@ test('with the latest release, update brings the project up to date itself: its 
     '    settings.json: checks.warnTimeoutSeconds added, at 30: the seconds the checks that warn are given after one call',
     '✓ Claude Code: hooks written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
     '✓ Claude Code: the guide of Weaver written to .claude/skills/weaver/SKILL.md',
+    '✓ Claude Code: the mod that shows the end of a task in its chat written to .claude/skills/weaver-status',
   ])
   assert.deepEqual(DeclarationFolder.in(top).load()?.checks[0]?.repair, ['npx', 'prettier', '--write', '{files}'])
   assert.deepEqual(
@@ -212,6 +213,18 @@ test('update writes the guide of a wired runtime again once the project declares
   assert.equal(existsSync(join(top, '.agents/skills/weaver')), false, 'a runtime that is not wired gets no guide')
 })
 
+test('update writes the mod again when it is not the one of this Weaver', async () => {
+  await weaver(top, ['install', 'claude'])
+  writeFileSync(join(top, '.claude/skills/weaver-status/hooks/register.tsx'), 'export const register = () => {}\n')
+
+  const { lines } = await weaver(top, ['update'], { channel: channel('9.9.9') })
+
+  assert.deepEqual(lines.slice(1), [
+    '✓ Claude Code: the mod that shows the end of a task in its chat written again in .claude/skills/weaver-status',
+  ])
+  assert.match(readFileSync(join(top, '.claude/skills/weaver-status/hooks/register.tsx'), 'utf8'), /on\('classic\.Stop'/)
+})
+
 test('update leaves a skill named weaver that Weaver did not write as it is, and says so', async () => {
   const mine = '---\nname: weaver\n---\nMine.\n'
 
@@ -235,11 +248,12 @@ test('a dry run says what an update would do and writes nothing, in the project 
 
   assert.equal(here.status, 0)
   assert.equal(here.lines[1], '- .weaver/ would be brought up to date:')
-  assert.equal(
-    here.lines.at(-2),
+  assert.deepEqual(here.lines.slice(-3), [
     '- Claude Code: hooks would be written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
-  )
-  assert.equal(here.lines.at(-1), 'Dry run: nothing was written.')
+    '- Claude Code: the mod that shows the end of a task in its chat would be written to .claude/skills/weaver-status',
+    'Dry run: nothing was written.',
+  ])
+  assert.equal(existsSync(join(top, '.claude/skills/weaver-status')), false)
   assert.deepEqual(readJson(top, '.weaver/settings.json'), FIRST_SETTINGS)
   assert.equal(readFileSync(join(top, CLAUDE), 'utf8'), hooks)
 })
