@@ -196,3 +196,6 @@ sketch
 # A local copy of the harness Weaver is the rewrite of: its code and what it remembered. Never tracked.
 legacy/
 
+
+# Claude Code writes it beside a mod it loads, pointing at the types it lays there.
+apps/cli/mods/weaver-status/tsconfig.json
