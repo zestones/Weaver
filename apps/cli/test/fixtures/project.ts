@@ -84,6 +84,8 @@ class GivenInput implements Input {
 export function makeProject(top: string): string {
   mkdirSync(top, { recursive: true })
   execFileSync('git', ['-C', top, 'init', '-q', '-b', 'main'])
+  // What git ignores is the project's alone: the global ignore file of the machine running the tests is left out.
+  execFileSync('git', ['-C', top, 'config', 'core.excludesFile', '/dev/null'])
 
   return top
 }

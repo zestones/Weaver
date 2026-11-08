@@ -1,6 +1,7 @@
 import { EndOfTaskProgress, RepositorySessions, type ProgressRecord, type Session } from '@weaver/engine'
 import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
+import { HookErrors } from '../../progress/hook-errors.ts'
 import { EndOfTaskPage } from '../../progress/end-of-task-page.ts'
 import { Project } from '../../project/project.ts'
 import type { Command } from '../line/command.ts'
@@ -29,6 +30,7 @@ export class StatusCommand implements Command {
   } as const
   private readonly cwd: string
   private readonly screen: Screen
+  private errors: HookErrors | null = null
 
   constructor(cwd: string, output: Output) {
     this.cwd = cwd
@@ -42,7 +44,10 @@ export class StatusCommand implements Command {
       return 2
     }
 
-    const sessions = new RepositorySessions(Project.locate(this.cwd).repository)
+    const repo = Project.locate(this.cwd).repository
+    const sessions = new RepositorySessions(repo)
+
+    this.errors = new HookErrors(repo)
 
     // A program reads one answer: only a person at a terminal is drawn a watch.
     if (args.includes(WATCH) && this.screen.redraws) await this.watch(sessions)
@@ -72,6 +77,8 @@ export class StatusCommand implements Command {
 
   // The ends of task running now, or the last one when none runs.
   private print(sessions: RepositorySessions, watching: boolean): void {
+    for (const line of this.errors?.lines() ?? []) this.screen.note(line)
+
     const now = Date.now()
     const ends = this.endsOfTask(sessions)
     const running = ends.filter(({ record }) => record.endedAt === null && !EndOfTaskProgress.isCut(record))

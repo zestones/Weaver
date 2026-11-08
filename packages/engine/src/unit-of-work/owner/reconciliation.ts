@@ -38,6 +38,8 @@ export class Reconciliation {
     const action = this.ownerAction(head, paths)
 
     const outcomes = Object.entries(this.unit.files).map(([path, file]) => {
+      if (!current.has(path)) return [path, { file, note: null }] as const
+
       const blob = current.get(path) ?? null
 
       return [path, action === null ? this.edited(file, blob) : this.afterOwnerAction(path, file, blob, action)] as const

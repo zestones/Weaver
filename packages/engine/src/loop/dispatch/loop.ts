@@ -12,6 +12,7 @@ import type { ReviewLauncher } from '../../review/launching/review-launcher.ts'
 import { ReviewRounds } from '../../review/rounds/review-rounds.ts'
 import type { EventBody, EventSource } from '../../unit-of-work/journal/journal-event.ts'
 import { Journal } from '../../unit-of-work/journal/journal.ts'
+import { HookFeedback } from '../exchange/hook-feedback.ts'
 import { Answer } from '../exchange/answer.ts'
 import { Turn } from '../exchange/turn.ts'
 import { AfterCall } from '../moments/after-call.ts'
@@ -55,26 +56,32 @@ export class Loop {
 
     if (moment === undefined || repo === null) return Answer.silent()
 
+    const journal = new Journal(repo)
+    const source = { session: event.sessionId, agent: agent.name }
+    const feedback = new HookFeedback(journal, source)
     const declaration = this.declarationOf(repo)
 
     // A repository that declares nothing is not supervised, and nothing is kept of what happens there.
     if (declaration === null) return Answer.silent()
 
-    const journal = new Journal(repo)
-    const source = { session: event.sessionId, agent: agent.name }
-
     if (declaration instanceof DeclarationError) {
-      this.keep(journal, source, { kind: 'error', event: eventName, message: declaration.message })
-
-      return moment.speaksToOwner ? Answer.saying(`[weaver] Nothing is checked: ${declaration.message}`) : Answer.silent()
+      return feedback.pending(eventName, feedback.failure(eventName, declaration.message))
     }
 
     try {
-      return await moment.run(new Turn(agent, event, repo, declaration))
-    } catch (error) {
-      this.keep(journal, source, { kind: 'error', event: eventName, message: error instanceof Error ? error.message : String(error) })
+      let answer = await moment.run(new Turn(agent, event, repo, declaration))
 
-      throw error
+      if (repo.unavailable.size > 0) {
+        answer = feedback.failure(
+          eventName,
+          `${String(repo.unavailable.size)} paths could not be hashed and were left out of attribution`,
+          answer,
+        )
+      }
+
+      return feedback.pending(eventName, answer)
+    } catch (error) {
+      return feedback.pending(eventName, feedback.failure(eventName, error instanceof Error ? error.message : String(error)))
     } finally {
       const run = { event: eventName, tool: event.call?.name ?? null, subagent: event.agentId, ms: this.sinceStart() }
 

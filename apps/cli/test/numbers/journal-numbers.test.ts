@@ -192,3 +192,33 @@ test('a session the runtime went on with under a new id is one session, and its 
   assert.deepEqual(figures.sessions, { total: 1, byAgent: { claude: 1 }, continued: 1 })
   assert.equal(figures.turns.heldByCards, 1)
 })
+
+test('empty or skipped check lists are unchecked, and old verdicts without check details have unknown coverage', () => {
+  const verdict = {
+    ...BASE,
+    kind: 'check',
+    unit: 1,
+    round: 1,
+    passed: true,
+    failed: [],
+    toValidate: 0,
+    files: 1,
+    lines: 1,
+    repaired: 0,
+    ms: 1,
+    checks: [],
+  } as const
+  const run = { id: 'lint', status: 'pass', ms: 1, failures: 0, toValidate: 0, candidates: 0 } as const
+  const events: JournalEvent[] = [
+    verdict,
+    { ...verdict, checks: [{ ...run, status: 'skip' }] },
+    { ...verdict, v: 1 },
+    { ...verdict, checks: [{ ...run, kept: true }] },
+  ]
+  const figures = new JournalNumbers(events).figures
+
+  assert.deepEqual([figures.verdicts.passed, figures.verdicts.unchecked, figures.verdicts.unknown], [1, 2, 1])
+  const text = drawn((screen) => new StatsPage({ since: null, journal: figures, cards: null }, '/journal').print(screen)).join('\n')
+
+  assert.match(text, /1 passed, 0 failed, 2 unchecked, 1 unknown coverage/)
+})

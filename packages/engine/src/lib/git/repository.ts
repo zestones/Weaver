@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync } from 'node:fs'
+import { lstatSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 export type Blob = string | null
@@ -20,6 +20,8 @@ const BASE_ENV = { GIT_OPTIONAL_LOCKS: '0' }
 
 export class Repository {
   static readonly REGULAR_MODE = '100644'
+
+  readonly unavailable = new Set<string>()
 
   readonly top: string
   readonly gitDir: string
@@ -90,12 +92,41 @@ export class Repository {
 
   // Every blob is written to the object store, so that it can be read back after the file changed again.
   hashPaths(paths: readonly string[]): Map<string, Blob> {
-    const present = paths.filter((path) => this.isFile(path))
-    const hashes =
-      present.length === 0 ? [] : this.git(['hash-object', '-w', '--stdin-paths'], { input: `${present.join('\n')}\n` }).split('\n')
-    const hashed = new Map(present.map((path, index) => [path, hashes[index] ?? null]))
+    const hashed = new Map<string, Blob>()
+    const present = paths.filter((path) => {
+      const kind = this.pathKind(path)
 
-    return new Map(paths.map((path) => [path, hashed.get(path) ?? null]))
+      if (kind === 'missing') hashed.set(path, null)
+      if (kind === 'unavailable') this.unavailable.add(path)
+
+      return kind === 'file'
+    })
+
+    if (present.length === 0) return hashed
+
+    try {
+      const hashes = this.git(['hash-object', '-w', '--stdin-paths'], {
+        input: `${present.map((path) => JSON.stringify(path)).join('\n')}\n`,
+      }).split('\n')
+
+      if (hashes.length !== present.length) throw new Error('Incomplete hash batch')
+      present.forEach((path, index) => hashed.set(path, hashes[index] ?? null))
+    } catch {
+      for (const path of present) {
+        try {
+          const kind = this.pathKind(path)
+
+          if (kind === 'missing') hashed.set(path, null)
+          else if (kind === 'file') hashed.set(path, this.git(['hash-object', '-w', '--', path]))
+          else this.unavailable.add(path)
+        } catch {
+          if (this.pathKind(path) === 'missing') hashed.set(path, null)
+          else this.unavailable.add(path)
+        }
+      }
+    }
+
+    return hashed
   }
 
   treeEntries(tree: string, paths: readonly string[]): Map<string, TreeEntry> {
@@ -104,7 +135,7 @@ export class Repository {
     if (paths.length === 0) return entries
 
     for (const record of this.git(['ls-tree', '-z', tree, '--', ...paths]).split('\0')) {
-      const match = /^(\d+) blob ([0-9a-f]+)\t(.+)$/.exec(record)
+      const match = /^(\d+) blob ([0-9a-f]+)\t(.+)$/s.exec(record)
 
       if (match?.[3] !== undefined) entries.set(match[3], { mode: match[1] ?? Repository.REGULAR_MODE, blob: match[2] ?? '' })
     }
@@ -124,9 +155,13 @@ export class Repository {
     return records.filter((record) => record.length > 3).map((record) => record.slice(3))
   }
 
-  private isFile(path: string): boolean {
-    const absolute = join(this.top, path)
+  private pathKind(path: string): 'file' | 'missing' | 'unavailable' {
+    try {
+      return lstatSync(join(this.top, path)).isFile() ? 'file' : 'unavailable'
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
 
-    return existsSync(absolute) && !lstatSync(absolute).isDirectory()
+      return code === 'ENOENT' || code === 'ENOTDIR' ? 'missing' : 'unavailable'
+    }
   }
 }

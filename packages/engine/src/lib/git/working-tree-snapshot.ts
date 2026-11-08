@@ -27,8 +27,46 @@ export class WorkingTreeSnapshot {
   }
 
   private writeTree(): string {
-    this.includeTrackedIgnored()
-    this.repo.git(['add', '-A', '--', '.'], { index: this.index })
+    const paths = [
+      ...new Set([
+        ...this.repo.git(['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0'),
+        ...this.repo.git(['ls-files', '--cached', '-z'], { index: this.index }).split('\0'),
+      ]),
+    ].filter(Boolean)
+    const files: string[] = []
+    const missing: string[] = []
+
+    for (const path of paths) {
+      try {
+        const entry = lstatSync(join(this.repo.top, path), { throwIfNoEntry: false })
+
+        if (entry === undefined) missing.push(path)
+        else if (entry.isFile()) files.push(path)
+        else this.repo.unavailable.add(path)
+      } catch {
+        this.repo.unavailable.add(path)
+      }
+    }
+
+    if (missing.length > 0)
+      this.repo.git(['update-index', '--force-remove', '-z', '--stdin'], { index: this.index, input: `${missing.join('\0')}\0` })
+    if (files.length > 0) {
+      try {
+        this.add(files)
+      } catch {
+        for (const path of files) {
+          try {
+            const entry = lstatSync(join(this.repo.top, path), { throwIfNoEntry: false })
+
+            if (entry === undefined) this.repo.git(['update-index', '--force-remove', '--', path], { index: this.index })
+            else if (entry.isFile()) this.add([path])
+            else this.repo.unavailable.add(path)
+          } catch {
+            this.repo.unavailable.add(path)
+          }
+        }
+      }
+    }
 
     return this.repo.git(['write-tree'], { index: this.index })
   }
@@ -51,20 +89,10 @@ export class WorkingTreeSnapshot {
     utimesSync(this.index, atime, mtime)
   }
 
-  // The owner may stage an ignored file after the private index was seeded.
-  private includeTrackedIgnored(): void {
-    const paths = this.repo
-      .git(['ls-files', '--cached', '--ignored', '--exclude-standard', '-z'])
-      .split('\0')
-      .filter(Boolean)
-      .filter((path) => {
-        const entry = lstatSync(join(this.repo.top, path), { throwIfNoEntry: false })
-
-        return entry !== undefined && !entry.isDirectory()
-      })
-
-    if (paths.length > 0) {
-      this.repo.git(['add', '--force', '--', ...paths.map((path) => `:(top,literal)${path}`)], { index: this.index })
-    }
+  private add(paths: readonly string[]): void {
+    this.repo.git(['add', '--force', '--pathspec-from-file=-', '--pathspec-file-nul'], {
+      index: this.index,
+      input: `${paths.map((path) => `:(top,literal)${path}`).join('\0')}\0`,
+    })
   }
 }

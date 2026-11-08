@@ -112,3 +112,44 @@ test('weaver status takes no other word, and says when no end of task has run', 
   assert.deepEqual(lines, ['Usage: weaver status [--watch]', 'Run weaver help status for what each word means.'])
   assert.deepEqual((await weaver(makeProject(join(scratch, 'empty')), ['status'])).lines, ['No end of task has run here yet.', ''])
 })
+
+test('status shows recent hook errors even without progress, ignoring old and truncated journal lines', async () => {
+  const project = makeProject(join(scratch, 'errors'))
+  const repo = Repository.locate(project) ?? assert.fail('repository')
+  const journal = new Journal(repo)
+  const source = { session: 'one', agent: 'codex' }
+
+  journal.append(source, { kind: 'error', event: 'Stop', message: 'old failure' }, new Date(Date.now() - 8 * 86400000).toISOString())
+  journal.append(source, { kind: 'error', event: 'PreToolUse', message: 'cannot hash file' })
+  journal.append({ ...source, session: 'two' }, { kind: 'error', event: 'Stop', message: 'broken state' })
+  writeFileSync(join(journal.dir, 'truncated.jsonl'), '{incomplete')
+  const { status, lines } = await weaver(project, ['status'])
+  const text = lines.join('\n')
+
+  assert.equal(status, 0)
+  assert.match(text, /2 hook errors in the last 7 days, across 2 sessions/)
+  assert.match(text, /Latest: .*Stop: broken state/)
+  assert.match(text, /Journal: .*weaver\/events/)
+  assert.doesNotMatch(text, /old failure/)
+  assert.match(text, /No end of task has run/)
+})
+
+test('status says nothing was checked for a task with no configured checks', async () => {
+  const project = makeProject(join(scratch, 'unchecked'))
+  const repo = Repository.locate(project) ?? assert.fail('repository')
+  const run = (event: string, payload: object) =>
+    new Loop().handle(event, ['--agent=claude'], JSON.stringify({ cwd: project, session_id: 'unchecked', ...payload }))
+  const call = { tool_name: 'Write', tool_use_id: 'write', tool_input: { file_path: join(project, 'new.txt') } }
+
+  writeConfig(project, { settings: SETTINGS })
+  await run('UserPromptSubmit', { prompt: 'add a file' })
+  await run('PreToolUse', call)
+  writeFileSync(join(project, 'new.txt'), 'new')
+  await run('PostToolUse', call)
+  await run('Stop', { last_assistant_message: 'Done.' })
+  const text = (await weaver(repo.top, ['status'])).lines.join('\n')
+
+  assert.match(text, /nothing was checked/)
+  assert.match(text, /Nothing was checked: no checks were scheduled/)
+  assert.doesNotMatch(text, /0 checks passed/)
+})

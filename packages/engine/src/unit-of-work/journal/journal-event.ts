@@ -188,7 +188,15 @@ interface ContinueEvent {
   readonly from: string
 }
 
+interface NotificationEvent {
+  readonly kind: 'notification'
+  readonly event: string
+  readonly message: string
+  readonly channel: 'owner' | 'agent'
+}
+
 export type EventBody =
+  | NotificationEvent
   | TouchEvent
   | CheckEvent
   | AskedEvent

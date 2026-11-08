@@ -55,6 +55,8 @@ export class EndOfTaskPage {
     )
     if (asked !== null) screen.hint(`Last asked: ${asked}`, 1)
 
+    if (this.record.checks.length === 0) screen.note('Nothing was checked: no checks were scheduled.', 1)
+
     for (const step of steps)
       screen[step.mark](`${step.name.padEnd(names)}  ${step.time.padEnd(times)}  ${screen.dim(step.said)}`.trimEnd(), 1)
   }

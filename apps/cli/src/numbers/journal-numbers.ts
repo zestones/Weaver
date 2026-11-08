@@ -65,6 +65,8 @@ export interface JournalFigures {
     readonly total: number
     readonly passed: number
     readonly failed: number
+    readonly unchecked: number
+    readonly unknown: number
     readonly toValidate: number
     readonly repaired: number
     readonly ms: DistributionNumbers
@@ -173,7 +175,11 @@ export class JournalNumbers {
 
     return {
       total: verdicts.length,
-      passed: verdicts.filter((verdict) => verdict.passed).length,
+      passed: verdicts.filter((verdict) => verdict.passed && verdict.v >= 2 && verdict.checks.some((check) => check.status !== 'skip'))
+        .length,
+      unchecked: verdicts.filter((verdict) => verdict.passed && verdict.v >= 2 && !verdict.checks.some((check) => check.status !== 'skip'))
+        .length,
+      unknown: verdicts.filter((verdict) => verdict.passed && verdict.v < 2).length,
       failed: verdicts.filter((verdict) => !verdict.passed).length,
       toValidate: this.sum(verdicts.map((verdict) => verdict.toValidate)),
       repaired: this.sum(verdicts.map((verdict) => verdict.repaired)),

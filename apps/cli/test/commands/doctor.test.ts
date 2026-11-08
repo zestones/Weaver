@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ExecutionCatalog, ScriptedExecution, type AgentExecution, type RuntimeHook } from '@weaver/agent-sdk'
+import { Journal, Repository } from '@weaver/engine'
 import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
 import { RuntimeCatalog } from '../../src/runtimes/runtime-catalog.ts'
@@ -336,9 +337,9 @@ test('a writer whose command does not start, or whose skill is missing, is a pro
   assert.deepEqual((await doctor()).lines.slice(1, 3), ['  ✓ The writer codex starts', `  ✓ The hook starts: ${link.hook}`])
 })
 
-test('without a writer, the flags that wait are noted: they stay raw until one is declared', async () => {
+test('without a writer, the flags that wait are a problem: they stay raw until one is declared', async () => {
   const note =
-    '  - 1 flag waits and no writer is declared: a flag stays raw without one. .weaver/llm/writer.json says who writes the cards.'
+    '  X 1 flag waits and no writer is declared: a flag stays raw without one. .weaver/llm/writer.json says who writes the cards.'
 
   await weaver(top, ['install', 'claude'])
   assert.ok(!(await doctor()).lines.some((line) => line.includes('registry')), 'nothing is said of a registry that is not there')
@@ -348,7 +349,7 @@ test('without a writer, the flags that wait are noted: they stay raw until one i
 
   const { status, lines } = await doctor()
 
-  assert.equal(status, 0, lines.join('\n'))
+  assert.equal(status, 1, lines.join('\n'))
   assert.deepEqual(lines.slice(2, 4), ['  ✓ The registry: 2 cards wait for you', note])
 
   write(top, 1)
@@ -484,4 +485,53 @@ test('a check given more time than the checks share is a problem: the time they 
       '  X `backend` is given 1500 s, but the checks share 1200 s at the end of a task, which cuts it first: raise checks.totalTimeoutSeconds in settings.json, or lower its timeoutSeconds in project/checks.json.',
     ),
   )
+})
+
+test('a runtime that ran author hooks and lost its wiring is a problem, even if another runtime is wired', async () => {
+  await weaver(top, ['install', 'claude'])
+  const repo = Repository.locate(top) ?? assert.fail('repository')
+
+  new Journal(repo).append(
+    { session: 'author-session', agent: 'codex' },
+    { kind: 'hook', event: 'Stop', tool: null, subagent: null, ms: 1 },
+  )
+  const { status, lines } = await doctor()
+
+  assert.equal(status, 1)
+  assert.match(lines.join('\n'), /Codex: not wired, but ran here at .*author-session.*weaver install codex/)
+})
+
+test('reviewer activity does not establish author wiring; recent hook errors are problems', async () => {
+  await weaver(top, ['install', 'claude'])
+  const repo = Repository.locate(top) ?? assert.fail('repository')
+  const journal = new Journal(repo)
+
+  journal.append(
+    { session: 'author', agent: 'claude' },
+    {
+      kind: 'review',
+      unit: 1,
+      runtime: 'codex',
+      model: null,
+      reason: '',
+      standing: 'clean',
+      rules: 1,
+      findings: 0,
+      findingRules: [],
+      suspicions: 0,
+      dropped: 0,
+      experiments: 0,
+      failure: null,
+      seconds: 1,
+      costUsd: null,
+    },
+  )
+  journal.append({ session: 'author', agent: 'codex' }, { kind: 'hook', event: 'PreToolUse', tool: null, subagent: 'child', ms: 1 })
+  assert.equal((await doctor()).status, 0)
+  journal.append({ session: 'author', agent: 'claude' }, { kind: 'error', event: 'Stop', message: 'disk full' })
+  const { status, lines, closing } = await doctor()
+
+  assert.equal(status, 1)
+  assert.match(lines.join('\n'), /1 hook error in the last 7 days, across 1 session.*Stop: disk full/)
+  assert.doesNotMatch(closing, /alive/)
 })

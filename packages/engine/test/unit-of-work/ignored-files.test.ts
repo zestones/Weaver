@@ -8,7 +8,20 @@ import { BaseTree } from '../../src/unit-of-work/diff/base-tree.ts'
 import { UnitDiff } from '../../src/unit-of-work/diff/unit-diff.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import { SAMPLE_REPO, git, makeRepo, writeFiles } from '../fixtures/repo.ts'
-import { A_FILE, agentRuns, agentWrites, finishWith, PASSING, prompt, stateOf, stubChecks, unitFiles } from '../fixtures/session.ts'
+import { declarationOf } from '../fixtures/declaration.ts'
+import {
+  bashCall,
+  startTool,
+  A_FILE,
+  agentRuns,
+  agentWrites,
+  finishWith,
+  PASSING,
+  prompt,
+  stateOf,
+  stubChecks,
+  unitFiles,
+} from '../fixtures/session.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-ignored-files-'))
 const CACHE_FILE = '.cache/agents/draft.py'
@@ -108,4 +121,25 @@ test('a failed Git ignore query cannot silently drop unit files', () => {
   const files = { '../outside.py': { base: null, last: null, foreign: false, touchedAt: '', since: '' } }
 
   assert.throws(() => new BaseTree(session.repo, session.dir).of(snapshot(), files), /Cannot classify ignored unit files/)
+})
+
+test('project scope exclusions apply before opening shell, edit and repair attribution windows', async () => {
+  const project = declarationOf({ scope: { exclude: ['.local'] } })
+
+  writeFiles(session.repo.top, { '.local/file': 'before' })
+  const close = startTool(session, bashCall('make build'), project)
+
+  writeFiles(session.repo.top, { '.local/file': 'after', 'src/new.ts': 'new' })
+  close()
+  assert.deepEqual(unitFiles(session), ['src/new.ts'])
+  const edited = startTool(session, { tool_name: 'Write', tool_input: { file_path: join(session.repo.top, '.local/file') } }, project)
+
+  writeFiles(session.repo.top, { '.local/file': 'edit' })
+  edited()
+  await session.repair(() => {
+    writeFiles(session.repo.top, { '.local/file': 'repair' })
+
+    return Promise.resolve()
+  }, project.exclude)
+  assert.deepEqual(unitFiles(session), ['src/new.ts'])
 })

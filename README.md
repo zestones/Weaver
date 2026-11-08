@@ -41,7 +41,7 @@ The agent calls Weaver at each of its hooks, in a process that lasts a little ov
 
 ![One turn, hook by hook: a request, before a tool call, after a tool call, the end of the turn.](_docs/assets/weaver-turn.svg)
 
-A turn starts with your request and ends when the agent stops. In between, Weaver is called before and after every tool call. After a call that changed files, the checks that warn run on those files, and the agent reads what they found with the result of its call. The end of the turn is where most of the work happens.
+A turn starts with your request and ends when the agent stops. In between, Weaver is called before and after every tool call. After a call that changed files, the checks that warn run on those files, and the agent reads what they found with the result of its call. The end of the turn is where most of the work happens. Attribution covers regular files and respects `scripts.scope.exclude`; symlinks and special files are left out. A failed batch is retried file by file, and unavailable paths are counted in a warning.
 
 ### When the agent stops
 
@@ -69,6 +69,7 @@ A few things the diagram leaves out:
 - **An agent hears a check without ending its task.** `weaver check backend` runs that check on its unit of work as the end of the task would, and counts as no refusal; the end of the task then gives its verdict again if nothing changed. Every request names it, with the checks of the project, and the guide says how.
 - **An agent that waits for its own work is left to wait.** While a command it sent to the background, a watch it started or a subagent it sent to the background has not ended, it may stop without its final sections: it is not reminded, and its runtime wakes it when the task ends.
 - **The cards a task is about are written on.** A call that changes the files of a card that waits tells the agent of the card, once. When the agent says it has finished, the cards it read or whose files it changed, and that it wrote nothing on, are listed for it once, before its work is checked: it writes what it looked into and what it changed on each one its task settled, and names in its final message, as `#12`, the ones its task leaves as they were: a card named there is not asked for. A card a subagent only read is that subagent's to write on.
+- **Reviewers obey the project's guards.** A reviewer is kept from writing outside its copy, and the project's command guards apply to it as to the agent: what it may start or touch beyond the copy is the project's to declare.
 - **Every limit is written in the project**: how many times the checks may refuse, how long they may run, how long the warnings of a call may take, how long a review may take. A check that runs out of time says which limit stopped it, its own or the time the checks share, and `weaver doctor` says when a check is given more than that shared time.
 
 ## What an agent is told
@@ -191,6 +192,10 @@ A command that needs more than the names of the files reads what Weaver sets in 
 | `WEAVER_CALL_DIFF`   | `warn`            | A JSON file: the files the call changed, each with its status, the blob it held `before` the session's work and the one it holds `after`. |
 | `WEAVER_GIT_OBJECTS` | all three         | The object store that holds those trees and blobs: git reads them with it as `GIT_OBJECT_DIRECTORY`, over the repository's own.           |
 
+When no checks are declared, a task still settles, but its summary, report and progress say plainly that nothing was checked. Configure `.weaver/project/checks.json` to add automated validation.
+
+Hook failures tell the agent to notify you and run `weaver doctor`, naming the journal. The same notice is limited to once per session per ten minutes. A Stop failure is shown to you and delivered to the agent with its next request or tool result. Both `weaver status` and `weaver doctor` show hook errors from the last seven days; doctor treats them as problems, as it does a previously used runtime whose wiring is missing or flags waiting without a writer. Missing wiring is repaired with `weaver install <runtime>`.
+
 The end of a task runs the checks, then the review, and may take long. `weaver status`, from a terminal of your own, says where it is: the checks that ended and how long each took, the one running and for how long, the ones still waiting, then the review, each beside the time it usually takes in the project. With no end of task running, it says how the last one ended, or that it was stopped before its end. `--watch` draws it again every second, until Ctrl+C.
 
 ```sh
@@ -229,7 +234,7 @@ Codex loads the hooks of a project only once it trusts the project, and runs eac
 
 To stay up to date there is one command, `weaver update`, which you run in a supervised project whenever you like. It does three things in order: it installs the latest release of Weaver when you do not have it, it applies to `.weaver/` the migrations the project lacks, naming each and what it changed, and it wires the hooks to that release. `weaver update --dry-run` shows what it would do and writes nothing: when a later release is published, what that release says changed, and what it would change in this project, asked of a copy of it that is unpacked and never installed.
 
-Releases stay side by side, and a project runs the one that wired it until `weaver update` is run there: `weaver doctor` says when a project is behind. A release that changes the format of `.weaver/` comes with the migration from the format before; `version`, in `settings.json`, is the number of that format.
+Releases stay side by side, and a project runs the one that wired it until `weaver update` is run there: `weaver doctor` says when a project is behind. At the first owner request of a session, a project running an older release also tells the agent to ask you to run `weaver update` if a newer release is installed locally or selected on PATH. A release that changes the format of `.weaver/` comes with the migration from the format before; `version`, in `settings.json`, is the number of that format.
 
 | Command                                                           | What it does                                                                                                                                                                                   |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

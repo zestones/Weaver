@@ -113,10 +113,9 @@ export class ChecksOnDemand {
     const now = this.repo.hashPaths(paths)
 
     return Object.fromEntries(
-      paths.map((path) => [
-        path,
-        { base: atHead.get(path) ?? null, last: now.get(path) ?? null, foreign: false, touchedAt: '', since: '' },
-      ]),
+      paths
+        .filter((path) => now.has(path))
+        .map((path) => [path, { base: atHead.get(path) ?? null, last: now.get(path) ?? null, foreign: false, touchedAt: '', since: '' }]),
     )
   }
 }

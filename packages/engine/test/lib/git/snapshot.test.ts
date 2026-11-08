@@ -96,3 +96,15 @@ describe('the snapshot of the working tree', () => {
     assert.equal(repo.git(['show', `${snapshot('same-second')}:src/a.ts`]), 'export const a = 3')
   })
 })
+
+test('one failing clean filter does not prevent the snapshot from including the other regular files', () => {
+  writeFiles(repo.top, { '.gitattributes': 'bad filter=broken\n', bad: 'unreadable by filter', good: 'new content' })
+  repo.git(['config', 'filter.broken.clean', 'false'])
+  repo.git(['config', 'filter.broken.required', 'true'])
+  const index = readFileSync(join(repo.gitDir, 'index'))
+  const tree = snapshot('broken-filter')
+
+  assert.equal(repo.git(['show', `${tree}:good`]), 'new content')
+  assert.ok(repo.unavailable.has('bad'))
+  assert.deepEqual(readFileSync(join(repo.gitDir, 'index')), index)
+})

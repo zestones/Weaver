@@ -334,3 +334,31 @@ test('a task whose end the runtime never tells is given up on once the time it w
 
   assert.equal((await finishWith(session, stubChecks([PASSING]), project, 'Watching.')).decision, 'block')
 })
+
+test('without declared checks the task settles once and every recorded outcome says nothing was checked', async () => {
+  const project = declaration({ checks: {} })
+
+  prompt(session, 'change it', project)
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  const { systemMessage = '', decision } = await finishWith(session, stubChecks([]), project)
+
+  assert.equal(decision, undefined)
+  assert.match(systemMessage, /No checks are configured; nothing was checked/)
+  assert.match(systemMessage, /without automated validation/)
+  assert.doesNotMatch(systemMessage, /0 checks passed/)
+  assert.match(reportOf(systemMessage), /nothing was checked/)
+  assert.match(EndOfTaskProgress.read(session.dir)?.outcome ?? '', /nothing was checked/)
+  assert.deepEqual(unitFiles(session), [])
+  await finishWith(session, stubChecks([]), project)
+  assert.equal(eventsOf(session, 'settle').length, 1)
+})
+
+test('all skipped checks settle without claiming a pass', async () => {
+  prompt(session, 'change it')
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  const skipped = new CheckOutcome({ ...PASSING, status: 'skip' })
+  const { systemMessage = '' } = await finishWith(session, stubChecks([skipped]))
+
+  assert.match(systemMessage, /All checks were skipped; nothing was checked/)
+  assert.doesNotMatch(reportOf(systemMessage), /checks passed/)
+})

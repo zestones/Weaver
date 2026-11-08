@@ -1,3 +1,4 @@
+import { ReleaseNotice } from '../exchange/release-notice.ts'
 import { TaskNotification } from '../../agents/events/task-notification.ts'
 import { RequestBriefing } from '../../guidance/briefing/request-briefing.ts'
 import { ReviewStore } from '../../review/results/review-store.ts'
@@ -16,7 +17,7 @@ export class OnRequest implements Moment {
     const request = new OwnerRequest(prompt)
     const session = turn.session()
     const told = [new RequestBriefing(turn.declaration).text, new MaintenanceNotice(session).briefing]
-    const briefed = Answer.adding(told.flatMap((text) => (text === null ? [] : [text])).join('\n\n'))
+    let briefed = Answer.adding(told.flatMap((text) => (text === null ? [] : [text])).join('\n\n'))
     const ended = new TaskNotification(prompt).ended
 
     if (ended !== null && !turn.event.subagent) session?.endedInBackground(ended)
@@ -25,6 +26,10 @@ export class OnRequest implements Moment {
     // requests, such as the end of a task, starts no work: it is not briefed again.
     if (turn.event.subagent) return briefed
     if (!request.isFromOwner) return Answer.silent()
+
+    const release = new ReleaseNotice().forSession(session)
+
+    if (release !== null) briefed = briefed.context('UserPromptSubmit', release)
 
     const directives = new OwnerDirectives([prompt])
 

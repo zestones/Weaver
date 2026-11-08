@@ -1,12 +1,20 @@
 import { existsSync } from 'node:fs'
 import type { ExecutionCatalog, RuntimeHook } from '@weaver/agent-sdk'
-import { DeclarationParts, RepositorySessions, type Declaration, type ReviewPolicy, type ReviewerName } from '@weaver/engine'
+import {
+  JournalHistory,
+  DeclarationParts,
+  RepositorySessions,
+  type Declaration,
+  type ReviewPolicy,
+  type ReviewerName,
+} from '@weaver/engine'
 import { RegistryError, type Card } from '@weaver/memory'
 import type { EngineLink } from '../../link/engine-link.ts'
 import { OwnRelease } from '../../link/own-release.ts'
 import { Counted } from '../../output/counted.ts'
 import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
+import { HookErrors } from '../../progress/hook-errors.ts'
 import { Project } from '../../project/project.ts'
 import { RuntimeCatalog } from '../../runtimes/runtime-catalog.ts'
 import { RuntimeSettings } from '../../runtimes/runtime-settings.ts'
@@ -52,7 +60,7 @@ export class DoctorCommand implements Command {
     const runtimes = new RuntimeCatalog().settings(project.top, this.link, [])
     const held = await Promise.all(runtimes.map((runtime) => this.held(runtime, project.top)))
     const wired = runtimes.flatMap((runtime, index) => [
-      this.runtime(runtime),
+      this.runtime(runtime, project),
       ...this.guide(project, runtime),
       ...this.mod(project, runtime),
       ...(held[index] ?? []),
@@ -62,6 +70,7 @@ export class DoctorCommand implements Command {
       ['Review', this.review(project)],
       ['Cards', [...this.writer(project), ...this.cards(project)]],
       ['Sessions', this.maintenance(project)],
+      ['Hook errors', this.hookErrors(project)],
       ['Runtimes', [this.hook(), ...wired, this.anyRuntime(runtimes)]],
     ]
     const problems = sections.flatMap(([, findings]) => findings).filter((finding) => finding.state === 'problem').length
@@ -73,6 +82,12 @@ export class DoctorCommand implements Command {
     else this.screen.problem(`${new Counted(problems, 'problem').text} to settle.`)
 
     return problems === 0 ? 0 : 1
+  }
+
+  private hookErrors(project: Project): Finding[] {
+    const lines = new HookErrors(project.repository).lines()
+
+    return lines.length === 0 ? [] : [{ state: 'problem', text: lines.join(' ') }]
   }
 
   // What was raised elsewhere is said as a sentence here, as the other findings are.
@@ -303,7 +318,7 @@ export class DoctorCommand implements Command {
 
   private unwritten(flags: number, project: Project): Finding {
     return {
-      state: 'note',
+      state: 'problem',
       text: `${new Counted(flags, 'flag waits', 'flags wait').text} and no writer is declared: a flag stays raw without one. ${project.configName}/${DeclarationParts.FILES.writer} says who writes the cards.`,
     }
   }
@@ -331,11 +346,21 @@ export class DoctorCommand implements Command {
       : { state: 'problem', text: `The hook does not start: ${this.link.hook}. Build Weaver with pnpm build.` }
   }
 
-  private runtime(runtime: RuntimeSettings): Finding {
+  private runtime(runtime: RuntimeSettings, project: Project): Finding {
     const wiring = runtime.wiring()
 
     if (wiring === 'installed') return { state: 'ok', text: `${runtime.label}: wired in ${runtime.file}` }
-    if (wiring === 'absent') return { state: 'note', text: `${runtime.label}: not wired` }
+    if (wiring === 'absent') {
+      const history = new JournalHistory(project.repository)
+      const ran = history.authorHook(runtime.runtime)
+
+      return ran === null
+        ? { state: 'note', text: `${runtime.label}: not wired` }
+        : {
+            state: 'problem',
+            text: `${runtime.label}: not wired, but ran here at ${ran.at} in session ${ran.session ?? 'unknown'}. Journal: ${history.journal.dir}. Run weaver install ${runtime.runtime}.`,
+          }
+    }
 
     const wired = runtime.wiredTag()
     const own = new OwnRelease()

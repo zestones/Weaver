@@ -432,7 +432,7 @@ test('a reviewer at work in a copy of the project is held there by its own hook,
   const call = (path: string) => ({ tool_name: 'Write', tool_input: { file_path: path, content: 'x' }, tool_use_id: 'c', cwd: copy })
   const asReviewer = (event: string, payload: Record<string, unknown>) =>
     JSON.parse(
-      spawnSync(process.execPath, [HOOK, event, '--agent=claude', `--review-copy=${copy}`], {
+      spawnSync(process.execPath, [HOOK, event, '--agent=claude', `--review-copy=${copy}`, `--review-project=${repo.top}`], {
         input: JSON.stringify({ session_id: 'reviewer', cwd: copy, ...payload }),
         encoding: 'utf8',
         env: { ...process.env, WEAVER_REVIEWER: '1' },
@@ -510,10 +510,7 @@ test('a repository that declares nothing is left alone, and a declaration that c
 
   writeDeclaration(repo.top, { checks: { lint: { judge: ['true'] } } })
 
-  assert.match(
-    stop().systemMessage ?? '',
-    /Nothing is checked: \.weaver is not a valid project declaration: project\/checks\.json: lint stands behind no rule/,
-  )
+  assert.match(stop().systemMessage ?? '', /\.weaver is not a valid project declaration: project\/checks\.json: lint stands behind no rule/)
 })
 
 test('the user’s index and object store never see the loop', () => {
@@ -636,10 +633,16 @@ test('the journal keeps how Weaver itself ran: what was asked, each run of the h
 test('a hook that cannot do its work is kept as an error: a configuration it cannot read, a moment that fails', () => {
   writeFiles(repo.top, { '.weaver/project/checks.json': '{ "syntax": ' })
 
-  assert.match(hook('UserPromptSubmit', { prompt: 'add b' }).systemMessage ?? '', /^\[weaver\] Nothing is checked: /)
-  assert.deepEqual(hook('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' }, tool_use_id: 'x' }), {})
+  assert.match(hook('UserPromptSubmit', { prompt: 'add b' }).hookSpecificOutput?.additionalContext ?? '', /UserPromptSubmit hook failed/)
+  assert.match(
+    hook('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'ls' }, tool_use_id: 'x' }).hookSpecificOutput?.additionalContext ?? '',
+    /PreToolUse hook failed/,
+  )
   assert.deepEqual(
-    new Journal(repo).read().map(({ kind, session, ...event }) => [kind, session, 'event' in event ? event.event : null]),
+    new Journal(repo)
+      .read()
+      .filter((event) => event.kind !== 'notification')
+      .map(({ kind, session, ...event }) => [kind, session, 'event' in event ? event.event : null]),
     [
       ['error', 'session-1', 'UserPromptSubmit'],
       ['error', 'session-1', 'PreToolUse'],

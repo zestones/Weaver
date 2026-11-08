@@ -39,7 +39,7 @@ export class AgentReviewer implements Reviewer {
 
     if (execution === null) return this.failed(assignment, `Weaver cannot start ${assignment.runtime}`)
     if (!assignment.experiments) {
-      return this.read(request, assignment, repo, await this.ask(execution, this.task(request, assignment, repo.top, null, stop)))
+      return this.read(request, assignment, repo, await this.ask(execution, this.task(request, assignment, repo.top, null, stop, repo.top)))
     }
 
     const copy = this.copyOf(repo)
@@ -47,7 +47,12 @@ export class AgentReviewer implements Reviewer {
     if (typeof copy === 'string') return this.failed(assignment, copy)
 
     try {
-      return this.read(request, assignment, repo, await this.ask(execution, this.task(request, assignment, copy.path, copy, stop)))
+      return this.read(
+        request,
+        assignment,
+        repo,
+        await this.ask(execution, this.task(request, assignment, copy.path, copy, stop, repo.top)),
+      )
     } finally {
       copy.discard()
     }
@@ -91,6 +96,7 @@ export class AgentReviewer implements Reviewer {
     cwd: string,
     copy: ReviewCopy | null,
     signal: AbortSignal | null,
+    project: string,
   ): AgentTask {
     const { runtime, model, effort, timeoutSeconds } = assignment
 
@@ -98,7 +104,7 @@ export class AgentReviewer implements Reviewer {
       prompt: request.prompt(copy?.path ?? null),
       cwd,
       access: copy === null ? 'read-only' : 'write',
-      beforeTool: copy === null ? null : [process.execPath, this.hook, 'PreToolUse', `--agent=${runtime}`, ReviewCopy.flag(copy.path)],
+      beforeTool: [process.execPath, this.hook, 'PreToolUse', `--agent=${runtime}`, ReviewCopy.flag(cwd), `--review-project=${project}`],
       timeoutSeconds,
       model,
       effort,

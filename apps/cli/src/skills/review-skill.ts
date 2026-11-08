@@ -26,7 +26,7 @@ export class ReviewSkill extends ProjectSkill {
       '',
       '## What you may run',
       '',
-      'This section matters when `experiments` is on in `.weaver/llm/reviewers.json`: you then work in a copy of the project, where you may write and run what you need. Say here what a reviewer may reach beyond that copy, such as a development stack that is already running, and what it must never start or touch.',
+      'This section matters when `experiments` is on in `.weaver/llm/reviewers.json`: you then work in a copy of the project, where you may write and run what you need, within the project’s command guards. Say here what a reviewer may reach beyond that copy, such as a development stack that is already running, and what it must never start or touch.',
       '',
       '## What this project cares about',
       '',

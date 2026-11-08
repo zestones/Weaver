@@ -29,6 +29,8 @@ export class WeaverGuide {
       this.whileWorking(),
       this.onCard(),
       this.ending(),
+      ...(this.declaration.review === null ? [] : ['Reviewers obey the project’s command guards, as the agent does.']),
+      'When Weaver reports that a later release is installed, tell the owner to run `weaver update` in this project after active agents finish. The notice is given once per session.',
       this.owners(),
       ...this.guards(),
     ].join('\n\n')
@@ -39,6 +41,8 @@ export class WeaverGuide {
       '## How a task goes',
       '',
       '1. Each request of the owner opens a unit of work: the files your calls change. That is what Weaver checks and reviews, not the rest of the tree.',
+      'Attribution covers regular files and respects scripts.scope.exclude. Symlinks and special files are left out; unavailable paths are counted in a hook warning.',
+      'If a hook fails, tell the owner and run `weaver doctor`; its message names the journal. A failure at the end of a task is also delivered with the next request or tool result. `weaver status` and `weaver doctor` show hook errors from the last seven days.',
       '2. A guard may refuse a call before it runs, and says why. Do what the reason says, or tell the owner what you need: never go around a guard.',
       '3. After a call that changed files, a check may warn you of what would hold the end of your task: fix it then.',
       `4. When your final message ${this.declaration.finish.headings === null ? 'ends your turn' : 'carries the sections of the project'}, the checks of the project run on your unit of work${this.declaration.review === null ? '' : ', then a reviewer may read it'}. A failure${this.declaration.review === null ? '' : ', or a finding,'} sends you back to work.`,
@@ -78,7 +82,10 @@ export class WeaverGuide {
   private checks(): string[] {
     const { checks } = this.declaration
 
-    if (checks.length === 0) return ['This project declares no check.']
+    if (checks.length === 0)
+      return [
+        'This project declares no check. Tasks still settle, but nothing was checked: tell the owner that the work has no automated validation. Checks are configured in `.weaver/project/checks.json`.',
+      ]
 
     return ['The checks of this project:', '', ...checks.map((check) => `- ${this.check(check)}`)]
   }

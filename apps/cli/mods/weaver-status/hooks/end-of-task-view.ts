@@ -1,4 +1,4 @@
-import type { CheckProgress, Progress } from '../types'
+import type { CheckProgress, Progress } from '../types/index.js'
 import { Duration } from './duration.ts'
 
 export type Mark = 'done' | 'problem' | 'alert' | 'note' | 'running'
@@ -38,6 +38,7 @@ export class EndOfTaskView {
     const { step, checks, review, outcome } = this.progress
 
     if (step === 'over') return `${WEAVER} ${outcome ?? ''}`
+    if (checks.length === 0 && step === 'checks') return `${WEAVER} nothing was checked: no checks were scheduled`
     if (step === 'repairs') return `${WEAVER} repairs`
     if (step === 'review' && review !== null) return `${WEAVER} review ${this.since(review.startedAt, review.usualMs)}`
 
@@ -62,11 +63,14 @@ export class EndOfTaskView {
 
   get steps(): Step[] {
     const { checks, review } = this.progress
+    const steps: Step[] =
+      checks.length === 0
+        ? [{ mark: 'note', name: 'checks', time: '', said: 'Nothing was checked: no checks were scheduled.' }]
+        : checks.map((check) => this.check(check))
 
-    if (review === null) return checks.map((check) => this.check(check))
-    if (review.status === 'waiting') return [...checks.map((check) => this.check(check)), this.waiting(REVIEW, review.usualMs)]
-    if (review.status === 'running')
-      return [...checks.map((check) => this.check(check)), this.running(REVIEW, review.startedAt, review.usualMs)]
+    if (review === null) return steps
+    if (review.status === 'waiting') return [...steps, this.waiting(REVIEW, review.usualMs)]
+    if (review.status === 'running') return [...steps, this.running(REVIEW, review.startedAt, review.usualMs)]
 
     const [mark, said] = STANDINGS[review.standing ?? ''] ?? ['note', review.standing ?? '']
     const name = review.reviewer === null ? REVIEW : `${REVIEW} by ${review.reviewer}`
@@ -75,7 +79,7 @@ export class EndOfTaskView {
         ? ''
         : this.between(review.startedAt, review.endedAt)
 
-    return [...checks.map((check) => this.check(check)), { mark, name, time, said }]
+    return [...steps, { mark, name, time, said }]
   }
 
   // How long the end of task took, once it is over; null while it runs.

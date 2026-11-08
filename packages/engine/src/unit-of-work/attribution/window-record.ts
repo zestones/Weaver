@@ -7,6 +7,8 @@ export interface WindowRecord {
   readonly untilStop: boolean
   // The window watches the paths it names and no other.
   readonly exact: boolean
+  readonly unavailable?: readonly string[]
+  readonly exclude?: readonly string[]
   readonly before: Readonly<Record<string, Blob>>
   readonly head: string | null
   readonly attribution: WriteScope

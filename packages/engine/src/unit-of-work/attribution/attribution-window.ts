@@ -1,3 +1,4 @@
+import { inScope } from '../../lib/git/path-scope.ts'
 import type { Blob, Repository } from '../../lib/git/repository.ts'
 import type { WriteScope } from '../../lib/shell/writes/write-scope.ts'
 import { Attribution } from './attribution.ts'
@@ -38,13 +39,18 @@ export class AttributionWindow {
     this.record = record
   }
 
-  static open(repo: Repository, call: WatchedCall): AttributionWindow {
+  static open(repo: Repository, call: WatchedCall, exclude: readonly string[] = []): AttributionWindow {
+    const paths = (call.targets ?? repo.dirtyPaths()).filter((path) => inScope(path, exclude))
+    const before = repo.hashPaths(paths)
+
     return new AttributionWindow({
       at: new Date().toISOString(),
       tool: call.tool,
       untilStop: call.untilStop,
       exact: call.targets !== null,
-      before: Object.fromEntries(repo.hashPaths(call.targets ?? repo.dirtyPaths())),
+      before: Object.fromEntries(before),
+      unavailable: paths.filter((path) => !before.has(path)),
+      exclude,
       head: repo.head(),
       attribution: call.scope,
       agent: call.agent,
@@ -69,12 +75,15 @@ export class AttributionWindow {
 
   // The same call watched again from now: what it changed until now has been charged.
   reopened(repo: Repository): AttributionWindow {
-    const { before, exact } = this.record
+    const { before, exact, exclude = [] } = this.record
+    const paths = (exact ? Object.keys(before) : repo.dirtyPaths()).filter((path) => inScope(path, exclude))
+    const hashed = repo.hashPaths(paths)
 
     return new AttributionWindow({
       ...this.record,
       at: new Date().toISOString(),
-      before: Object.fromEntries(repo.hashPaths(exact ? Object.keys(before) : repo.dirtyPaths())),
+      before: Object.fromEntries(hashed),
+      unavailable: paths.filter((path) => !hashed.has(path)),
       head: repo.head(),
     })
   }
@@ -103,12 +112,16 @@ export class AttributionWindow {
 
   private changes(repo: Repository): Map<string, Change> {
     const watched = Object.keys(this.record.before)
-    const candidates = this.record.exact ? watched : [...new Set([...watched, ...repo.dirtyPaths()])]
+    const candidates = (this.record.exact ? watched : [...new Set([...watched, ...repo.dirtyPaths()])]).filter(
+      (path) => inScope(path, this.record.exclude ?? []) && !this.record.unavailable?.includes(path),
+    )
     const after = repo.hashPaths(candidates)
     const before = this.before(repo, candidates)
     const changes = new Map<string, Change>()
 
     for (const path of candidates) {
+      if (!after.has(path)) continue
+
       const previous = before.get(path) ?? null
       const current = after.get(path) ?? null
 
@@ -122,7 +135,7 @@ export class AttributionWindow {
   private before(repo: Repository, paths: readonly string[]): Map<string, Blob> {
     const { before } = this.record
     const atHead = repo.blobsAt(
-      'HEAD',
+      this.record.head ?? 'HEAD',
       paths.filter((path) => !(path in before)),
     )
 

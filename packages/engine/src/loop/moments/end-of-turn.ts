@@ -133,7 +133,7 @@ export class EndOfTurn implements Moment {
 
     const diff = UnitDiff.of(session.repo, session.dir, unit.files, declaration.exclude)
 
-    return session.repair(() => this.checks.repair(declaration, diff, deadline))
+    return session.repair(() => this.checks.repair(declaration, diff, deadline), declaration.exclude)
   }
 
   // The only way to speak to an agent that has stopped is to refuse its stop. One that waits for a task it left
@@ -202,7 +202,7 @@ export class EndOfTurn implements Moment {
 
     // The review goes on by itself: the unit stays open for it, and the agent is not kept waiting.
     if (review?.standing === 'running') {
-      progress.over('passed; the review goes on by itself')
+      progress.over(`${report.coverage.description}; the review goes on by itself`)
 
       return this.ended(turn, null, Answer.saying(report.summary(reportPath)))
     }
@@ -210,7 +210,7 @@ export class EndOfTurn implements Moment {
     if (verdict.passed) {
       session.settle(unit.files)
       if (review !== null) new ReviewCards(session.repo).open(review, session, unit, declaration)
-      progress.over('passed')
+      progress.over(report.coverage.unchecked ? `${report.coverage.description}; settled without automated validation` : 'passed')
 
       return this.ended(turn, null, this.over(session, Answer.saying(report.summary(reportPath))))
     }

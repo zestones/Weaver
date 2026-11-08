@@ -124,7 +124,7 @@ export class ReviewRequest {
     return copy === null
       ? ['Do not change any file: you may only read.']
       : [
-          `You work in a copy of the repository as the change left it, at ${copy}. Inside this copy you may do anything: read, write, run the tests, add a throwaway test, print a value. Nothing there is kept, and you never write outside it.`,
+          `You work in a copy of the repository as the change left it, at ${copy}. Inside this copy you may do anything the project's command guards allow: read, write, run the tests, add a throwaway test, print a value. Nothing there is kept, and you never write outside it.`,
           'Experiment rather than speculate: what you can run, you do not have to guess.',
         ]
   }

@@ -1,5 +1,6 @@
 interface ToolDenial {
   readonly hookEventName: 'PreToolUse'
+  readonly additionalContext?: string
   readonly permissionDecision: 'deny'
   readonly permissionDecisionReason: string
 }
@@ -12,7 +13,7 @@ interface RequestContext {
 
 // Both runtimes give this text to their model with the result of the call.
 interface CallContext {
-  readonly hookEventName: 'PostToolUse' | 'PostToolUseFailure'
+  readonly hookEventName: 'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure'
   readonly additionalContext: string
 }
 
@@ -57,6 +58,25 @@ export class Answer {
 
   static telling(hookEventName: CallContext['hookEventName'], additionalContext: string): Answer {
     return new Answer({ hookSpecificOutput: { hookEventName, additionalContext } })
+  }
+
+  context(event: string, message: string): Answer {
+    if (event === 'Stop') return this.before(message)
+    if (!['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure'].includes(event)) return this.before(message)
+
+    const previous = this.body?.hookSpecificOutput
+    const said = previous?.additionalContext
+
+    const additionalContext = said === undefined ? message : `${said}\n\n${message}`
+
+    if (event === 'PreToolUse' && previous?.hookEventName === 'PreToolUse') {
+      return new Answer({ ...this.body, hookSpecificOutput: { ...previous, additionalContext } })
+    }
+    if (event === 'UserPromptSubmit') {
+      return new Answer({ ...this.body, hookSpecificOutput: { hookEventName: event, additionalContext } })
+    }
+
+    return new Answer({ ...this.body, hookSpecificOutput: { hookEventName: event as CallContext['hookEventName'], additionalContext } })
   }
 
   after(alert: string | null): Answer {

@@ -95,7 +95,10 @@ export class StatsPage {
     if (verdicts.total === 0) return [this.row('Verdicts', '0'), settled]
 
     return [
-      this.row('Verdicts', `${String(verdicts.total)}: ${String(verdicts.passed)} passed, ${String(verdicts.failed)} failed`),
+      this.row(
+        'Verdicts',
+        `${String(verdicts.total)}: ${String(verdicts.passed)} passed, ${String(verdicts.failed)} failed${verdicts.unchecked > 0 ? `, ${String(verdicts.unchecked)} unchecked` : ''}${verdicts.unknown > 0 ? `, ${String(verdicts.unknown)} unknown coverage` : ''}`,
+      ),
       this.row('  time', `${this.spread(verdicts.ms)}, ${this.span(verdicts.ms.total)} in all`),
       this.row('  files changed', this.sizes(verdicts.files)),
       this.row('  lines added', this.sizes(verdicts.lines)),

@@ -47,7 +47,7 @@ export class TreeDiff {
   }
 
   files(excluded: readonly string[]): ChangedFile[] {
-    const pathspec = [':(top)', ...excluded.map((folder) => `:(top,exclude)${folder}`)]
+    const pathspec = [':(top)', ...excluded.map((folder) => `:(top,exclude,literal)${folder}`)]
     const ranges = this.addedRanges(pathspec)
 
     return [...this.listFiles(pathspec)].map(([path, { status, oldPath }]) => ({ status, path, oldPath, added: ranges.get(path) ?? [] }))
@@ -93,7 +93,9 @@ export class TreeDiff {
   }
 
   excludedFolders(excluded: readonly string[]): ExcludedFolder[] {
-    return excluded.map((folder) => ({ folder, files: this.listFiles([`:(top)${folder}`]).size })).filter((entry) => entry.files > 0)
+    return excluded
+      .map((folder) => ({ folder, files: this.listFiles([`:(top,literal)${folder}`]).size }))
+      .filter((entry) => entry.files > 0)
   }
 
   private listFiles(pathspec: readonly string[]): Map<string, Pick<ChangedFile, 'status' | 'oldPath'>> {

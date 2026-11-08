@@ -62,7 +62,15 @@ test('the reviewer is the runtime it was assigned, started where the project is,
 
   assert.deepEqual(
     [task?.cwd, task?.access, task?.beforeTool, task?.model, task?.effort, task?.timeoutSeconds, task?.environment],
-    [repo.top, 'read-only', null, 'gpt-5.5', 'high', 120, { WEAVER_REVIEWER: '1' }],
+    [
+      repo.top,
+      'read-only',
+      [process.execPath, '/weaver/hook.js', 'PreToolUse', '--agent=codex', `--review-copy=${repo.top}`, `--review-project=${repo.top}`],
+      'gpt-5.5',
+      'high',
+      120,
+      { WEAVER_REVIEWER: '1' },
+    ],
   )
   assert.match(task?.prompt ?? '', /Do not change any file: you may only read\./)
   assert.match(JSON.stringify(task?.answerSchema), /"rule":\{"type":"string","enum":\["N1","N2","BUG"\]\}/, 'only the rules it was given')
@@ -82,7 +90,14 @@ test('a reviewer that may experiment works in a copy of the project, held there 
 
   assert.match(copy, new RegExp(`^${copies}/project-[0-9a-f]{10}-1$`))
   assert.equal(task?.access, 'write')
-  assert.deepEqual(task?.beforeTool, [process.execPath, '/weaver/hook.js', 'PreToolUse', '--agent=codex', `--review-copy=${copy}`])
+  assert.deepEqual(task?.beforeTool, [
+    process.execPath,
+    '/weaver/hook.js',
+    'PreToolUse',
+    '--agent=codex',
+    `--review-copy=${copy}`,
+    `--review-project=${repo.top}`,
+  ])
   assert.match(task?.prompt ?? '', new RegExp(`You work in a copy of the repository as the change left it, at ${copy}\\.`))
   assert.match(task?.prompt ?? '', /Experiment rather than speculate/)
   assert.equal(existsSync(copy), false)

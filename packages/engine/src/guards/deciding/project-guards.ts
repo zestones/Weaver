@@ -6,7 +6,7 @@ import { DeclarationGuard } from '../kinds/declaration-guard.ts'
 import { EngineGuard } from '../kinds/engine-guard.ts'
 import type { Guard } from '../kinds/guard.ts'
 import { OwnerCommandGuard } from '../kinds/owner-command-guard.ts'
-import { RunsGuard } from '../kinds/runs-guard.ts'
+import { ProjectCommandGuards } from './project-command-guards.ts'
 import { WritesGuard } from '../kinds/writes-guard.ts'
 import type { Refusal } from '../results/refusal.ts'
 
@@ -19,6 +19,7 @@ export class ProjectGuards {
       new EngineGuard(repo),
       new OwnerCommandGuard(),
       new DeclarationGuard(repo, declaration.skills),
+      ...new ProjectCommandGuards(declaration).guards,
       ...declaration.guards.flatMap((declared) => this.guardsOf(declared, repo)),
     ]
   }
@@ -36,9 +37,6 @@ export class ProjectGuards {
   private guardsOf(declared: DeclaredGuard, repo: Repository): Guard[] {
     const fields = { id: declared.id, statement: declared.statement, liftable: true }
 
-    return [
-      ...(declared.writes.length > 0 ? [new WritesGuard(fields, repo.top, declared.writes)] : []),
-      ...(declared.runs.length > 0 ? [new RunsGuard(fields, declared.runs)] : []),
-    ]
+    return [...(declared.writes.length > 0 ? [new WritesGuard(fields, repo.top, declared.writes)] : [])]
   }
 }

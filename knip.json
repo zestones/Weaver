@@ -6,7 +6,8 @@
     },
     "packages/engine": {
       "entry": ["src/index.ts", "src/bin/hook.ts", "src/bin/review-worker.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts"]
+      "project": ["src/**/*.ts", "test/**/*.ts"],
+      "ignoreBinaries": ["mkfifo"]
     },
     "packages/agent-sdk": {
       "entry": ["src/index.ts"],

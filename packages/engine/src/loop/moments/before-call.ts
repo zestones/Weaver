@@ -59,7 +59,11 @@ export class BeforeCall implements Moment {
     const writes = call.writes(turn.repo.top, turn.declaration.scripts)
 
     if (writes !== null && callId !== null) {
-      session?.watch(callId, { tool: call.name, ...writes, untilStop: call.background, agent: turn.event.agentId })
+      session?.watch(
+        callId,
+        { tool: call.name, ...writes, untilStop: call.background, agent: turn.event.agentId },
+        turn.declaration.exclude,
+      )
     }
 
     return Answer.silent()

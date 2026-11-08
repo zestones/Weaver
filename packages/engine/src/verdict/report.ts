@@ -1,3 +1,4 @@
+import { CheckCoverage } from './check-coverage.ts'
 import { counted } from '../lib/text/counted.ts'
 import { duration } from '../lib/text/duration.ts'
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs'
@@ -31,6 +32,10 @@ export class Report {
   constructor(declaration: Declaration, verdict: UnitVerdict) {
     this.declaration = declaration
     this.verdict = verdict
+  }
+
+  get coverage(): CheckCoverage {
+    return new CheckCoverage(this.declaration.checks.length, this.verdict.outcomes, this.verdict.diff.files.length)
   }
 
   write(dir: string): string {
@@ -85,7 +90,7 @@ export class Report {
     }
 
     return [
-      `[weaver] The checks pass, and the reviewer (${outcome.runtime}) found ${counted(outcome.findings.length, 'point')} on this unit of work (refusal ${String(round)} of ${String(maxRefusals)}).`,
+      `[weaver] ${this.coverage.description}, and the reviewer (${outcome.runtime}) found ${counted(outcome.findings.length, 'point')} on this unit of work (refusal ${String(round)} of ${String(maxRefusals)}).`,
       'Fix each one, or decide to leave it: a finding never holds your change by itself, but each one needs your answer.',
       ANSWER_HOW,
       IN_WORDS,
@@ -104,7 +109,11 @@ export class Report {
     const parts =
       diff.files.length === 0
         ? ['[weaver] No file changed in this turn.']
-        : [`[weaver] ${counted(ran, 'check')} passed on ${counted(diff.files.length, 'changed file')}.`]
+        : this.coverage.unchecked
+          ? [
+              `[weaver] ${this.coverage.description}. ${counted(diff.files.length, 'changed file')} without automated validation. Tell the owner; configure .weaver/project/checks.json.`,
+            ]
+          : [`[weaver] ${counted(ran, 'check')} passed on ${counted(diff.files.length, 'changed file')}.`]
 
     if (diff.excluded.length > 0) {
       parts.push(`Not looked at: ${diff.excluded.map(({ folder, files }) => `${counted(files, 'file')} under ${folder}/`).join(', ')}.`)
@@ -149,7 +158,7 @@ export class Report {
     const { diff } = verdict
 
     return [
-      `# Unit ${String(verdict.unit)}, round ${String(verdict.round)}: ${verdict.passed ? 'checks passed' : 'checks failed'}`,
+      `# Unit ${String(verdict.unit)}, round ${String(verdict.round)}: ${verdict.passed ? this.coverage.description : 'checks failed'}`,
       ...this.section(
         `Changed files (${String(diff.files.length)})`,
         diff.files.map((file) => `- ${file.status} ${file.path}`),
@@ -164,7 +173,7 @@ export class Report {
       ),
       ...this.section(
         'Checks',
-        verdict.outcomes.flatMap((outcome) => this.checkLines(outcome)),
+        this.coverage.unchecked ? [this.coverage.description] : verdict.outcomes.flatMap((outcome) => this.checkLines(outcome)),
       ),
       ...this.section('Review', this.reviewSection()),
       ...this.section('To validate', verdict.toValidate().lines()),

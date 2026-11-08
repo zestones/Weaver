@@ -165,8 +165,15 @@ export class Session {
     })).unit.number
   }
 
-  watch(callId: string, call: WatchedCall): void {
-    const window = AttributionWindow.open(this.repo, call)
+  checkRelease(): boolean {
+    return this.store.transact((latest) => ({
+      record: latest.releaseChecked === true ? latest : { ...latest, releaseChecked: true },
+      value: latest.releaseChecked !== true,
+    })).value
+  }
+
+  watch(callId: string, call: WatchedCall, exclude: readonly string[] = []): void {
+    const window = AttributionWindow.open(this.repo, call, exclude)
 
     this.store.update((latest) => ({
       ...latest,
@@ -201,8 +208,8 @@ export class Session {
   }
 
   // The repairs of the project's checks run as one call of the session: what they rewrite stays the agent's work.
-  async repair(repairs: () => Promise<void>): Promise<readonly string[]> {
-    this.watch(REPAIR, { tool: REPAIR, targets: null, scope: 'all', untilStop: false, agent: null })
+  async repair(repairs: () => Promise<void>, exclude: readonly string[] = []): Promise<readonly string[]> {
+    this.watch(REPAIR, { tool: REPAIR, targets: null, scope: 'all', untilStop: false, agent: null }, exclude)
     await repairs()
 
     return this.closeCall(REPAIR).flatMap((touch) => touch.paths)
