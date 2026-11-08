@@ -3,7 +3,6 @@ import type { Key } from 'ink'
 import type { Form } from './form.ts'
 import { TypedText } from './typed-text.ts'
 
-const REASON_LIMIT = 100
 // The key that picks each closing.
 const KEYS: Readonly<Record<Closing, string>> = { fixed: 'f', wontfix: 'w', issue: 'i', invalid: 'v' }
 
@@ -18,7 +17,7 @@ interface Fields {
 
 // Closing a card: how, and why. A card someone concluded on starts with what they concluded: fixed closes as fixed,
 // refuted as invalid, and the reason is what their report comes to, what was changed or what the investigation
-// shows, which the owner corrects or keeps. A note that is no report gives its first line.
+// shows, which the owner corrects or keeps. A proposal keeps its full draft.
 export class CloseForm implements Form {
   static readonly KEYS = KEYS
 
@@ -46,8 +45,7 @@ export class CloseForm implements Form {
     const taken = concluded !== null && (concluded.as === 'fixed' || concluded.as === 'refuted') ? concluded : null
     const note = taken === null ? null : (card.record.notes.findLast((written) => written.provenance === taken.by) ?? null)
     const report = note === null || taken === null ? null : new NoteReport(taken.as, note.text)
-    const [first = ''] = (report?.outcome ?? note?.text ?? '').split('\n')
-    const reason = first.length > REASON_LIMIT ? `${first.slice(0, REASON_LIMIT - 1).trimEnd()}…` : first
+    const reason = card.record.proposal?.reason ?? report?.outcome ?? note?.text ?? ''
 
     return new CloseForm(card, note === null ? null : taken, {
       closing: taken?.as === 'refuted' ? 'invalid' : 'fixed',

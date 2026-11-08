@@ -31,7 +31,8 @@ const KEYS: readonly (readonly [string, readonly (readonly [string, string])[]])
     [
       ['n', 'write a note on the card'],
       ['l', 'change its labels'],
-      ['c', 'close it'],
+      ['c', 'accept proposal or close (owner only)'],
+      ['C', 'edit closing disposition and reason (owner only)'],
       ['q', 'leave'],
     ],
   ],

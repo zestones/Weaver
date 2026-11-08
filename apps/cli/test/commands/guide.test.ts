@@ -34,7 +34,9 @@ test('every command the guide names is one weaver has', async () => {
 
   const guide = (await weaver(top, ['guide'])).lines.join('\n')
   const named = new Set(
-    [...guide.matchAll(/`weaver ([a-z]+(?: (?:reopen|retitle|label|rewrite|tie|untie|separate))?)/g)].map(([, name]) => name ?? ''),
+    [...guide.matchAll(/`weaver ([a-z]+(?: (?:reopen|retitle|label|rewrite|tie|untie|separate|restore|revisions|issue-result))?)/g)].map(
+      ([, name]) => name ?? '',
+    ),
   )
 
   assert.ok(named.size >= 10, [...named].join(', '))

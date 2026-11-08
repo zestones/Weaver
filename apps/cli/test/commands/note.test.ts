@@ -8,7 +8,7 @@ import { makeProject, weaver } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-note-'))
 const WRITTEN = { status: 0, lines: ['✓ Note written on card #1.'] }
-const USAGE = ['', 'Usage: weaver note <number> [confirmed|refuted|unsure|fixed] [text]']
+const USAGE = ['', 'Usage: weaver note <number> [confirmed|refuted|unsure|fixed|needs-owner] [text]']
 const notesOf = (top: string) => cardOf(top, 1).record.notes.map(({ conclusion, text }) => [conclusion, text])
 let top: string
 let counter = 0
@@ -35,7 +35,7 @@ test('the owner writes on a card from a terminal: what the line says, and what t
     ['confirmed', 'ran the test'],
   ])
   assert.deepEqual([author, role, session, subagent, unit, requests], ['owner', 'owner', null, null, null, []])
-  assert.equal((await weaver(top, ['cards'])).lines[2], '  #1  raw (confirmed)  no call of refresh() exists under src/.')
+  assert.equal((await weaver(top, ['cards'])).lines[2], '  #1  raw (confirmed) · actionable  no call of refresh() exists under src/.')
 })
 
 test('a report is read on the standard input when the line gives no text, and only then', async () => {

@@ -52,11 +52,7 @@ test('the screen shows the views, the list under its levels, the selected card a
       'a card has its five sides, and the one that holds a report says how many',
     )
     assert.match(frame(), /▊ {2}NO LEVEL 1 ─+ {2}▎/, 'a card without a level stands after the others')
-    assert.match(
-      frame(),
-      /▊ {2}▍ OBSERVATION +▎\n[^\n]*▊ +▎\n[^\n]*▊ {2}No call of refresh\(\) exists under src\/\./,
-      'a heading has an empty line under it',
-    )
+    assert.match(frame(), /▊ {2}▍ CLOSING PROPOSAL +▎\n[^\n]*▊ +▎\n[^\n]*▊ {2}Proposed as fixed\./, 'a heading has an empty line under it')
     assert.equal(
       lines.at(-1),
       '   ↑↓ navigate · ←→ view · enter open · / search · f filter · n note · l label · c close   ? help',

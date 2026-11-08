@@ -127,7 +127,7 @@ test('a card is drawn from what it holds: what it is, what was written of it, it
     '  Asked     1. refresh the token before it expires…',
     '            #review',
     '',
-    'Write on it with weaver note 7 [confirmed|refuted|unsure|fixed] <text>.',
+    'Write on it with weaver note 7 [conclusion] <text>.',
     'Close it with weaver close 7 fixed|wontfix|issue|invalid [reason].',
   ])
 })
@@ -198,7 +198,7 @@ test('what a review left is drawn with its rule, the line its reviewer read and 
     '  Session   session-1, unit 2',
     '  Asked     parse the answer',
     '',
-    'Write on it with weaver note 2 [confirmed|refuted|unsure|fixed] <text>.',
+    'Write on it with weaver note 2 [conclusion] <text>.',
     'Close it with weaver close 2 fixed|wontfix|issue|invalid [reason].',
   ])
 })

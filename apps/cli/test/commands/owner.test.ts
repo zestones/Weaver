@@ -14,14 +14,6 @@ const OWNERS: readonly (readonly string[])[] = [
   ['update', '--offline'],
   ['maintenance', 'on'],
   ['close', '1', 'fixed'],
-  ['cards', 'reopen', '2'],
-  ['cards', 'retitle', '1', 'Another', 'title'],
-  ['cards', 'label', '1', 'type:bug'],
-  ['cards', 'rewrite', '1'],
-  ['cards', 'tie', '1', '2'],
-  ['cards', 'untie', '1', '3'],
-  ['cards', 'separate', '4'],
-  ['ui'],
 ]
 
 afterAll(() => {

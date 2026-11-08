@@ -141,9 +141,17 @@ export class WeaverGuide {
 
   private owners(): string {
     return [
+      '## Card changes and closing proposals',
+      '',
+      'Agents and owners may use `weaver cards tie <a> <b> [reason]`, `weaver cards untie <a> <b>`, `weaver cards separate <number>`, `weaver cards reopen <number> [reason]`, `weaver cards retitle <number> <title>`, `weaver cards label <number> <family:value>`, and `weaver cards rewrite <number>` (Markdown on stdin). Every change records its actor. Retitles, labels and rewrites retain their before and after content: inspect it with `weaver cards revisions <number>`, and restore with `weaver cards restore <number> <revision> [reason]`. Reopening starts a new resolution cycle and keeps the previous closing in history.',
+      '',
+      'Resolution is uninvestigated, investigated, fixed, refuted or needs-owner. Use `weaver note <number> needs-owner <question>` for a concrete owner decision; a later investigation resumes work. Fixed means reported fixed. A latest fixed or refuted conclusion on an open card produces a deterministic closing proposal from its notes, including existing notes. It records cause, fix, verification and remaining work. Missing verification says "verification not run" with a warning; the owner can still accept it. Raw flags still wait for the writer.',
+      '',
+      'The list distinguishes actionable cards, cards needing the owner and proposals for closing. Read the full proposal with `weaver cards <number>`. Only the owner accepts it, with `weaver close <number>`, or supplies a disposition with `weaver close <number> fixed|wontfix|issue|invalid [reason]`. A changed card makes a previously shown proposal stale: read it again before accepting. In `weaver ui`, agents can read, note and label; only the owner closes. The c key accepts a proposal in one gesture and C opens the closing form. Issue bodies expand related problems without local card numbers. After checking the tracker for an interrupted filing, use `weaver cards issue-result <number> <url|not-filed>` to reconcile it before the owner retries closure.',
+      '',
       '## What is the owner’s',
       '',
-      `These commands decide on a card, plug Weaver in or out, or lift its guards: they refuse to run under an agent. ${OwnerCommandGuard.COMMANDS.map((command) => `\`weaver ${command}\``).join(', ')}. When one is needed, say so in your final message: the owner runs it.`,
+      `These commands close a card, plug Weaver in or out, or lift its guards: they refuse to run under an agent. ${OwnerCommandGuard.COMMANDS.map((command) => `\`weaver ${command}\``).join(', ')}. When one is needed, say so in your final message: the owner runs it.`,
       '',
       'The configuration of Weaver under `.weaver/`, its state under `.git/weaver/` and the hooks of the runtimes are the owner’s too: describe the change you need instead of making it.',
     ].join('\n')

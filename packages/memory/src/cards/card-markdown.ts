@@ -31,6 +31,7 @@ export class CardMarkdown {
     return [
       `# ${this.card.title}`,
       this.header().join('\n'),
+      ...this.proposal(),
       ...this.body(),
       ...this.flag(),
       ...this.notes(),
@@ -38,6 +39,18 @@ export class CardMarkdown {
       ...this.ties(),
       ...this.closing(),
     ].join('\n\n')
+  }
+
+  private proposal(): string[] {
+    const proposal = this.record.proposal
+    return proposal === null
+      ? []
+      : [
+          '## Closing proposal',
+          `Proposed as ${proposal.as} (revision ${String(proposal.revision)}).`,
+          proposal.reason,
+          `Owner: accept with weaver close ${String(this.card.number)}.`,
+        ]
   }
 
   private header(): string[] {
@@ -49,6 +62,7 @@ export class CardMarkdown {
       `- Card: #${String(number)}`,
       `- Origin: ${origin}`,
       `- State: ${this.state()}`,
+      `- Resolution: ${this.record.lifecycle?.stage ?? 'uninvestigated'}`,
       `- Labels: ${labels.length === 0 ? 'none' : labels.join(', ')}`,
       `- Places: ${places.length === 0 ? 'none' : places.map((place) => `\`${PlaceText.write(place)}\``).join(', ')}`,
       `- Author: ${this.author(provenance)}`,

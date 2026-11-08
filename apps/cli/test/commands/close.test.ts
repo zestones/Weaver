@@ -87,10 +87,10 @@ test('every error of the registry is shown as it says, and the card stays as it 
 })
 
 test('close says how it is written when a word is missing or unknown', async () => {
-  const usage = ['Usage: weaver close <number> fixed|wontfix|issue|invalid [reason]', 'Run weaver help close for what each word means.']
+  const usage = ['Usage: weaver close <number> [fixed|wontfix|issue|invalid] [reason]', 'Run weaver help close for what each word means.']
 
   assert.deepEqual(await weaver(top, ['close']), { status: 2, lines: usage })
-  assert.deepEqual(await weaver(top, ['close', '1']), { status: 2, lines: usage })
+  assert.equal((await weaver(top, ['close', '1'])).status, 1)
   assert.deepEqual(await weaver(top, ['close', '1', 'later']), { status: 2, lines: usage })
   assert.deepEqual(await weaver(top, ['close', 'F1', 'fixed']), { status: 2, lines: usage })
 })
@@ -108,12 +108,10 @@ test('closing as an issue runs the command of the project with the title, the ca
   const { closing, state } = cardOf(top, 1).record
 
   assert.deepEqual([title, labels], ['Nothing refreshes the token', 'type:bug,area:auth'])
-  assert.match(body, /^--body=# Nothing refreshes the token\n\n- Card: #1\n[^]*\n- State: open\n[^]*## Flag\n\n```text\nSeen: /)
-  assert.match(
-    body,
-    /\n## Notes\n\n### 2026-10-12T09:30:00\.000Z, claude, as author: confirmed\n\nRan the test with a token of one second:\n/,
-    'an issue carries what was found about its card',
-  )
+  assert.match(body, /^--body=## Problem/)
+  assert.match(body, /## Evidence/)
+  assert.match(body, /Ran the test with a token of one second/)
+  assert.doesNotMatch(body, /Card: #|Session:|State:|card \d+|#\d+/i)
   assert.equal(state, 'closed')
   assert.deepEqual([closing?.as, closing?.reason, closing?.issue], ['issue', 'for the next release', 'https://issues.example/42'])
   assert.match(
@@ -130,7 +128,7 @@ test('a card without labels is filed without the option that names them', async 
   const [flag, title, body, quiet, ...others] = receivedWords()
 
   assert.deepEqual([flag, title, quiet, others], ['--title', 'The response is cast to User without being parsed.', '--quiet', []])
-  assert.match(body ?? '', /^# The response is cast to User without being parsed\.\n\n- Card: #2\n/)
+  assert.match(body ?? '', /^## Problem\n\nThe response is cast to User without being parsed/)
   assert.deepEqual([cardOf(top, 2).record.closing?.as, cardOf(top, 2).record.closing?.issue], ['issue', null])
 })
 

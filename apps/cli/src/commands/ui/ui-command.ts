@@ -1,3 +1,6 @@
+import type { Caller } from '../../caller/caller.ts'
+import { ProcessCaller } from '../../caller/process-caller.ts'
+import { CardActor } from '../../caller/card-actor.ts'
 import { basename } from 'node:path'
 import { CardDesk } from '../../cards/card-desk.ts'
 import type { Output } from '../../output/output.ts'
@@ -16,13 +19,14 @@ export class UiCommand implements Command {
     words: [],
     examples: ['weaver ui'],
   } as const
-  // It closes cards and changes them.
-  readonly ownerOnly = true
+  readonly ownerOnly = false
+  private readonly caller: Caller
   private readonly cwd: string
   private readonly output: Output
   private readonly screen: Screen
 
-  constructor(cwd: string, output: Output) {
+  constructor(cwd: string, output: Output, caller: Caller = new ProcessCaller()) {
+    this.caller = caller
     this.cwd = cwd
     this.output = output
     this.screen = new Screen(output)
@@ -42,7 +46,7 @@ export class UiCommand implements Command {
     }
 
     const project = Project.locate(this.cwd)
-    const registry = project.recordedRegistry()
+    const registry = project.recordedRegistry(new CardActor(this.caller).provenance())
 
     if (registry === null) {
       this.screen.line('Nothing waits for you.')
@@ -51,6 +55,7 @@ export class UiCommand implements Command {
     }
 
     try {
+      registry.claimCommand(['ui'])
       // Ink and React are loaded here, to draw the screen: no other command pays for them.
       const { Interface } = await import('../../ui/start/interface.tsx')
 

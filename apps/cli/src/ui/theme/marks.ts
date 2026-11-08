@@ -16,6 +16,7 @@ export const TONES: Readonly<Record<Tone, { readonly ink: string; readonly groun
 
 // What someone concluded of a card, as a mark that is read without colour and the tone that goes with it.
 export const CONCLUDED: Readonly<Record<Conclusion, { readonly mark: string; readonly tone: Tone }>> = {
+  'needs-owner': { mark: '?', tone: 'orange' },
   confirmed: { mark: '✓', tone: 'green' },
   refuted: { mark: '✗', tone: 'coral' },
   unsure: { mark: '?', tone: 'neutral' },

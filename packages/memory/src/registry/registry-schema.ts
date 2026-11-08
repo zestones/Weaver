@@ -45,4 +45,34 @@ export const MIGRATIONS: readonly string[] = [
   `
   UPDATE cards SET record = json_set(record, '$.notes', json('[]'));
   `,
+  `
+  CREATE TABLE card_commands (id TEXT PRIMARY KEY, words TEXT NOT NULL, actor TEXT NOT NULL, claimed INTEGER NOT NULL DEFAULT 0) STRICT;
+  CREATE TABLE proposal_views (card INTEGER PRIMARY KEY, proposal TEXT NOT NULL) STRICT;
+  CREATE TABLE issue_filings (id INTEGER PRIMARY KEY, card INTEGER NOT NULL, record TEXT NOT NULL) STRICT;
+  UPDATE cards SET record = json_set(record,
+    '$.notes', json((SELECT json_group_array(json_set(value, '$.id', 'note-' || (key + 1))) FROM json_each(record, '$.notes'))),
+    '$.lifecycle', json_object(
+      'revision', json_array_length(record, '$.history'),
+      'cycle', (SELECT count(*) FROM json_each(record, '$.history') WHERE json_extract(value, '$.action') = 'reopened'),
+      'noteStart', (SELECT count(*) FROM json_each(record, '$.history') WHERE json_extract(value, '$.action') = 'noted'
+        AND key < COALESCE((SELECT max(key) FROM json_each(record, '$.history') WHERE json_extract(value, '$.action') = 'reopened'), -1)),
+      'stage', 'uninvestigated'),
+    '$.revisions', CASE WHEN json_type(record, '$.written') = 'object'
+      THEN json_array(json_object('revision', json_array_length(record, '$.history'),
+        'before', NULL, 'after', json_extract(record, '$.written'), 'by', NULL,
+        'reason', 'Migration baseline; earlier overwritten content is unavailable'))
+      ELSE json('[]') END);
+  WITH conclusions AS (
+    SELECT number, COALESCE(
+      (SELECT json_extract(value, '$.conclusion') FROM json_each(record, '$.notes')
+        WHERE key >= json_extract(record, '$.lifecycle.noteStart') AND json_type(value, '$.conclusion') = 'text'
+        ORDER BY key DESC LIMIT 1),
+      CASE WHEN json_extract(record, '$.lifecycle.cycle') = 0 AND json_extract(record, '$.flag.fields.did') = 'fixed' THEN 'fixed' END
+    ) AS latest FROM cards
+  )
+  UPDATE cards SET record = json_set(record, '$.lifecycle.stage',
+    CASE (SELECT latest FROM conclusions WHERE conclusions.number = cards.number)
+      WHEN 'fixed' THEN 'fixed' WHEN 'refuted' THEN 'refuted' WHEN 'needs-owner' THEN 'needs-owner'
+      WHEN 'confirmed' THEN 'investigated' WHEN 'unsure' THEN 'investigated' ELSE 'uninvestigated' END);
+  `,
 ]

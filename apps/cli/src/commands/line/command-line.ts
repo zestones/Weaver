@@ -1,3 +1,6 @@
+import { IssueResultCommand } from '../changes/issue-result-command.ts'
+import { RestoreCommand } from '../changes/restore-command.ts'
+import { RevisionsCommand } from '../changes/revisions-command.ts'
 import { ExecutionCatalog } from '@weaver/agent-sdk'
 import type { Caller } from '../../caller/caller.ts'
 import { ProcessCaller } from '../../caller/process-caller.ts'
@@ -139,17 +142,20 @@ export class CommandLine {
       new GuideCommand(this.cwd, this.output),
       new StatsCommand(this.cwd, this.output),
       new CardsCommand(this.cwd, this.output, this.caller),
-      new UiCommand(this.cwd, this.output),
+      new UiCommand(this.cwd, this.output, this.caller),
       new FlagCommand(this.cwd, this.output, this.input, this.caller),
       new NoteCommand(this.cwd, this.output, this.input, this.caller),
-      new CloseCommand(this.cwd, this.output),
-      new ReopenCommand(this.cwd, this.output),
-      new RetitleCommand(this.cwd, this.output),
-      new LabelCommand(this.cwd, this.output),
-      new RewriteCommand(this.cwd, this.output, this.input),
-      new TieCommand(this.cwd, this.output),
-      new UntieCommand(this.cwd, this.output),
-      new SeparateCommand(this.cwd, this.output),
+      new CloseCommand(this.cwd, this.output, this.caller),
+      new ReopenCommand(this.cwd, this.output, this.caller),
+      new RetitleCommand(this.cwd, this.output, this.caller),
+      new LabelCommand(this.cwd, this.output, this.caller),
+      new RewriteCommand(this.cwd, this.output, this.input, this.caller),
+      new TieCommand(this.cwd, this.output, this.caller),
+      new UntieCommand(this.cwd, this.output, this.caller),
+      new SeparateCommand(this.cwd, this.output, this.caller),
+      new RestoreCommand(this.cwd, this.output, this.caller),
+      new RevisionsCommand(this.cwd, this.output, this.caller),
+      new IssueResultCommand(this.cwd, this.output, this.caller),
     ]
   }
 

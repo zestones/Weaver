@@ -135,6 +135,8 @@ export class CardsCommand implements Command {
 
       if (card === null) throw new Error(`no card has the number ${String(number)}`)
 
+      if (this.caller.agent() === null) registry?.showProposal(number, card.record.proposal)
+
       // The parser of Markdown and the grammars of the languages are loaded here, to draw a card: no other command
       // pays for them.
       await this.screen.page([card.markdown(), ...this.answering(card)].join('\n\n'), async (paint, width) => {
@@ -189,11 +191,13 @@ export class CardsCommand implements Command {
         return 0
       }
 
+      if (this.caller.agent() === null) for (const card of cards) registry?.showProposal(card.number, card.record.proposal)
+
       const rows = cards.map((card) => this.row(card, project))
       // Put in order by level, each card says its level before what it is about.
       const columns = cards.map((card) => [
         `#${String(card.number)}`,
-        card.standing,
+        card.isWaiting ? `${card.standing} · ${card.workflow}` : card.standing,
         ...(scale.length === 0 ? [] : [card.valuesOf(LabelFamilies.LEVEL).join(', ') || '-']),
       ])
       const widths = (columns[0] ?? []).map((_, column) => Math.max(...columns.map((cells) => (cells[column] ?? '').length)))
@@ -212,7 +216,7 @@ export class CardsCommand implements Command {
       this.screen.line()
       this.screen.hint(
         this.caller.agent() === null
-          ? `Read one with weaver cards <number>, and close it with weaver close <number> ${Card.CLOSINGS.join('|')} [reason].`
+          ? 'Read one with weaver cards <number>; accept its proposal with weaver close <number>.'
           : 'Read one with weaver cards <number>, and write on it with weaver note <number>: closing it is the owner’s.',
       )
 

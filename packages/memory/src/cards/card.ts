@@ -53,8 +53,10 @@ export class Card {
   get conclusion(): Concluded | null {
     const { notes, flag, provenance, history } = this.record
     const reopened = history.findLast((event) => event.action === 'reopened')?.at ?? null
-    const concluded = notes.flatMap(({ conclusion, provenance: by }): Concluded[] => (conclusion === null ? [] : [{ as: conclusion, by }]))
-    const last = concluded.findLast(({ by }) => reopened === null || by.at > reopened)
+    const concluded = notes
+      .slice(this.record.lifecycle?.noteStart ?? 0)
+      .flatMap(({ conclusion, provenance: by }): Concluded[] => (conclusion === null ? [] : [{ as: conclusion, by }]))
+    const last = concluded.findLast(({ by }) => this.record.lifecycle !== undefined || reopened === null || by.at > reopened)
 
     if (last !== undefined) return last
 
@@ -65,9 +67,21 @@ export class Card {
   get isInvestigated(): boolean {
     const reopened = this.record.history.findLast((event) => event.action === 'reopened')?.at ?? null
 
-    return this.record.notes.some(
-      ({ conclusion, provenance }) => conclusion !== null && conclusion !== 'fixed' && (reopened === null || provenance.at > reopened),
-    )
+    return this.record.notes
+      .slice(this.record.lifecycle?.noteStart ?? 0)
+      .some(
+        ({ conclusion, provenance }) =>
+          conclusion !== null &&
+          conclusion !== 'fixed' &&
+          conclusion !== 'needs-owner' &&
+          (this.record.lifecycle !== undefined || reopened === null || provenance.at > reopened),
+      )
+  }
+
+  get workflow(): string {
+    if (!this.isWaiting) return this.standing
+    if (this.record.proposal !== null) return 'proposed for closing'
+    return this.conclusion?.as === 'needs-owner' ? 'needs the owner' : 'actionable'
   }
 
   oneLine(): string {

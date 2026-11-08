@@ -18,7 +18,7 @@ test('a note names its card first, then what it concludes if it does, then what 
   })
   assert.deepEqual(
     NoteText.CONCLUSIONS.map((word) => read(['3', word, 'x']).conclusion),
-    ['confirmed', 'refuted', 'unsure', 'fixed'],
+    ['confirmed', 'refuted', 'unsure', 'fixed', 'needs-owner'],
   )
   assert.deepEqual(
     read(['12', 'Confirmed', 'it']),

@@ -46,7 +46,9 @@ function Hinted({ hint: [key, does] }: { readonly hint: Hint }): ReactNode {
 // they did came to takes their place until the next key: it is read once, and the keys are known.
 export function KeyBar({ model }: Props): ReactNode {
   const said = model.said
-  const hints = model.searching ? SEARCHING : model.focus === 'detail' ? IN_DETAIL : IN_LIST
+  const hints = (model.searching ? SEARCHING : model.focus === 'detail' ? IN_DETAIL : IN_LIST).filter(
+    ([key]) => key !== 'c' || model.canClose,
+  )
 
   if (said !== null) {
     return (

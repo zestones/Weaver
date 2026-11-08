@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { ExecutionCatalog } from '@weaver/agent-sdk'
-import { CardRegistry } from '../registry/card-registry.ts'
 import type { WriterJob } from '../writing/request/writer-job.ts'
 import { WriterRun } from '../writing/running/writer-run.ts'
 
@@ -16,13 +15,7 @@ class CardWriterWorkerProgram {
   async run(): Promise<void> {
     try {
       const job = JSON.parse(this.argv[0] ?? '') as WriterJob
-      const registry = new CardRegistry(job.stateDir)
-
-      try {
-        await new WriterRun(job, new ExecutionCatalog(), registry).run()
-      } finally {
-        registry.close()
-      }
+      await new WriterRun(job, new ExecutionCatalog()).run()
     } catch {
       process.exitCode = 1
     }

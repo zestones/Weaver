@@ -50,6 +50,25 @@ export class BeforeCall implements Moment {
       if (command === ChecksOnDemand.COMMAND) session?.asked(ChecksOnDemand.namesIn(words))
     }
 
+    const changes = WeaverCommand.among(call.commands())
+      .map((command) => ({ asksHelp: command.asksHelp, words: command.words.filter((word) => word !== '--no-color') }))
+      .filter(
+        (command) =>
+          !command.asksHelp &&
+          (command.words[0] === 'ui' ||
+            (command.words[0] === 'cards' &&
+              ['tie', 'untie', 'separate', 'reopen', 'retitle', 'label', 'rewrite', 'restore', 'issue-result'].includes(
+                command.words[1] ?? '',
+              ))),
+      )
+    if (changes.length > 0)
+      this.inRegistry(turn, (registry) => {
+        const actor = { ...this.author(turn, session), commit: turn.repo.head(), at: new Date().toISOString() }
+        changes.forEach((command, index) =>
+          registry.rememberCommand(`${turn.event.sessionId ?? ''}:${callId ?? actor.at}:${String(index)}`, command.words, actor),
+        )
+      })
+
     const read = CardReading.among(call).map((reading) => reading.card)
 
     // A card the agent reads is one its task may settle: the end of the task asks what it did about it. A subagent

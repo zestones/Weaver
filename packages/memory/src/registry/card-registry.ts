@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
 import type {
   CardClosing,
+  ClosingProposal,
   CardEvent,
   CardNote,
   CardOrigin,
@@ -53,6 +54,15 @@ export interface NewReviewCard {
   readonly provenance: Provenance
 }
 
+interface IssueAttempt {
+  readonly status: 'running' | 'failed' | 'succeeded'
+  readonly command: readonly string[]
+  readonly output: string | null
+  readonly at: string
+  readonly revision: number
+  readonly by: Provenance
+}
+
 const FILE = 'registry.sqlite'
 // A write is a few milliseconds: past this, something holds the database that will not let go.
 const BUSY_TIMEOUT_MS = 5000
@@ -64,8 +74,19 @@ export class CardRegistry {
   private readonly db: DatabaseSync
   private readonly cards: CardTable
   private readonly turn: WriterTurn
+  private acting: Provenance
 
-  constructor(stateDir: string) {
+  constructor(stateDir: string, actor?: Provenance) {
+    this.acting = actor ?? {
+      author: 'owner',
+      role: 'owner',
+      session: null,
+      subagent: null,
+      unit: null,
+      requests: [],
+      commit: null,
+      at: new Date().toISOString(),
+    }
     this.path = join(stateDir, FILE)
     this.db = this.guarded(() => {
       mkdirSync(stateDir, { recursive: true })
@@ -79,6 +100,32 @@ export class CardRegistry {
   // Whether a registry was ever made there: opening one makes it.
   static isIn(stateDir: string): boolean {
     return existsSync(join(stateDir, FILE))
+  }
+
+  get actor(): Provenance {
+    return this.acting
+  }
+
+  rememberCommand(id: string, words: readonly string[], actor: Provenance): void {
+    this.write(() => {
+      this.db
+        .prepare('INSERT OR IGNORE INTO card_commands (id, words, actor) VALUES (?, ?, ?)')
+        .run(id, JSON.stringify(words), JSON.stringify(actor))
+    })
+  }
+
+  claimCommand(words: readonly string[]): void {
+    this.write(() => {
+      const since = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      const row = this.db
+        .prepare(
+          "SELECT id, actor FROM card_commands WHERE words = ? AND claimed = 0 AND json_extract(actor, '$.at') >= ? ORDER BY rowid LIMIT 1",
+        )
+        .get(JSON.stringify(words), since)
+      if (row === undefined) return
+      this.acting = JSON.parse(String(row.actor)) as Provenance
+      this.db.prepare('UPDATE card_commands SET claimed = 1 WHERE id = ?').run(String(row.id))
+    })
   }
 
   close(): void {
@@ -144,7 +191,13 @@ export class CardRegistry {
     return this.guarded(() => this.cards.naming(files).map((record) => new Card(record)))
   }
 
-  closeCard(number: number, as: Closing, reason: string | null, issue: string | null = null): Card {
+  closeCard(
+    number: number,
+    as: Closing,
+    reason: string | null,
+    issue: string | null = null,
+    proposal: ClosingProposal | null = null,
+  ): Card {
     return this.change(number, (record) => {
       const why = reason === null || reason.trim() === '' ? null : reason.trim()
 
@@ -153,23 +206,100 @@ export class CardRegistry {
         throw new RegistryError(`card #${String(number)} is already closed as ${record.closing?.as ?? ''}`.trimEnd())
       if (as === 'wontfix' && why === null) throw new RegistryError(`closing card #${String(number)} as wontfix needs a reason`)
 
-      const closing: CardClosing = { as, reason: why, issue, at: this.now() }
+      if (proposal !== null) this.validateProposal(record, proposal)
+      const closing: CardClosing = { as, reason: why, issue, at: this.now(), by: this.actor, proposal }
 
       return this.after(record, 'closed', why === null ? as : `${as}: ${why}`, { state: 'closed', closing, seenSinceClosing: false })
     })
+  }
+
+  showProposal(number: number, shown?: ClosingProposal | null): void {
+    this.write(() => {
+      const proposal = shown === undefined ? this.existing(number).proposal : shown
+      if (proposal !== null)
+        this.db.prepare('INSERT OR REPLACE INTO proposal_views (card, proposal) VALUES (?, ?)').run(number, JSON.stringify(proposal))
+    })
+  }
+
+  shownProposal(number: number): ClosingProposal | null {
+    return this.guarded(() => {
+      const row = this.db.prepare('SELECT proposal FROM proposal_views WHERE card = ?').get(number)
+      return row === undefined ? null : (JSON.parse(String(row.proposal)) as ClosingProposal)
+    })
+  }
+
+  beginIssue(number: number, command: readonly string[]): IssueAttempt {
+    return this.write(() => {
+      const row = this.db.prepare('SELECT record FROM issue_filings WHERE card = ? ORDER BY id DESC LIMIT 1').get(number)
+      const previous = row === undefined ? null : (JSON.parse(String(row.record)) as IssueAttempt)
+      if (previous?.status === 'running')
+        throw new RegistryError(
+          'an earlier issue filing was interrupted; check the issue tracker, then run weaver cards issue-result <number> <url|not-filed> before retrying',
+        )
+      if (previous?.status === 'succeeded') return previous
+      const record = this.existing(number)
+      const attempt: IssueAttempt = {
+        command,
+        status: 'running',
+        output: null,
+        at: this.now(),
+        revision: record.history.length,
+        by: this.actor,
+      }
+      this.db.prepare('INSERT INTO issue_filings (card, record) VALUES (?, ?)').run(number, JSON.stringify(attempt))
+      return attempt
+    })
+  }
+
+  finishIssue(number: number, status: 'failed' | 'succeeded', output: string | null): void {
+    this.write(() => {
+      this.db
+        .prepare(
+          "UPDATE issue_filings SET record = json_set(record, '$.status', ?, '$.output', ?) WHERE id = (SELECT max(id) FROM issue_filings WHERE card = ?)",
+        )
+        .run(status, output, number)
+    })
+  }
+
+  reconcileIssue(number: number, result: string): void {
+    this.write(() => {
+      this.existing(number)
+      const row = this.db.prepare('SELECT record FROM issue_filings WHERE card = ? ORDER BY id DESC LIMIT 1').get(number)
+      if (row === undefined) throw new RegistryError('this card has no issue filing to reconcile')
+      const previous = JSON.parse(String(row.record)) as IssueAttempt
+      const record: IssueAttempt = {
+        ...previous,
+        status: result === 'not-filed' ? 'failed' : 'succeeded',
+        output: result === 'not-filed' ? null : result,
+        by: this.actor,
+        at: this.now(),
+      }
+      this.db.prepare('INSERT INTO issue_filings (card, record) VALUES (?, ?)').run(number, JSON.stringify(record))
+    })
+  }
+
+  acceptProposal(number: number, proposal: ClosingProposal): Card {
+    return this.closeCard(number, proposal.as, proposal.reason, null, proposal)
+  }
+
+  private validateProposal(record: CardRecord, proposal: ClosingProposal): void {
+    if (record.proposal?.revision === proposal.revision && JSON.stringify(record.proposal) === JSON.stringify(proposal)) return
+    const changes = record.history.slice(proposal.revision).map((event) => `${event.action}${event.note === null ? '' : `: ${event.note}`}`)
+    throw new RegistryError(`closing proposal is stale: ${changes.join('; ') || 'the card or its notes changed'}. Read the card again`)
   }
 
   // Written on a card whatever its state, but for a merged one: what is found about it goes to the card it became.
   note(number: number, note: CardNote): Noted {
     return this.write(() => {
       const record = this.existing(number)
-      const said = { ...note, text: note.text.trim() }
+      const said = { ...note, id: `note-${String(record.notes.length + 1)}`, text: note.text.trim() }
 
       if (record.state === 'merged') throw new RegistryError(`${this.merged(record)}: write on that one`)
       if (said.text === '') throw new RegistryError('a note says something: this one is empty')
-      if (record.notes.some((written) => this.sameNote(written, said))) return { card: new Card(record), known: true }
+      if (record.notes.slice(record.lifecycle?.noteStart ?? 0).some((written) => this.sameNote(written, said)))
+        return { card: new Card(record), known: true }
 
-      const noted = this.after(record, 'noted', said.conclusion, { notes: [...record.notes, said] })
+      const noted = this.after(record, 'noted', said.conclusion, { notes: [...record.notes, said] }, said.provenance)
 
       return { card: new Card(this.cards.update(noted)), known: false }
     })
@@ -184,6 +314,12 @@ export class CardRegistry {
         state: this.standing({ ...record, closing: null }),
         closing: null,
         seenSinceClosing: false,
+        lifecycle: {
+          revision: record.lifecycle?.revision ?? record.history.length,
+          cycle: (record.lifecycle?.cycle ?? 0) + 1,
+          noteStart: record.notes.length,
+          stage: 'uninvestigated',
+        },
       })
     })
   }
@@ -195,8 +331,12 @@ export class CardRegistry {
       labels?: Readonly<Record<string, readonly string[]>>
       sections?: readonly { name: string; text: string }[]
     },
+    reason?: string,
+    expectedRevision?: number,
   ): Card {
     return this.change(number, (record) => {
+      if (expectedRevision !== undefined && record.lifecycle?.revision !== expectedRevision)
+        throw new RegistryError('card changed since it was read; read it again')
       const { written } = record
       const { title, labels, sections } = change
       const given = Object.entries({ title, labels, sections }).flatMap(([name, value]) => (value === undefined ? [] : [name]))
@@ -207,15 +347,28 @@ export class CardRegistry {
       if (given.length === 0) throw new RegistryError('a correction gives a title, labels or sections: this one gives none')
       if (title?.trim() === '') throw new RegistryError('the title of a card cannot be empty')
 
-      return this.after(record, 'corrected', given.join(', '), {
-        written: {
-          ...written,
-          title: title === undefined ? written.title : oneLine(title),
-          labels: labels ?? written.labels,
-          sections: sections ?? written.sections,
-        },
+      const after = {
+        ...written,
+        title: title === undefined ? written.title : oneLine(title),
+        labels: labels ?? written.labels,
+        sections: sections ?? written.sections,
+      }
+      const why = reason ?? `Changed ${given.join(', ')}`
+      return this.after(record, 'corrected', why, {
+        written: after,
+        revisions: [
+          ...(record.revisions ?? []),
+          { revision: record.history.length + 1, before: written, after, by: this.actor, reason: why },
+        ],
       })
     })
+  }
+
+  restore(number: number, revision: number, reason: string): Card {
+    const record = this.guarded(() => this.existing(number))
+    const saved = record.revisions?.find((entry) => entry.revision === revision)
+    if (saved === undefined) throw new RegistryError(`no content revision ${String(revision)} on this card`)
+    return this.correct(number, saved.after, reason, record.lifecycle?.revision)
   }
 
   // The two cards may be about the same thing, and nobody is sure: they stay two.
@@ -308,6 +461,10 @@ export class CardRegistry {
       return this.after(record, 'written', null, {
         state: record.state === 'raw' ? 'open' : record.state,
         written,
+        revisions: [
+          ...(record.revisions ?? []),
+          { revision: record.history.length + 1, before: record.written, after: written, by: this.actor, reason: 'Writer content' },
+        ],
         writing: { ...record.writing, failure: null },
       })
     })
@@ -432,16 +589,37 @@ export class CardRegistry {
       ties: [],
       mergedInto: null,
       writing: { attempts: 0, failure: null },
-      history: [this.event(action, null)],
+      history: [{ ...this.event(action, null), by: provenance }],
     }
   }
 
-  private after(record: CardRecord, action: CardEvent['action'], note: string | null, change: Partial<CardRecord>): CardRecord {
-    return { ...record, ...change, history: [...record.history, this.event(action, note)] }
+  private after(
+    record: CardRecord,
+    action: CardEvent['action'],
+    note: string | null,
+    change: Partial<CardRecord>,
+    by: Provenance = this.actor,
+  ): CardRecord {
+    const lifecycle = change.lifecycle ??
+      record.lifecycle ?? { revision: record.history.length, cycle: 0, noteStart: 0, stage: 'uninvestigated' }
+    return {
+      ...record,
+      ...change,
+      lifecycle: { ...lifecycle, revision: record.history.length + 1 },
+      history: [
+        ...record.history,
+        {
+          ...this.event(action, note),
+          by,
+          ...(action === 'closed' ? { proposal: record.proposal } : {}),
+          ...(action === 'reopened' ? { closing: record.closing } : {}),
+        },
+      ],
+    }
   }
 
   private event(action: CardEvent['action'], note: string | null): CardEvent {
-    return { at: this.now(), action, note }
+    return { at: this.now(), action, note, by: this.actor }
   }
 
   private now(): string {

@@ -84,8 +84,11 @@ test('the worker is given a job, writes up the flags that wait in its registry w
   const seen = JSON.parse(readFileSync(seenAt, 'utf8')) as Seen
 
   assert.deepEqual([printed.stdout, printed.stderr], ['', ''])
+  assert.equal(card?.record.writing.failure, null)
   assert.deepEqual([card?.state, card?.title], ['open', 'Written by the worker'])
   assert.deepEqual(card?.record.written?.writer.runtime, 'claude')
+  assert.equal(card?.record.history.at(-1)?.by?.author, 'claude')
+  assert.equal(card?.record.history.at(-1)?.by?.role, 'author')
   assert.deepEqual([seen.cwd, seen.marked], [top, '1'])
   assert.deepEqual(
     seen.argv.slice(seen.argv.indexOf('--allowedTools')),

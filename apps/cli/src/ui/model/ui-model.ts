@@ -97,6 +97,10 @@ export class UiModel {
     this.settle()
   }
 
+  get canClose(): boolean {
+    return this.desk.canClose
+  }
+
   get catalog(): LabelCatalog {
     return this.desk.labels
   }
@@ -298,8 +302,19 @@ export class UiModel {
     else if (input === 'f') this.box = FilterForm.for(this.catalog, this.listingOf(this.view), this.labels, this.since)
     else if (tab !== undefined && card !== null) this.show(tab)
     else if (card === null) return
-    else if (input === 'c') this.box = card.isWaiting ? CloseForm.for(card) : null
-    else if (input === 'n') this.box = card.state === 'merged' ? null : NoteForm.for(card)
+    else if ((input === 'c' || input === 'C') && this.desk.canClose) {
+      if (input === 'c' && card.record.proposal !== null) {
+        try {
+          this.say(this.desk.close(card.number, null, null, card.record.proposal))
+          this.all = this.desk.cards()
+        } catch (error) {
+          this.said = { text: error instanceof Error ? error.message : String(error), problem: true }
+          this.all = this.desk.cards()
+        }
+        return
+      }
+      this.box = card.isWaiting ? CloseForm.for(card) : null
+    } else if (input === 'n') this.box = card.state === 'merged' ? null : NoteForm.for(card)
     else if (input === 'l') this.box = card.record.written === null ? null : LabelsForm.for(card, this.catalog)
 
     if (card !== null && this.box === null) this.said = this.unable(input, card)
@@ -307,6 +322,7 @@ export class UiModel {
 
   // Why a key did nothing on this card, when it is one of those that act on a card.
   private unable(input: string, card: Card): Said | null {
+    if ((input === 'c' || input === 'C') && !this.desk.canClose) return { text: "Closing a card is the owner's.", problem: true }
     if (input === 'c' && !card.isWaiting)
       return { text: `Card #${String(card.number)} is ${card.standing}: there is nothing to close.`, problem: true }
     if (input === 'n' && card.state === 'merged')

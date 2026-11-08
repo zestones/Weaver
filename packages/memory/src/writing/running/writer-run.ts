@@ -27,7 +27,18 @@ export class WriterRun {
   }
 
   async run(): Promise<void> {
-    const registry = this.registry ?? new CardRegistry(this.job.stateDir)
+    const registry =
+      this.registry ??
+      new CardRegistry(this.job.stateDir, {
+        author: this.job.settings.runtime,
+        role: 'author',
+        session: null,
+        subagent: null,
+        unit: null,
+        requests: [],
+        commit: null,
+        at: new Date().toISOString(),
+      })
 
     try {
       if (registry.takeWriterTurn(process.pid)) await this.write(registry)

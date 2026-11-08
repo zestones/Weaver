@@ -6,8 +6,9 @@ import { CardChange, type RegistryChange } from './card-change.ts'
 const CLOSINGS = Card.CLOSINGS
 
 export class CloseCommand extends CardChange {
+  override readonly ownerOnly = true
   override readonly name = 'close'
-  override readonly usage = `close <number> ${CLOSINGS.join('|')} [reason]`
+  override readonly usage = `close <number> [${CLOSINGS.join('|')}] [reason]`
   override readonly summary = 'Close a card'
   override readonly help = {
     group: 'Cards',
@@ -23,8 +24,8 @@ export class CloseCommand extends CardChange {
   protected override change([number = 0]: readonly number[], [as, ...words]: readonly string[], project: Project): RegistryChange | null {
     const closing = CLOSINGS.find((known) => known === as)
 
-    if (closing === undefined) return null
+    if (as !== undefined && closing === undefined) return null
 
-    return (registry) => new CardDesk(project, registry).close(number, closing, words.length === 0 ? null : words.join(' '))
+    return (registry) => new CardDesk(project, registry).close(number, closing ?? null, words.length === 0 ? null : words.join(' '))
   }
 }

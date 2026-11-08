@@ -3,6 +3,8 @@ export { FlagText } from './flags/flag-text.ts'
 export { PlaceText } from './flags/place-text.ts'
 export type {
   CardClosing,
+  ClosingProposal,
+  CardRevision,
   CardEvent,
   CardNote,
   CardOrigin,

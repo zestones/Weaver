@@ -40,10 +40,16 @@ test('without a command, weaver says what it is, how it is typed and what it can
     'cards tie',
     'cards untie',
     'cards separate',
+    'cards restore',
+    'cards revisions',
+    'cards issue-result',
   ])
   assert.deepEqual(listedUnder(lines, 'FLAGS'), ['--help', '--version', '--no-color'])
-  assert.ok(lines.includes('  install         Put Weaver on this project'), 'the names of a page are all as wide')
-  assert.ok(lines.includes('  --no-color      Print without colour'))
+  assert.ok(
+    lines.some((line) => /^ {2}install +Put Weaver on this project$/.test(line)),
+    'the names of a page are all as wide',
+  )
+  assert.ok(lines.some((line) => /^ {2}--no-color +Print without colour$/.test(line)))
   assert.ok(lines.includes('  $ weaver doctor'))
   assert.equal(lines.at(-1), '  Read the manual at https://github.com/zestones/Weaver')
 })
@@ -61,7 +67,7 @@ test('help is asked for by its word or its flag, anywhere on the line, and an ag
       'Close a card: it was fixed, it will not be, it is now an issue of its own, or what it says proved not to be true.',
       '',
       'USAGE',
-      '  weaver close <number> fixed|wontfix|issue|invalid [reason]',
+      '  weaver close <number> [fixed|wontfix|issue|invalid] [reason]',
       '',
       'ARGUMENTS',
       '  <number>                     The number of the card, as weaver cards shows it',

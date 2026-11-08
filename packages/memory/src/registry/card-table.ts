@@ -1,5 +1,6 @@
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite'
 import type { CardOrigin, CardRecord, CardState } from '../cards/card-record.ts'
+import { CardLifecycle } from './card-lifecycle.ts'
 import { Card } from '../cards/card.ts'
 
 export interface CardFilter {
@@ -36,6 +37,7 @@ export class CardTable {
   }
 
   insert(record: CardRecord, keys: CardKeys): CardRecord {
+    record = new CardLifecycle().reconcile(record)
     const { number, state, origin, provenance, writing } = record
 
     this.db
@@ -63,6 +65,7 @@ export class CardTable {
 
   // The places of a card, its session and its unit never change: only what does is written again.
   update(record: CardRecord): CardRecord {
+    record = new CardLifecycle().reconcile(record)
     const { number, state, writing } = record
 
     this.db
@@ -139,6 +142,6 @@ export class CardTable {
     return this.db
       .prepare(`SELECT record FROM cards WHERE ${where}`)
       .all(...values)
-      .map((row) => JSON.parse(String(row.record)) as CardRecord)
+      .map((row) => new CardLifecycle().reconcile(JSON.parse(String(row.record)) as CardRecord))
   }
 }

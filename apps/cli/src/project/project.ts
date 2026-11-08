@@ -10,7 +10,7 @@ import {
   type Declaration,
   type PartName,
 } from '@weaver/engine'
-import { CardRegistry } from '@weaver/memory'
+import { CardRegistry, type Provenance } from '@weaver/memory'
 import type { EngineLink } from '../link/engine-link.ts'
 import { Counted } from '../output/counted.ts'
 import { CardSkill } from '../skills/card-skill.ts'
@@ -162,13 +162,13 @@ export class Project {
   }
 
   // Creates the registry when nothing was recorded yet. Whoever opens it closes it.
-  registry(): CardRegistry {
-    return new CardRegistry(this.repository.stateDir)
+  registry(actor?: Provenance): CardRegistry {
+    return new CardRegistry(this.repository.stateDir, actor)
   }
 
   // null while nothing was recorded: a command that only reads creates nothing.
-  recordedRegistry(): CardRegistry | null {
-    return existsSync(join(this.repository.stateDir, REGISTRY_FILE)) ? this.registry() : null
+  recordedRegistry(actor?: Provenance): CardRegistry | null {
+    return existsSync(join(this.repository.stateDir, REGISTRY_FILE)) ? this.registry(actor) : null
   }
 
   // The text of a file by its path from the top; null when it is not there.

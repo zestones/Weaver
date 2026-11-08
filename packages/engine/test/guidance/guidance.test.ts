@@ -27,6 +27,7 @@ test('every request names each command of Weaver at its moment, in a line, and l
     '- before you change a file: `weaver cards --file <path>` or `--search <words>`, what the owner already knows of it;',
     '- something your task does not settle: `weaver flag` it;',
     "- a check's verdict before the end: `weaver check <name>`, among format, tests;",
+    '- card organization or correction: `weaver cards tie`, `untie`, `separate`, `reopen`, `retitle`, `label`, `rewrite`; inspect or restore with `revisions` and `restore`; only the owner closes proposals;',
     '- a card your task settles or advances: `weaver note <number>`, what you looked into, then what you changed;',
     '- the end of a task that changed files: a final message with ## Request, ## To validate, ## Found along the way.',
     'How to do each, and what is the owner’s alone: `weaver guide`.',

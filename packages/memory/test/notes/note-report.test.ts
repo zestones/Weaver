@@ -17,7 +17,7 @@ const FIX = 'Changed: `refresh()` is called before a request, in `src/auth/clien
 test('a note that concludes reports an investigation, or a fix when it says the thing is fixed', () => {
   assert.deepEqual(
     NoteText.CONCLUSIONS.map((conclusion) => NoteReport.kindOf(conclusion)),
-    ['investigation', 'investigation', 'investigation', 'fix'],
+    ['investigation', 'investigation', 'investigation', 'fix', 'investigation'],
   )
   assert.equal(NoteReport.kindOf(null), null, 'a note that concludes nothing reports nothing')
 })

@@ -19,7 +19,10 @@ export class NoteCommand implements Command {
     description: 'Write on a card what you found or did about it. The text is given on the line, or read on the standard input.',
     words: [
       ['<number>', 'The number of the card, as weaver cards shows it'],
-      [`[${CONCLUSIONS}]`, 'What you conclude of the card: it is true, it is not, you could not tell, or it is fixed'],
+      [
+        `[${CONCLUSIONS}]`,
+        'What you conclude of the card: it is true, it is not, you could not tell, it is fixed, or it needs an owner decision',
+      ],
       ['[text]', 'What the note says'],
     ],
     examples: ['weaver note 12 "to look at with the next release"', 'weaver note 12 confirmed < report.md'],

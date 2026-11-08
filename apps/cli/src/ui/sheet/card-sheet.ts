@@ -74,7 +74,7 @@ export class CardSheet {
   // A heading has an empty line under it, and two above it: it belongs to what follows. A part without a heading
   // goes on from the one before, an empty line apart.
   lines(tab: SheetTab): string[] {
-    const parts = (tab === 'card' ? this.written() : tab === 'flag' ? this.origin() : this.noted(tab)).filter(
+    const parts = (tab === 'card' ? [...this.proposal(), ...this.written()] : tab === 'flag' ? this.origin() : this.noted(tab)).filter(
       (part) => part.head !== null || part.lines.length > 0,
     )
 
@@ -84,6 +84,18 @@ export class CardSheet {
 
       return [...apart, ...under]
     })
+  }
+
+  private proposal(): Part[] {
+    const proposal = this.record.proposal
+    return proposal === null
+      ? []
+      : [
+          this.titled(
+            'Closing proposal',
+            this.markdown.lines(`Proposed as ${proposal.as}. Owner: c accepts; C edits.\n\n${proposal.reason}`),
+          ),
+        ]
   }
 
   // What the card says: the sections of its writer, what a review left, or its flag while nobody wrote it up.

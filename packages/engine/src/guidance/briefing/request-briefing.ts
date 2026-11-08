@@ -14,6 +14,7 @@ export class RequestBriefing {
       '- before you change a file: `weaver cards --file <path>` or `--search <words>`, what the owner already knows of it;',
       '- something your task does not settle: `weaver flag` it;',
       ...(checks.length === 0 ? [] : [`- a check's verdict before the end: \`weaver check <name>\`, among ${checks.join(', ')};`]),
+      '- card organization or correction: `weaver cards tie`, `untie`, `separate`, `reopen`, `retitle`, `label`, `rewrite`; inspect or restore with `revisions` and `restore`; only the owner closes proposals;',
       '- a card your task settles or advances: `weaver note <number>`, what you looked into, then what you changed;',
       ...(headings.length === 0
         ? []

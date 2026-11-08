@@ -6,7 +6,7 @@ export type CardState = 'raw' | 'open' | 'closed' | 'merged'
 // invalid: what the card says proved not to be true.
 export type Closing = 'fixed' | 'wontfix' | 'issue' | 'invalid'
 // What the one who looked into a card concludes of it: what it says is true, is not, could not be told, or is fixed.
-export type Conclusion = 'confirmed' | 'refuted' | 'unsure' | 'fixed'
+export type Conclusion = 'confirmed' | 'refuted' | 'unsure' | 'fixed' | 'needs-owner'
 
 export interface Provenance {
   // 'claude', 'codex' or 'owner'.
@@ -57,7 +57,40 @@ export interface WrittenCard {
   readonly at: string
 }
 
+export type ResolutionStage = 'uninvestigated' | 'investigated' | 'fixed' | 'refuted' | 'needs-owner'
+
+export interface ClosingProposal {
+  readonly draftedBy: 'weaver'
+  readonly as: Closing
+  readonly reason: string
+  readonly by: Provenance
+  readonly revision: number
+  readonly evidence: readonly string[]
+  readonly cause: string
+  readonly fix: string
+  readonly verification: string
+  readonly remaining: string
+  readonly warning: boolean
+}
+
+export interface CardRevision {
+  readonly revision: number
+  readonly before: WrittenCard | null
+  readonly after: WrittenCard
+  readonly by: Provenance | null
+  readonly reason: string
+}
+
+interface CardLifecycleRecord {
+  readonly revision: number
+  readonly cycle: number
+  readonly noteStart: number
+  readonly stage: ResolutionStage
+}
+
 export interface CardClosing {
+  readonly by?: Provenance
+  readonly proposal?: ClosingProposal | null
   readonly as: Closing
   readonly reason: string | null
   // What the command that files an issue printed, for `issue`.
@@ -74,6 +107,7 @@ export interface Occurrence {
 
 // What is written on a card once it exists: by an agent the owner asked to verify or to fix it, or by the owner.
 export interface CardNote {
+  readonly id?: string
   readonly provenance: Provenance
   // null for a note that concludes nothing.
   readonly conclusion: Conclusion | null
@@ -81,6 +115,9 @@ export interface CardNote {
 }
 
 export interface CardEvent {
+  readonly proposal?: ClosingProposal | null
+  readonly by?: Provenance
+  readonly closing?: CardClosing | null
   readonly at: string
   readonly action:
     | 'flagged'
@@ -112,8 +149,9 @@ export interface CardRecord {
   // What the writer made of the flag; null while raw, and for a card that comes from a review.
   readonly written: WrittenCard | null
   readonly closing: CardClosing | null
-  // Room for a closing an agent proposes and the owner accepts. Nothing writes it yet.
-  readonly proposal: { readonly as: Closing; readonly reason: string; readonly by: Provenance } | null
+  readonly proposal: ClosingProposal | null
+  readonly lifecycle?: CardLifecycleRecord
+  readonly revisions?: readonly CardRevision[]
   readonly seenSinceClosing: boolean
   readonly occurrences: readonly Occurrence[]
   // In the order they were written.

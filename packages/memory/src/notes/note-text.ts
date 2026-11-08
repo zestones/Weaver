@@ -7,7 +7,7 @@ const RULES =
 
 // Reads a note as it is typed: the number of its card, what it concludes if it does, then what it says.
 export class NoteText {
-  static readonly CONCLUSIONS: readonly Conclusion[] = ['confirmed', 'refuted', 'unsure', 'fixed']
+  static readonly CONCLUSIONS: readonly Conclusion[] = ['confirmed', 'refuted', 'unsure', 'fixed', 'needs-owner']
   // The format, for an agent that got it wrong: shown under the problems.
   static readonly FORMAT: string = NoteText.formatFor('<number>')
 
@@ -33,7 +33,7 @@ export class NoteText {
   // The format with the number of a card in it, for an agent that reads this card: one command for each report.
   static formatFor(card: string): string {
     const reports = NoteReport.KINDS.map((kind) => {
-      const words = NoteText.CONCLUSIONS.filter((word) => NoteReport.kindOf(word) === kind)
+      const words = NoteText.CONCLUSIONS.filter((word) => word !== 'needs-owner' && NoteReport.kindOf(word) === kind)
 
       return [`weaver note ${card} ${words.join('|')} <<'EOF'`, ...NoteReport.asked(kind), 'EOF'].join('\n')
     })

@@ -1,3 +1,4 @@
+import type { Caller } from '../../caller/caller.ts'
 import type { Input } from '../../input/input.ts'
 import type { Output } from '../../output/output.ts'
 import { CardChange, type RegistryChange } from './card-change.ts'
@@ -19,8 +20,8 @@ export class RewriteCommand extends CardChange {
   } as const
   private readonly input: Input
 
-  constructor(cwd: string, output: Output, input: Input) {
-    super(cwd, output)
+  constructor(cwd: string, output: Output, input: Input, caller?: Caller) {
+    super(cwd, output, caller)
     this.input = input
   }
 

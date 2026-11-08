@@ -143,30 +143,30 @@ test('the commands of Weaver that decide or change are the owner’s, however an
     ['uninstall', 'uninstall'],
     ['update --dry-run', 'update'],
     ['maintenance on 3f2a91c0', 'maintenance'],
-    ['ui', 'ui'],
-    ['cards reopen 12', 'cards reopen'],
-    ['cards retitle 12 "A better title"', 'cards retitle'],
-    ['cards label 12 type:bug', 'cards label'],
-    ['cards rewrite 12', 'cards rewrite'],
-    ['cards tie 12 13', 'cards tie'],
-    ['cards untie 12 13', 'cards untie'],
-    ['cards separate 12', 'cards separate'],
   ] as const
 
   for (const [words, named] of owned) {
     for (const program of ['weaver', '/opt/weaver/bin/weaver', 'node /opt/weaver/dist/bin/weaver.js', 'cd src && timeout 30 weaver']) {
       assert.equal(
         refusal(`${program} ${words}`),
-        `[weaver weaver:owner-command] Running \`weaver ${named}\` is refused. Deciding on a card, plugging Weaver in or out and lifting its guards are the owner's, from a terminal of their own. Say in your final message what you need them to run.`,
+        `[weaver weaver:owner-command] Running \`weaver ${named}\` is refused. Closing a card, plugging Weaver in or out and lifting its guards are the owner's, from a terminal of their own. Say in your final message what you need them to run.`,
         `${program} ${words}`,
       )
     }
   }
 
   assert.match(refusal('weaver cards --all && weaver close 3 fixed') ?? '', /Running `weaver close`/)
-  assert.match(refusal('echo fixed | weaver cards rewrite 3') ?? '', /Running `weaver cards rewrite`/)
+  assert.equal(refusal('echo fixed | weaver cards rewrite 3'), null)
 
   for (const command of [
+    'weaver ui',
+    'weaver cards tie 12 13 && weaver cards untie 12 13',
+    'weaver cards separate 12',
+    'weaver cards reopen 12',
+    'weaver cards retitle 12 title',
+    'weaver cards label 12 type:bug',
+    'weaver cards rewrite 12',
+    'weaver cards restore 12 2',
     'weaver cards',
     'weaver cards 12',
     'weaver cards --all --file src/a.ts --label type:bug',

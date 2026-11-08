@@ -127,8 +127,8 @@ test('a written card is corrected in its title, its labels or its sections, and 
   )
   assert.deepEqual(relabelled.record.written?.look, writtenOf().look)
   assert.deepEqual(actions(registry, 1)?.slice(-2), [
-    ['corrected', 'title'],
-    ['corrected', 'labels, sections'],
+    ['corrected', 'Changed title'],
+    ['corrected', 'Changed labels, sections'],
   ])
   assert.deepEqual(
     [

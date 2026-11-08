@@ -120,3 +120,18 @@ test('a card the final message names is answered for, and a card a subagent only
   assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
   assert.deepEqual(held(), [null, null])
 })
+
+test('card mutations pass through the hook and retain the runtime author and session without a refusal', () => {
+  prompt(session, 'Reorganize the cards')
+  const command = 'weaver cards tie 1 2'
+  const answer = refusalOf(session, bashCall(command))
+  assert.equal(answer, null)
+  withRegistry(session.repo, (registry) => {
+    registry.claimCommand(['cards', 'tie', '1', '2'])
+    assert.equal(registry.actor.author, 'claude')
+    assert.equal(registry.actor.role, 'author')
+    assert.equal(registry.actor.session, session.id)
+    assert.deepEqual(registry.actor.requests, ['Reorganize the cards'])
+  })
+  assert.match(refusalOf(session, bashCall('weaver cards tie 1 2 && weaver close 1 fixed')) ?? '', /owner/)
+})

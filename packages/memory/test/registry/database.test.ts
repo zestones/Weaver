@@ -54,7 +54,7 @@ test('the registry creates its folder and one file in it, with a rollback journa
 
   assert.deepEqual(readdirSync(stateDir), ['registry.sqlite'])
   assert.equal(pragma(stateDir, 'journal_mode'), 'delete')
-  assert.equal(pragma(stateDir, 'user_version'), 2)
+  assert.equal(pragma(stateDir, 'user_version'), 3)
 })
 
 test('what was recorded and decided is there when the registry is opened again', () => {
@@ -107,14 +107,16 @@ test('a registry made before cards could be written on is brought up to date whe
   // As the first version of the schema left it: no card has notes.
   const older = new DatabaseSync(join(stateDir, 'registry.sqlite'))
 
-  older.exec("UPDATE cards SET record = json_remove(record, '$.notes'); PRAGMA user_version = 1")
+  older.exec(
+    "DROP TABLE card_commands; DROP TABLE proposal_views; DROP TABLE issue_filings; UPDATE cards SET record = json_remove(record, '$.notes'); PRAGMA user_version = 1",
+  )
   older.close()
 
   const registry = new CardRegistry(stateDir)
   const [closed, waiting] = [registry.find(1), registry.find(2)]
 
-  assert.equal(MIGRATIONS.length, 2)
-  assert.equal(pragma(stateDir, 'user_version'), 2)
+  assert.equal(MIGRATIONS.length, 3)
+  assert.equal(pragma(stateDir, 'user_version'), 3)
   assert.deepEqual([closed?.record.notes, waiting?.record.notes], [[], []])
   assert.deepEqual(
     [closed?.standing, closed?.record.closing?.reason, closed?.title],
@@ -144,7 +146,7 @@ test('a database newer than the code is refused with an error that says so, and 
     (error: unknown) =>
       error instanceof RegistryError &&
       error.message ===
-        `${join(stateDir, 'registry.sqlite')} was written by a newer Weaver: its schema is at version 7, and this one knows up to 2. Nothing in it was changed: update Weaver to read it.`,
+        `${join(stateDir, 'registry.sqlite')} was written by a newer Weaver: its schema is at version 7, and this one knows up to 3. Nothing in it was changed: update Weaver to read it.`,
   )
   assert.equal(pragma(stateDir, 'user_version'), 7)
 

@@ -1,3 +1,6 @@
+import type { Caller } from '../../caller/caller.ts'
+import { ProcessCaller } from '../../caller/process-caller.ts'
+import { CardActor } from '../../caller/card-actor.ts'
 import type { CardRegistry } from '@weaver/memory'
 import type { Output } from '../../output/output.ts'
 import { Screen } from '../../output/screen.ts'
@@ -14,13 +17,15 @@ export abstract class CardChange implements Command {
   abstract readonly usage: string
   abstract readonly summary: string
   abstract readonly help: CommandHelp
-  readonly ownerOnly = true
+  readonly ownerOnly: boolean = false
   // How many numbers of cards the command starts with.
   protected readonly cards: number = 1
+  private readonly caller: Caller
   private readonly cwd: string
   private readonly screen: Screen
 
-  constructor(cwd: string, output: Output) {
+  constructor(cwd: string, output: Output, caller: Caller = new ProcessCaller()) {
+    this.caller = caller
     this.cwd = cwd
     this.screen = new Screen(output)
   }
@@ -36,9 +41,10 @@ export abstract class CardChange implements Command {
       return 2
     }
 
-    const registry = project.registry()
+    const registry = project.registry(new CardActor(this.caller).provenance())
 
     try {
+      registry.claimCommand([...this.name.split(' '), ...args])
       this.screen.done(change(registry))
     } finally {
       registry.close()

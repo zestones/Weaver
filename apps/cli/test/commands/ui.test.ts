@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, test } from 'vitest'
-import { flag } from '../fixtures/cards.ts'
 import { makeProject, weaver } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-ui-command-'))
@@ -25,12 +24,7 @@ test('the interface needs a terminal, and has nothing to show in a project that 
   })
 })
 
-test('the interface is the owner’s: it closes cards and changes them', async () => {
-  flag(top)
-
-  assert.deepEqual(await weaver(top, ['ui'], { terminal: 120, under: 'claude' }), {
-    status: 1,
-    lines: ["X weaver ui is the owner's: it decides or changes something, so it runs from a terminal of their own, and not under claude."],
-  })
-  assert.match((await weaver(top, ['help', 'ui'])).lines.join('\n'), /^Go through the cards on one screen: [^]*\nUSAGE\n {2}weaver ui\n/)
+test('agents may open the interface; terminal requirements still apply', async () => {
+  assert.deepEqual(await weaver(top, ['ui'], { terminal: 120, under: 'claude' }), { status: 0, lines: ['Nothing waits for you.'] })
+  assert.match((await weaver(top, ['ui'], { under: 'claude' })).lines.join('\n'), /needs a terminal/)
 })

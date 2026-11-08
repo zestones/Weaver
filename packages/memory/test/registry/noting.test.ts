@@ -52,8 +52,8 @@ test('what is found about a card is written on it, in order, and the card stays 
     ],
   )
   assert.deepEqual(registry.find(1)?.record.history.slice(-2), [
-    { at: registry.find(1)?.record.history.at(-2)?.at, action: 'noted', note: null },
-    { at: registry.find(1)?.record.history.at(-1)?.at, action: 'noted', note: null },
+    { at: registry.find(1)?.record.history.at(-2)?.at, action: 'noted', note: null, by: first.card.record.notes[0]?.provenance },
+    { at: registry.find(1)?.record.history.at(-1)?.at, action: 'noted', note: null, by: OWNER },
   ])
   assert.deepEqual(registry.note(2, noteOf()).card.record.notes.length, 1, 'a card that comes from a review is written on too')
 })

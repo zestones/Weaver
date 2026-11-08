@@ -5,13 +5,13 @@ import {
   type CardRegistry,
   type CardState,
   type Closing,
+  type ClosingProposal,
   type Conclusion,
   type LabelCatalog,
 } from '@weaver/memory'
 import type { Project } from '../project/project.ts'
 import { IssueFiling } from './issue-filing.ts'
 
-const OWNER = 'owner'
 const EVERY_STATE: readonly CardState[] = ['raw', 'open', 'closed', 'merged']
 
 // What the owner does to the cards of a project, in one place. The commands and the interface both go through it:
@@ -48,13 +48,23 @@ export class CardDesk {
     return this.registry.list({ states: EVERY_STATE })
   }
 
-  // What to say once the card is closed. Closing as an issue files it first, with the command of the project.
-  close(number: number, closing: Closing, reason: string | null): string {
+  get canClose(): boolean {
+    return this.registry.actor.role === 'owner'
+  }
+
+  close(number: number, closing: Closing | null = null, reason: string | null = null, proposal?: ClosingProposal): string {
+    if (!this.canClose) throw new Error("closing a card is the owner's")
+    if (closing === null) {
+      const current = proposal ?? this.registry.shownProposal(number) ?? this.registry.find(number)?.record.proposal
+      if (current == null) throw new Error('this card has no closing proposal; give a disposition or record a conclusion first')
+      this.registry.acceptProposal(number, current)
+      return `Card #${String(number)} closed as ${current.as}.`
+    }
     const closed = `Card #${String(number)} closed as ${closing}`
     const card = this.registry.find(number)
     // A card that cannot be closed is not filed either: the registry says why when it is asked to close it.
     const line = closing === 'issue' && card?.isWaiting === true ? (this.project.declaration()?.issue ?? null) : null
-    const printed = card === null || line === null ? null : new IssueFiling(line, this.project.top).file(card)
+    const printed = card === null || line === null ? null : new IssueFiling(line, this.project.top, this.registry).file(card, reason)
 
     this.registry.closeCard(number, closing, reason, printed)
 
@@ -65,11 +75,10 @@ export class CardDesk {
     return printed === null ? `${closed}.` : `${closed}: ${printed}`
   }
 
-  // A note of the owner, written as the command writes it.
   note(number: number, conclusion: Conclusion | null, text: string): Card {
     const { card, problems } = new NoteRecorder(this.project.repository, this.registry).record(
       { words: [String(number), ...(conclusion === null ? [] : [conclusion])], body: text },
-      { author: OWNER, role: OWNER, session: null, subagent: null, unit: null, requests: [] },
+      { ...this.registry.actor, role: this.registry.actor.role === 'owner' ? 'owner' : 'author' },
     )
 
     if (card === null) throw new Error(problems.join(' '))
@@ -82,6 +91,6 @@ export class CardDesk {
     const card = this.registry.find(number)
     const kept = Object.entries({ ...card?.record.written?.labels, ...labels }).filter(([, values]) => values.length > 0)
 
-    return this.registry.correct(number, { labels: Object.fromEntries(kept) })
+    return this.registry.correct(number, { labels: Object.fromEntries(kept) }, undefined, card?.record.lifecycle?.revision)
   }
 }

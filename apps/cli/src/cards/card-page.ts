@@ -1,4 +1,4 @@
-import { Card, NoteText, PlaceText, type CardRecord, type PlaceContext, type Provenance } from '@weaver/memory'
+import { Card, PlaceText, type CardRecord, type PlaceContext, type Provenance } from '@weaver/memory'
 import type { Atom } from '../markdown/atom.ts'
 import { DrawnCode, type NumberedLine } from '../markdown/drawn-code.ts'
 import { InlineMarkdown } from '../markdown/inline-markdown.ts'
@@ -56,6 +56,7 @@ export class CardPage {
   lines(): string[] {
     const parts = [
       this.head(),
+      this.proposal(),
       ...this.body(),
       this.flag(),
       this.notes(),
@@ -67,6 +68,17 @@ export class CardPage {
     ]
 
     return parts.filter((part) => part.length > 0).flatMap((part, index) => (index === 0 ? part : ['', ...part]))
+  }
+
+  private proposal(): string[] {
+    const proposal = this.record.proposal
+    return proposal === null
+      ? []
+      : [
+          ...this.titled('Closing proposal'),
+          ...this.markdown.typed(proposal.reason),
+          ...this.wrapped.of(this.inline.typed(`Owner: accept with weaver close ${String(this.card.number)}.`)),
+        ]
   }
 
   // What the card says, how it stands, and where it is.
@@ -266,7 +278,7 @@ export class CardPage {
   private next(): string[] {
     const number = String(this.record.number)
     const hints = [
-      `Write on it with weaver note ${number} [${NoteText.CONCLUSIONS.join('|')}] <text>.`,
+      `Write on it with weaver note ${number} [conclusion] <text>.`,
       `Close it with weaver close ${number} ${Card.CLOSINGS.join('|')} [reason].`,
     ]
 

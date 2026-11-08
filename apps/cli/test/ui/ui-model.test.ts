@@ -102,7 +102,7 @@ test('the list is narrowed in the filter box, by labels and by date, and searche
 })
 
 test('the closed cards stand under how they were closed, the last closed first, and are found by the reason given', () => {
-  press(model, 'c', 'enter', 'c', 'v', 'tab', 'type:refresh() is called by the scheduler', 'enter', 'right', 'right')
+  press(model, 'c', 'c', 'v', 'tab', 'type:refresh() is called by the scheduler', 'enter', 'right', 'right')
 
   assert.deepEqual([model.view, model.order, model.grouped], ['closed', 'closing', true])
   assert.deepEqual([cardOf(top, 4).standing, cardOf(top, 1).standing], ['closed (fixed)', 'closed (invalid)'])
@@ -150,24 +150,22 @@ test('a card has its five sides under the same digits, and the side in sight is 
 })
 
 test('a card is closed in its box: what someone concluded gives how, and the reason the owner keeps or corrects', () => {
-  press(model, 'c')
+  press(model, 'C')
 
   const closing = box<CloseForm>()
 
   assert.ok(closing instanceof CloseForm)
   assert.deepEqual(
     [closing.card.number, closing.closing, closing.reason.text, closing.taken?.by.author],
-    [4, 'fixed', 'removed the line that logged it, in `src/log.ts`.', 'claude'],
+    [4, 'fixed', cardOf(top, 4).record.proposal?.reason, 'claude'],
     'the reason is what the report of the fix says was changed',
   )
 
+  const reason = closing.reason.text
   assert.equal(closing.typing, true, 'a reason taken from a note is where the keys go')
   press(model, 'type: (abc1234)', 'enter')
   assert.deepEqual([model.box, model.said], [null, { text: 'Card #4 closed as fixed.', problem: false }])
-  assert.deepEqual(
-    [cardOf(top, 4).record.closing?.reason, cardOf(top, 4).state],
-    ['removed the line that logged it, in `src/log.ts`. (abc1234)', 'closed'],
-  )
+  assert.deepEqual([cardOf(top, 4).record.closing?.reason, cardOf(top, 4).state], [`${reason} (abc1234)`, 'closed'])
   assert.deepEqual([numbers(model), model.selected?.number], [[1, 2, 3], 1], 'the card that took its place is selected')
 
   press(model, 'c', 'w', 'enter')
@@ -232,7 +230,7 @@ test('enter goes into the card: its sides are turned and scrolled, and esc comes
   model.resized(100, 20)
   press(model, 'enter')
   assert.deepEqual([model.focus, model.tab], ['detail', 'card'])
-  assert.deepEqual(model.sheet.lines.slice(0, 3), ['▍ OBSERVATION', '', 'No call of refresh() exists under src/.'])
+  assert.deepEqual(model.sheet.lines.slice(0, 3), ['▍ CLOSING PROPOSAL', '', 'Proposed as fixed. Owner: c accepts; C edits.'])
 
   press(model, '2')
   assert.equal(model.sheet.lines[0], '▍ FLAG')
