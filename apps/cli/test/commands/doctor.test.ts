@@ -549,3 +549,14 @@ test('doctor reports count and oldest age for unavailable writers and exhausted 
   })
   assert.match((await doctor()).lines.join(' '), /1 flag has repeatedly failed writing; oldest \d+ seconds old/)
 })
+
+test('doctor notes the old finish prohibition and preserves the owner skill byte for byte', async () => {
+  await weaver(top, ['install', 'claude'])
+  const path = join(top, SKILL)
+  const text = `${readFileSync(path, 'utf8')}\nMy custom instruction. Do not do it in the task, unless the task cannot go on without it.\n`
+  writeFileSync(path, text)
+  const result = await doctor()
+  assert.equal(result.status, 0)
+  assert.match(result.lines.join('\n'), /still prohibits fixing discoveries.*Weaver preserves your custom skill/)
+  assert.equal(readFileSync(path, 'utf8'), text)
+})

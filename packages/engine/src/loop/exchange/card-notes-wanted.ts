@@ -1,30 +1,31 @@
 import { NoteText, type Card } from '@weaver/memory'
 
-// What holds the end of a task about cards that wait for the owner, until its agent writes on them what it did: the
-// owner reads a card to decide on it, and a final message is read once.
 export class CardNotesWanted {
   readonly text: string | null
 
-  // `changed` are the files of the unit of work.
   constructor(cards: readonly Card[], changed: readonly string[]) {
     this.text =
       cards.length === 0
         ? null
         : [
-            '[weaver] This task is about cards that wait for the owner, and nothing was written on them during it:',
-            ...cards.map((card) => `- #${String(card.number)} ${card.title}: ${this.why(card, changed)}`),
+            '[weaver] Finish the card loop for these changed files (once for this unit):',
+            ...cards.map(
+              (card) =>
+                `- #${String(card.number)} ${card.title}: ${card.places
+                  .filter((place) => changed.includes(place.file))
+                  .map((place) => place.file)
+                  .join(
+                    ', ',
+                  )}; ${card.decision.kind === 'none' ? 'claimed for resolution' : card.decision.kind === 'owner' ? `owner decision: ${card.decision.question ?? ''}` : 'decision unknown'}.`,
+            ),
             '',
-            'On each one your work settled or advanced, write what you looked into, then what you changed, with the number of the card:',
+            'Resolve the claimed cards within your task’s reach: investigate, fix and verify, then document each with notes. Spend at most 10 minutes on this pass and handle at most 2 cards. Claims expire after 10 minutes; stop work on the card then.',
+            'For other cards, document only what this task settled or advanced. Leave pending owner decisions explicit; do not resolve them on the owner’s behalf.',
+            'If a claimed card is out of reach, write a deferred note with the reason and name it in your final message. It stays open, distinct from needs-owner. Only the owner closes.',
             '',
             NoteText.FORMAT,
             '',
-            'A card your task leaves as it was needs no note: name it in your final message, as #12, and say so. Then end your task again with your final message. Weaver asks this once, and checks your work then.',
+            'Then end with your final message. Weaver asks once per unit and checks your work next, without another card hold.',
           ].join('\n')
-  }
-
-  private why(card: Card, changed: readonly string[]): string {
-    const files = [...new Set(card.places.map((place) => place.file))].filter((file) => changed.includes(file))
-
-    return files.length === 0 ? 'you read it' : `your work changed ${files.join(', ')}`
   }
 }

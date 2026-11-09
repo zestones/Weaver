@@ -193,14 +193,21 @@ export class DoctorCommand implements Command {
 
     const missing = skill.missingHeadings()
 
-    return missing.length === 0
-      ? [{ state: 'ok', text: `The finish skill: ${skill.path}` }]
-      : [
-          {
-            state: 'problem',
-            text: `${skill.path} does not show ${missing.map((heading) => `## ${heading}`).join(', ')}, which its header lists.`,
-          },
-        ]
+    const findings: Finding[] =
+      missing.length === 0
+        ? [{ state: 'ok', text: `The finish skill: ${skill.path}` }]
+        : [
+            {
+              state: 'problem',
+              text: `${skill.path} does not show ${missing.map((heading) => `## ${heading}`).join(', ')}, which its header lists.`,
+            },
+          ]
+    if (skill.prohibitsResolution)
+      findings.push({
+        state: 'note',
+        text: `${skill.path} still prohibits fixing discoveries in the task. Update that instruction to resolve actionable cards in scope and leave owner decisions explicit. Weaver preserves your custom skill.`,
+      })
+    return findings
   }
 
   private review(project: Project): Finding[] {

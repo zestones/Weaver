@@ -15,11 +15,6 @@ export class WaitingCards {
     return this.read((registry) => registry.about(paths).reverse())
   }
 
-  // Those of these numbers that still wait.
-  among(numbers: readonly number[]): Card[] {
-    return this.read((registry) => numbers.flatMap((number) => registry.find(number) ?? []))
-  }
-
   // A project with no card has no registry yet, and looking makes none.
   private read(cards: (registry: CardRegistry) => Card[]): Card[] {
     if (!CardRegistry.isIn(this.repo.stateDir)) return []
@@ -27,7 +22,9 @@ export class WaitingCards {
     const registry = new CardRegistry(this.repo.stateDir)
 
     try {
-      return cards(registry).filter((card) => card.isWaiting && card.origin !== 'suspicion' && card.conclusion?.as !== 'fixed')
+      return cards(registry).filter(
+        (card) => card.isWaiting && card.origin !== 'suspicion' && card.conclusion?.as !== 'fixed' && card.conclusion?.as !== 'refuted',
+      )
     } finally {
       registry.close()
     }

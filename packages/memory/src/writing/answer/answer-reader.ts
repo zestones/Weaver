@@ -2,7 +2,7 @@ import type { WriterLook, WrittenCard } from '../../cards/card-record.ts'
 import { oneLine } from '../../lib/text/clip.ts'
 import type { LabelCatalog } from '../request/writer-job.ts'
 
-export interface FlagAnswer extends Pick<WrittenCard, 'title' | 'labels' | 'sections' | 'look'> {
+export interface FlagAnswer extends Pick<WrittenCard, 'title' | 'labels' | 'sections' | 'look' | 'decision'> {
   // The card it reads as the same thing, among those it may name; null when it names none.
   readonly sameAs: number | null
   readonly sure: boolean
@@ -36,6 +36,7 @@ export class AnswerReader {
 
     const title = this.text(given.title)
     const look = this.look(given.look)
+    const decision = this.decision(given.decision)
     const sections = this.sections.map((name) => ({ name, text: this.section(given.sections, name) }))
     const missing = sections.flatMap(({ name, text }) => (text === null ? [name] : []))
 
@@ -49,10 +50,19 @@ export class AnswerReader {
       labels: this.declared(given.labels),
       sections: sections.map(({ name, text }) => ({ name, text: text ?? '' })),
       look,
+      ...(decision === undefined ? {} : { decision }),
       sameAs: typeof given.sameAs === 'number' && known.includes(given.sameAs) ? given.sameAs : null,
       sure: given.sure === true,
       sameNote: this.text(given.sameNote),
     }
+  }
+
+  private decision(given: unknown): WrittenCard['decision'] {
+    const fields = this.fields(given)
+    if (fields?.kind === 'none') return { kind: 'none', question: null }
+    const question = this.text(fields?.question)
+    if (fields?.kind === 'owner' && question !== null) return { kind: 'owner', question }
+    return undefined
   }
 
   private section(given: unknown, name: string): string | null {

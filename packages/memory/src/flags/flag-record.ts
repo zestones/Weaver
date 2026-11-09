@@ -6,7 +6,13 @@ export interface Place {
 
 export type Did = 'left' | 'worked-around' | 'fixed'
 
+export interface CardDecision {
+  readonly kind: 'unknown' | 'none' | 'owner'
+  readonly question: string | null
+}
+
 export interface FlagFields {
+  readonly decision?: CardDecision
   readonly seen: string
   readonly expected: string
   readonly found: string

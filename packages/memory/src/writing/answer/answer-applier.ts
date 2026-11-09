@@ -22,10 +22,18 @@ export class AnswerApplier {
       return
     }
 
-    const { title, labels, sections, look } = answer
+    const { title, labels, sections, look, decision } = answer
 
     try {
-      this.registry.written(flag, { title, labels, sections, look, writer: this.writer, at: new Date().toISOString() })
+      this.registry.written(flag, {
+        title,
+        labels,
+        sections,
+        look,
+        ...(decision === undefined ? {} : { decision }),
+        writer: this.writer,
+        at: new Date().toISOString(),
+      })
     } catch (error) {
       this.registry.writingFailed(flag, error instanceof Error ? error.message : String(error))
 
@@ -44,7 +52,10 @@ export class AnswerApplier {
     if (other === null || other === flag) return
 
     try {
-      if (sure) this.registry.merge(flag, other, sameNote ?? SAME)
+      const decision = this.registry.find(flag)?.decision
+      const target = this.registry.find(other)?.decision
+      const preservesOwner = decision?.kind !== 'owner' || (target?.kind === 'owner' && target.question === decision.question)
+      if (sure && preservesOwner) this.registry.merge(flag, other, sameNote ?? SAME)
       else this.registry.tie(flag, other, sameNote ?? SAME)
     } catch (error) {
       if (!(error instanceof RegistryError)) throw error

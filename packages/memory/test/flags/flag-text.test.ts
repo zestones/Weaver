@@ -20,6 +20,7 @@ test('a flag with its five fields has no problem, and each field holds what the 
     checked: 'grep over src/. I did not run the application.',
     did: 'left',
     didNote: null,
+    decision: { kind: 'unknown', question: null },
   })
 })
 
@@ -34,7 +35,15 @@ test('the keywords are read in any letter case, and a body with Windows line end
   const flag = new FlagText('SEEN: a\r\nexpected: b\r\nFound: c\r\ncHeCkEd: d\r\ndid: LEFT AS IT IS\r\n')
 
   assert.deepEqual(flag.problems(), [])
-  assert.deepEqual(flag.fields(), { seen: 'a', expected: 'b', found: 'c', checked: 'd', did: 'left', didNote: null })
+  assert.deepEqual(flag.fields(), {
+    seen: 'a',
+    expected: 'b',
+    found: 'c',
+    checked: 'd',
+    did: 'left',
+    didNote: null,
+    decision: { kind: 'unknown', question: null },
+  })
 })
 
 test('a keyword counts at the start of a line only: elsewhere it is part of the field', () => {
@@ -120,4 +129,29 @@ test('the format shown to an agent is one a flag can be copied from', () => {
   assert.match(command ?? '', /^weaver flag <file>\[:<line>\] \.\.\. <<'EOF'$/)
   assert.deepEqual(new FlagText(example).problems(), [])
   assert.equal(new FlagText(example).fields()?.did, 'left')
+})
+
+test('decisions are independent fields, and missing or unusable decisions stay unknown without a refusal', () => {
+  for (const [line, decision] of [
+    ['Decision: none', { kind: 'none', question: null }],
+    [
+      'Decision: owner Which expiry should we use?\nOne hour or one day?',
+      { kind: 'owner', question: 'Which expiry should we use?\nOne hour or one day?' },
+    ],
+    ['', { kind: 'unknown', question: null }],
+    ['Decision: owner', { kind: 'unknown', question: null }],
+    ['Decision: maybe', { kind: 'unknown', question: null }],
+  ] as const) {
+    const flag = new FlagText(`${FLAG_BODY}\n${line}`)
+    assert.deepEqual(flag.problems(), [])
+    assert.deepEqual(flag.fields()?.decision, decision)
+    assert.equal(flag.fields()?.didNote, null)
+  }
+  assert.match(FlagText.FORMAT, /Decision: none \| owner <the question>/)
+})
+
+test('ambiguous duplicate decisions cannot erase an explicit owner question', () => {
+  const flag = new FlagText(`${FLAG_BODY}\nDecision: owner Which expiry?\nDecision: none`)
+  assert.deepEqual(flag.fields()?.decision, { kind: 'owner', question: 'Which expiry?' })
+  assert.deepEqual(flag.problems(), [])
 })

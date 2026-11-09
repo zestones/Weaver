@@ -1,4 +1,4 @@
-import type { FlagRecord, Place } from '../flags/flag-record.ts'
+import type { CardDecision, FlagRecord, Place } from '../flags/flag-record.ts'
 
 export type CardOrigin = 'flag' | 'finding' | 'suspicion' | 'owner'
 // raw: a flag no writer has written up. merged: the same thing as another card, kept as its occurrence.
@@ -6,7 +6,7 @@ export type CardState = 'raw' | 'open' | 'closed' | 'merged'
 // invalid: what the card says proved not to be true.
 export type Closing = 'fixed' | 'wontfix' | 'issue' | 'invalid'
 // What the one who looked into a card concludes of it: what it says is true, is not, could not be told, or is fixed.
-export type Conclusion = 'confirmed' | 'refuted' | 'unsure' | 'fixed' | 'needs-owner'
+export type Conclusion = 'confirmed' | 'refuted' | 'unsure' | 'fixed' | 'needs-owner' | 'no-decision' | 'deferred'
 
 export interface Provenance {
   // 'claude', 'codex' or 'owner'.
@@ -42,6 +42,7 @@ export interface WriterLook {
 }
 
 export interface WrittenCard {
+  readonly decision?: CardDecision
   readonly title: string
   // family -> values, all of them declared by the project.
   readonly labels: Readonly<Record<string, readonly string[]>>
@@ -58,7 +59,7 @@ export interface WrittenCard {
   readonly at: string
 }
 
-export type ResolutionStage = 'uninvestigated' | 'investigated' | 'fixed' | 'refuted' | 'needs-owner'
+export type ResolutionStage = 'uninvestigated' | 'investigated' | 'fixed' | 'refuted' | 'needs-owner' | 'deferred'
 
 export interface ClosingProposal {
   readonly draftedBy: 'weaver'

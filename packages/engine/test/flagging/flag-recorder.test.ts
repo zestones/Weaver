@@ -64,6 +64,7 @@ test('a flag is recorded as written, with who made it, where the repository stoo
     checked: 'grep over src/. I did not run the application.',
     did: 'left',
     didNote: null,
+    decision: { kind: 'unknown', question: null },
   })
   assert.deepEqual(
     { ...card?.record.provenance, at: null },

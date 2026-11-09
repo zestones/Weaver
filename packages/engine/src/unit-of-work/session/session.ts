@@ -246,22 +246,22 @@ export class Session {
 
   // A flag is journaled each time it is made; one that is new is named to the owner when the turn ends.
   flagged(card: number, known: boolean): void {
-    const { unit } = this.store.update((latest) => (known ? latest : { ...latest, flagged: [...latest.flagged, card] }))
+    const { unit } = this.store.update((latest) => ({
+      ...latest,
+      flagged: known ? latest.flagged : [...latest.flagged, card],
+      unit: new UnitOfWork(latest.unit).withFlagged(card).record,
+    }))
 
     this.log({ kind: 'flag', unit: unit.number, card, known })
   }
 
-  // A note that concludes nothing is free text: the card is still owed a report.
   noted(card: number, conclusion: string | null): void {
-    const { unit } = this.store.update((latest) =>
-      conclusion === null ? latest : { ...latest, unit: new UnitOfWork(latest.unit).withNoted(card).record },
-    )
+    const { unit } = this.store.update((latest) => ({ ...latest, unit: new UnitOfWork(latest.unit).withNoted(card).record }))
 
     this.log({ kind: 'note', unit: unit.number, card, conclusion })
   }
 
-  // The unit of work is about the cards its agent reads, and those whose files its calls change. Gives those it was
-  // not about yet.
+  // Gives the cards not yet announced for changed files in this unit.
   concerned(cards: readonly number[]): number[] {
     return this.store.transact((latest) => {
       const unit = new UnitOfWork(latest.unit)
@@ -271,17 +271,11 @@ export class Session {
     }).value
   }
 
-  // The cards of the unit its agent wrote nothing on, and did not answer for in its final message: the end of the task
-  // asks once for their notes.
-  askNotes(answered: ReadonlySet<number>): number[] {
+  askNotes(cards: readonly number[], resolving: readonly number[]): boolean {
     return this.store.transact((latest) => {
       const unit = new UnitOfWork(latest.unit)
-      const unnoted = unit.unnotedCards
-
-      return {
-        record: unnoted.length === 0 ? latest : { ...latest, unit: unit.withCardsAsked(unnoted).record },
-        value: unnoted.filter((card) => !answered.has(card)),
-      }
+      if (unit.cards.resolutionAsked === true || unit.cards.asked.length > 0) return { record: latest, value: false }
+      return { record: { ...latest, unit: unit.withCardsAsked(cards, resolving).record }, value: true }
     }).value
   }
 

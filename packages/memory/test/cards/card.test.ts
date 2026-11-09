@@ -84,6 +84,7 @@ test('a written card as Markdown is its title, its header, its sections, its fla
       '- Card: #12',
       '- Origin: flag',
       '- State: open',
+      '- Decision: unknown',
       '- Resolution: uninvestigated',
       '- Labels: type:bug, area:auth',
       '- Places: `src/auth/token.ts:42`, `src/auth/session.ts`',
@@ -126,7 +127,7 @@ test('the header says who flagged and for which requests, and what is not known'
 
   assert.match(
     byOwner,
-    /\n- Origin: owner\n- State: raw, not written up yet\n- Resolution: uninvestigated\n- Labels: none\n- Places: none\n- Author: the owner\n- Session: none\n/,
+    /\n- Origin: owner\n- State: raw, not written up yet\n- Decision: unknown\n- Resolution: uninvestigated\n- Labels: none\n- Places: none\n- Author: the owner\n- Session: none\n/,
   )
   assert.match(byOwner, /\n- Asked by the owner: nothing recorded\n- Date: 2026-10-11T10:00:00\.000Z\n- What the writer saw: nothing yet\n/)
   assert.match(bySubagent, /\n- Author: claude, as author, subagent `agent-7`\n/)
@@ -170,6 +171,7 @@ test('a card that comes from a review shows what the review said in place of sec
       '- Card: #7',
       '- Origin: finding',
       '- State: open',
+      '- Decision: unknown',
       '- Resolution: uninvestigated',
       '- Labels: none',
       '- Places: `src/api/user.ts:7`',

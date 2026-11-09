@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
+import { ReviewRounds } from '../../src/review/rounds/review-rounds.ts'
+import { ReviewStore } from '../../src/review/results/review-store.ts'
 import { ReviewOutcome } from '../../src/review/results/review-outcome.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import { SAMPLE_REPO, makeRepo } from '../fixtures/repo.ts'
@@ -326,4 +328,59 @@ test('no review is asked when the checks fail, when no rule of the review applie
 
   assert.equal(reviewer.requests.length, 0)
   assert.doesNotMatch(reportOf(unreviewed.systemMessage ?? ''), /## Review|for a reviewer/)
+})
+
+test('answers are persisted before the 40-line routing decision and survive a new review', async () => {
+  const reviewer = stubReviewer([found, clean])
+  await finish(reviewer)
+  const content = session.unit().lastReviewed ?? ''
+  agentWrites(session, { [A_FILE]: 'export const a = 3\n', [B_FILE]: 'export const b = 2\n'.repeat(60) })
+  await finish(reviewer, reviewed(), saying('F1 fixed: split the function in two'))
+  assert.deepEqual(new ReviewStore(session.dir).find(content)?.answers, [{ finding: 1, status: 'fixed', why: 'split the function in two' }])
+  assert.equal(reviewer.requests.length, 2)
+  assert.match(reviewer.requests[1]?.prompt(null) ?? '', /answered fixed: split the function in two/)
+})
+
+test('partial and unvalidated answers are kept even while the existing reminders still apply', async () => {
+  const reviewer = stubReviewer([new ReviewOutcome({ ...BY, findings: [FINDING, { ...FINDING, line: 2 }], seconds: 1 })])
+  await finish(reviewer)
+  const content = session.unit().lastReviewed ?? ''
+  await finish(reviewer, reviewed(), saying('F1 fixed: attempted the split'))
+  const store = new ReviewStore(session.dir)
+  assert.deepEqual(store.find(content)?.submittedAnswers, [{ finding: 1, status: 'fixed', why: 'attempted the split' }])
+  assert.deepEqual(store.find(content)?.answers, [], 'unvalidated answers are not treated as accepted fixes')
+  await finish(reviewer, reviewed(), saying('F2 not fixed: waiting for the owner choice'))
+  assert.deepEqual(
+    store.find(content)?.submittedAnswers?.map((answer) => answer.finding),
+    [1, 2],
+  )
+})
+
+test('a later check failure cannot discard answers to an earlier review', async () => {
+  const reviewer = stubReviewer([found])
+  await finish(reviewer)
+  const content = session.unit().lastReviewed ?? ''
+  agentWrites(session, { [A_FILE]: 'export const a = 3\n' })
+  await finishWith(session, stubChecks([FAILING]), reviewed(), saying('F1 fixed: split the function in two'), reviewer)
+  assert.deepEqual(new ReviewStore(session.dir).find(content)?.answers, [{ finding: 1, status: 'fixed', why: 'split the function in two' }])
+  assert.equal(reviewer.requests.length, 1)
+})
+
+test('revised answers remain in history, including a return to an earlier answer', async () => {
+  const reviewer = stubReviewer([found])
+  await finish(reviewer)
+  const unit = session.unit()
+  const rounds = new ReviewRounds({ start: () => undefined })
+  const first = 'F1 not fixed: the owner asked for one function'
+  const second = 'F1 not fixed: the code needs more investigation'
+  rounds.keepAnswers(session, unit, first)
+  rounds.keepAnswers(session, unit, second)
+  rounds.keepAnswers(session, unit, first)
+  rounds.keepAnswers(session, unit, first)
+  const record = new ReviewStore(session.dir).find(unit.lastReviewed ?? '')
+  assert.deepEqual(
+    record?.submittedAnswers?.map((answer) => answer.why),
+    ['the owner asked for one function', 'the code needs more investigation', 'the owner asked for one function'],
+  )
+  assert.equal(record?.answers[0]?.why, 'the owner asked for one function')
 })

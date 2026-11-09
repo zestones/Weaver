@@ -21,7 +21,7 @@ export class NoteCommand implements Command {
       ['<number>', 'The number of the card, as weaver cards shows it'],
       [
         `[${CONCLUSIONS}]`,
-        'What you conclude of the card: it is true, it is not, you could not tell, it is fixed, or it needs an owner decision',
+        'What you conclude of the card: it is true, it is not, you could not tell, it is fixed, it needs an owner decision, needs no decision, or is deferred',
       ],
       ['[text]', 'What the note says'],
     ],

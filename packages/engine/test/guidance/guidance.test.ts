@@ -24,7 +24,7 @@ test('every request names each command of Weaver at its moment, in a line, and l
   const { text } = new RequestBriefing(declarationOf(PROJECT))
 
   assert.deepEqual(text.split('\n').slice(1), [
-    '- before you change a file: `weaver cards --file <path>` or `--search <words>`, what the owner already knows of it;',
+    '- resolve actionable cards in your scope and document them; leave owner decisions explicit. Weaver names cards after file changes;',
     '- something your task does not settle: `weaver flag` it;',
     "- a check's verdict before the end: `weaver check <name>`, among format, tests;",
     '- card organization or correction: `weaver cards tie`, `untie`, `separate`, `reopen`, `retitle`, `label`, `rewrite`; inspect or restore with `revisions` and `restore`; only the owner closes proposals;',
@@ -44,7 +44,10 @@ test('the guide says how a task goes and each command with what the project decl
   assert.match(text, /\n- `tests`: runs on any change, after `format`; it may take up to 20 min\.\n/)
   assert.ok(text.includes(`\`\`\`text\n${FlagText.FORMAT}\n\`\`\``))
   assert.ok(text.includes(`\`\`\`text\n${NoteText.FORMAT}\n\`\`\``))
-  assert.match(text, /`weaver cards --file <path>`, one file at a time/)
+  assert.match(text, /After a call changes a file, Weaver injects the open cards/)
+  assert.doesNotMatch(text, /Do not fix what you flag|one file at a time/)
+  assert.match(text, /at most two actionable cards/)
+  assert.match(text, /Investigation alone does not clear an explicit owner question/)
   assert.match(text, /A fix is refused on a card where nothing yet says what was looked into/)
   assert.match(
     text,

@@ -49,7 +49,7 @@ export class NoteReport {
   private readonly given: readonly ReportField[]
 
   constructor(conclusion: Conclusion, text: string) {
-    const kind = NoteReport.kindOf(conclusion)
+    const kind = NoteReport.kindOf(conclusion) ?? 'investigation'
     const names = FIELDS[kind].map(({ name }) => name)
     const keyword = new RegExp(`^(${names.join('|')}):(.*)$`, 'i')
     const opening: string[] = []
@@ -68,10 +68,8 @@ export class NoteReport {
     this.given = fields.map(({ name, lines }) => ({ name, said: lines.join('\n').trim() }))
   }
 
-  static kindOf(conclusion: Conclusion): ReportKind
-  static kindOf(conclusion: Conclusion | null): ReportKind | null
   static kindOf(conclusion: Conclusion | null): ReportKind | null {
-    if (conclusion === null) return null
+    if (conclusion === null || conclusion === 'needs-owner' || conclusion === 'no-decision' || conclusion === 'deferred') return null
 
     return conclusion === 'fixed' ? 'fix' : 'investigation'
   }

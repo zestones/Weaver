@@ -5,7 +5,7 @@ const EXPECTS: Readonly<Record<string, string>> = {
   'To validate':
     'What the owner must decide or check before committing: an exception to a rule, a suppression, a deleted test, a limit you could not remove.',
   'Found along the way':
-    'What you noticed outside the request. Flag each thing with `weaver flag` when you find it, and name it here with the number of its flag. Do not do it in the task, unless the task cannot go on without it: flag it then as fixed in the task.',
+    'What you noticed outside the request. Flag each thing with `weaver flag` when you find it, and name it here with the number of its flag. Resolve actionable cards within your task’s scope, investigate and document the fix, and flag discoveries fixed along the way as fixed in the task. Leave owner decisions explicit; name deferred cards with their reasons.',
 }
 
 export class FinishSkill extends ProjectSkill {
@@ -19,6 +19,10 @@ export class FinishSkill extends ProjectSkill {
   constructor(top: string, path: string, headings: readonly string[]) {
     super(top, path)
     this.headings = headings
+  }
+
+  get prohibitsResolution(): boolean {
+    return /Do not (?:do|fix) (?:it|what you flag).*unless (?:the|your) task cannot go on without it/i.test(this.lines().join(' '))
   }
 
   missingHeadings(): string[] {

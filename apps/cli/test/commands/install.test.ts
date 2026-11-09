@@ -83,7 +83,7 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   assert.ok(lines.includes('✓ .weaver/ created: declare your guards and your checks in .weaver/project/.'))
   assert.match(
     readFileSync(join(top, SKILL), 'utf8'),
-    /## Request\n\nWhat you did for the request[^]*## To validate\n\n[^]*## Found along the way\n\nWhat you noticed outside the request\. Flag each thing with `weaver flag` when you find it, and name it here with the number of its flag\. Do not do it in the task, unless the task cannot go on without it: flag it then as fixed in the task\.\n```\n/,
+    /## Request\n\nWhat you did for the request[^]*## To validate\n\n[^]*## Found along the way\n\nWhat you noticed outside the request\. Flag each thing with `weaver flag` when you find it, and name it here with the number of its flag\. Resolve actionable cards within your task’s scope, investigate and document the fix, and flag discoveries fixed along the way as fixed in the task\. Leave owner decisions explicit; name deferred cards with their reasons\.\n```\n/,
   )
   assert.ok(lines.includes(`✓ ${SKILL} created: it tells the agent how to end a task. Adapt it to your project.`))
   assert.ok(lines.some((line) => line.includes(`${CLAUDE} is not ignored by git`)))

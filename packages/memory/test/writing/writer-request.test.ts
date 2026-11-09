@@ -180,7 +180,7 @@ test('the answer is held to a shape: the flags asked about, the families and the
   const card = (schema.properties as { cards: { items: { required: string[]; additionalProperties: boolean } } }).cards.items
 
   assert.deepEqual([schema.type, schema.required, schema.additionalProperties], ['object', ['cards'], false])
-  assert.deepEqual(card.required, ['flag', 'title', 'labels', 'sections', 'look', 'sameAs', 'sure', 'sameNote'])
+  assert.deepEqual(card.required, ['flag', 'title', 'labels', 'sections', 'decision', 'look', 'sameAs', 'sure', 'sameNote'])
   assert.equal(card.additionalProperties, false)
   assert.match(text, /"flag":\{"type":"integer","enum":\[12,13\]\}/)
   assert.match(text, /"family":\{"type":"string","enum":\["type","area"\]\}/)

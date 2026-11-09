@@ -88,6 +88,7 @@ test('a card is drawn from what it holds: what it is, what was written of it, it
   assert.deepEqual(page(WRITTEN), [
     'Nothing refreshes the token',
     `#7 · open · flagged by claude · ${WHEN} · type:bug, area:auth`,
+    'Decision: unknown',
     '',
     '  src/auth/token.py:42',
     '',
@@ -135,11 +136,12 @@ test('a card is drawn from what it holds: what it is, what was written of it, it
 test('a card nobody wrote up is named after what was seen, and says what the owner should know before reading on', () => {
   const failed = page({ ...RAW, writing: { attempts: 3, failure: 'the writer ran out of time' } }, 60)
 
-  assert.deepEqual(failed.slice(0, 6), [
+  assert.deepEqual(failed.slice(0, 7), [
     'no call of refresh() exists under src/, and __init__.py',
     'imports none.',
     '#7 · raw, not written up yet · flagged by claude ·',
     WHEN,
+    'Decision: unknown',
     '! Writing it up failed, 3 times: the writer ran out of time',
     '',
   ])
@@ -147,7 +149,7 @@ test('a card nobody wrote up is named after what was seen, and says what the own
 
   const disputed = page({ ...WRITTEN, written: WRITTEN.written && { ...WRITTEN.written, look: { verdict: 'contradicts', note: '' } } })
 
-  assert.equal(disputed[2], '! What the writer read contradicts the flag: see Writer, below.')
+  assert.equal(disputed[3], '! What the writer read contradicts the flag: see Writer, below.')
   assert.equal(disputed.includes('  Writer    codex on gpt-5: contradicts the flag.'), true)
 })
 
@@ -175,6 +177,7 @@ test('what a review left is drawn with its rule, the line its reviewer read and 
   assert.deepEqual(page(finding), [
     'The response is cast to User without being parsed.',
     `#2 · open · found by codex, in a subagent · ${WHEN}`,
+    'Decision: unknown',
     '',
     '  src/api/user.ts:7',
     '',
@@ -258,7 +261,7 @@ test('a card that was closed says how, what came again and what it may be the sa
   })
 
   assert.deepEqual(closed.slice(1, 3), [`#7 · closed (issue, seen again) · flagged by claude · ${WHEN} ·`, 'type:bug, area:auth'])
-  assert.deepEqual(closed.slice(3, 23), [
+  assert.deepEqual(closed.slice(4, 24), [
     '! Seen again since it was closed.',
     '',
     '  src/auth/token.py:42',
@@ -291,7 +294,7 @@ test('at a terminal the page is coloured: how the card stands, its places, the n
     lines[1]?.startsWith('\u001B[1m#7\u001B[22m \u001B[90m·\u001B[39m \u001B[32mopen\u001B[39m \u001B[90m·\u001B[39m flagged by claude'),
     true,
   )
-  assert.equal(lines[3], '  \u001B[36msrc/auth/token.py:42\u001B[39m')
+  assert.equal(lines[4], '  \u001B[36msrc/auth/token.py:42\u001B[39m')
   assert.equal(lines.includes('  \u001B[90mExpected\u001B[39m  the token is refreshed before a request goes out.'), true)
   assert.equal(
     lines.includes(

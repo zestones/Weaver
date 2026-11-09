@@ -79,13 +79,6 @@ export class UnitOfWork {
     return this.record.cards
   }
 
-  // The cards it is about that its agent wrote nothing on, and that the end of the task did not ask a note for yet.
-  get unnotedCards(): number[] {
-    const { concerned, noted, asked } = this.record.cards
-
-    return concerned.filter((card) => !noted.includes(card) && !asked.includes(card))
-  }
-
   get isEmpty(): boolean {
     return Object.keys(this.record.files).length === 0
   }
@@ -136,14 +129,19 @@ export class UnitOfWork {
     return this.withCards({ concerned: [...concerned, ...cards.filter((card) => !concerned.includes(card))] })
   }
 
+  withFlagged(card: number): UnitOfWork {
+    const flagged = this.record.cards.flagged ?? []
+    return flagged.includes(card) ? this : this.withCards({ flagged: [...flagged, card] })
+  }
+
   withNoted(card: number): UnitOfWork {
     const { noted } = this.record.cards
 
     return noted.includes(card) ? this : this.withCards({ noted: [...noted, card] })
   }
 
-  withCardsAsked(cards: readonly number[]): UnitOfWork {
-    return this.withCards({ asked: [...this.record.cards.asked, ...cards] })
+  withCardsAsked(cards: readonly number[], resolving: readonly number[] = []): UnitOfWork {
+    return this.withCards({ asked: [...this.record.cards.asked, ...cards], resolutionAsked: true, resolving })
   }
 
   withFiles(files: Files): UnitOfWork {

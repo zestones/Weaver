@@ -1,3 +1,4 @@
+import { Card } from '../cards/card.ts'
 import type { CardRecord, Conclusion, ResolutionStage } from '../cards/card-record.ts'
 import { ClosingDraft } from '../notes/closing-draft.ts'
 
@@ -11,15 +12,20 @@ export class CardLifecycle {
         : record.history.slice(0, record.history.lastIndexOf(reopened)).filter((event) => event.action === 'noted').length)
     const notes = record.notes.map((note, index) => ({ ...note, id: note.id ?? `note-${String(index + 1)}` }))
     const current = notes.slice(noteStart)
+    const decision = new Card(record).decision
     const conclusion: Conclusion | null =
-      current.findLast((note) => note.conclusion !== null)?.conclusion ??
-      (reopened === undefined && record.flag?.fields.did === 'fixed' ? 'fixed' : null)
+      current.findLast(
+        (note) =>
+          note.conclusion !== null && note.conclusion !== 'no-decision' && (note.conclusion !== 'needs-owner' || decision.kind === 'owner'),
+      )?.conclusion ?? (reopened === undefined && record.flag?.fields.did === 'fixed' ? 'fixed' : null)
     const stage: ResolutionStage =
-      conclusion === null
-        ? 'uninvestigated'
-        : conclusion === 'fixed' || conclusion === 'refuted' || conclusion === 'needs-owner'
-          ? conclusion
-          : 'investigated'
+      decision.kind === 'owner'
+        ? 'needs-owner'
+        : conclusion === null
+          ? 'uninvestigated'
+          : conclusion === 'fixed' || conclusion === 'refuted' || conclusion === 'needs-owner' || conclusion === 'deferred'
+            ? conclusion
+            : 'investigated'
     const revision = record.lifecycle?.revision ?? record.history.length
     const lifecycle = {
       revision,

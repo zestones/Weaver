@@ -18,7 +18,7 @@ test('a note names its card first, then what it concludes if it does, then what 
   })
   assert.deepEqual(
     NoteText.CONCLUSIONS.map((word) => read(['3', word, 'x']).conclusion),
-    ['confirmed', 'refuted', 'unsure', 'fixed', 'needs-owner'],
+    ['confirmed', 'refuted', 'unsure', 'fixed', 'needs-owner', 'no-decision', 'deferred'],
   )
   assert.deepEqual(
     read(['12', 'Confirmed', 'it']),
@@ -47,7 +47,7 @@ test('a note without the number of a card, or that says nothing, has a problem t
 })
 
 test('the format shown to an agent is one a report can be copied from, with the number of the card it reads', () => {
-  const [investigation = '', fix = '', rules = ''] = NoteText.formatFor('12').split('\n\n')
+  const [investigation = '', fix = '', decisions = '', rules = ''] = NoteText.formatFor('12').split('\n\n')
   const copied = (block: string, word: string) => {
     const [command = '', ...lines] = block.split('\n')
     const [number = '', conclusions = ''] = command.replace('weaver note ', '').split(' ')
@@ -63,6 +63,8 @@ test('the format shown to an agent is one a report can be copied from, with the 
   assert.deepEqual([copied(investigation, 'refuted').card, copied(investigation, 'refuted').conclusion], [12, 'refuted'])
   assert.deepEqual(new NoteReport('refuted', copied(investigation, 'refuted').text).problems(), [])
   assert.deepEqual(new NoteReport('fixed', copied(fix, 'fixed').text).problems(), [])
+  assert.match(decisions, /weaver note 12 no-decision/)
+  assert.match(decisions, /weaver note 12 deferred/)
   assert.match(rules, /^The first reports an investigation: .* Without a word, a note concludes nothing and is free text\.$/)
   assert.match(NoteText.FORMAT, /^weaver note <number> /)
 })

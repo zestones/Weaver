@@ -40,8 +40,11 @@ interface CheckProgress {
   readonly reviewing: string | null
 }
 
-// The cards of the owner the unit of work is about: those its agent read, and those whose files its calls changed.
+// Cards whose files the unit changed; optional resolution fields preserve older active units.
 export interface UnitCards {
+  readonly flagged?: readonly number[]
+  readonly resolutionAsked?: boolean
+  readonly resolving?: readonly number[]
   readonly concerned: readonly number[]
   // Those its agent wrote a note on.
   readonly noted: readonly number[]

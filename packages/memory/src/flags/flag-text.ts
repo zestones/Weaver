@@ -1,9 +1,10 @@
 import type { Did, FlagFields } from './flag-record.ts'
 
-type Keyword = 'Seen' | 'Expected' | 'Found' | 'Checked' | 'Did'
+type Keyword = 'Seen' | 'Expected' | 'Found' | 'Checked' | 'Did' | 'Decision'
 
 // What an agent is asked for when a field cannot be used.
 const ASKS: Readonly<Record<Keyword, string>> = {
+  Decision: 'say `none` or `owner` followed by the question',
   Seen: 'say what you saw, the fact and not what you conclude from it, or that it is unknown',
   Expected: 'say what you expected instead, or that it is unknown',
   Found: 'say what you were doing and what alerted you, or that it is unknown',
@@ -11,7 +12,7 @@ const ASKS: Readonly<Record<Keyword, string>> = {
   Did: 'start it with `left as it is`, `worked around` or `fixed in the task`',
 }
 const KEYWORDS = Object.keys(ASKS) as Keyword[]
-const KEYWORD = /^(seen|expected|found|checked|did):(.*)$/i
+const KEYWORD = /^(seen|expected|found|checked|did|decision):(.*)$/i
 const DONE: readonly (readonly [RegExp, Did])[] = [
   [/^left(?: as (?:it )?is)?(?![\w-])/i, 'left'],
   [/^worked[ -]around(?![\w-])/i, 'worked-around'],
@@ -19,7 +20,7 @@ const DONE: readonly (readonly [RegExp, Did])[] = [
 ]
 const QUOTED_LENGTH = 40
 
-// Reads the body of a flag into its five fields, and says what keeps it from being used.
+// Missing decisions remain unknown, including flags from before the decision field existed.
 export class FlagText {
   // The format, for an agent that got it wrong: shown under the problems.
   static readonly FORMAT: string = [
@@ -29,6 +30,7 @@ export class FlagText {
     'Found: what you were doing, and what alerted you.',
     'Checked: what you verified, and what you did not.',
     'Did: left as it is | worked around | fixed in the task, then anything to add.',
+    'Decision: none | owner <the question>',
     'EOF',
     'Each keyword starts a line, once. A field may span lines, and may say that it is unknown. The places are optional.',
   ].join('\n')
@@ -56,6 +58,7 @@ export class FlagText {
       const values = this.values(keyword)
       const [value] = values
 
+      if (keyword === 'Decision') return []
       if (value === undefined) return [`\`${keyword}:\` is missing: ${ASKS[keyword]}.`]
       if (values.length > 1) return [`\`${keyword}:\` is given ${String(values.length)} times: give it once.`]
       if (value === '') return [`\`${keyword}:\` says nothing: ${ASKS[keyword]}.`]
@@ -79,7 +82,18 @@ export class FlagText {
       found: this.values('Found')[0] ?? '',
       checked: this.values('Checked')[0] ?? '',
       ...done,
+      decision: this.decision(),
     }
+  }
+
+  private decision(): NonNullable<FlagFields['decision']> {
+    const values = this.values('Decision')
+    const value = values[0] ?? ''
+    const owner = values.flatMap((entry) => /^owner\s+([\s\S]+)$/i.exec(entry)?.[1]?.trim() || []).at(0)
+
+    if (owner !== undefined) return { kind: 'owner', question: owner }
+    if (values.length === 1 && /^none$/i.test(value)) return { kind: 'none', question: null }
+    return { kind: 'unknown', question: null }
   }
 
   private values(keyword: Keyword): string[] {

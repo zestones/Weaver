@@ -420,3 +420,22 @@ test('a dead writer leaves a durable unknown-cost batch, recovered once without 
   assert.equal(again.writerBatches().length, 2)
   again.close()
 })
+
+test('writer decisions fill unknowns, preserve explicit owner questions, and cannot hide them by merging', async () => {
+  const registry = flagged(1)
+  const flag = flagOf(bodyOf('otherCall()'))
+  registry.flag({ ...flag, fields: { ...flag.fields, decision: { kind: 'owner', question: 'Which expiry?' } } })
+  await run(
+    registry,
+    agent(
+      answering(
+        cardOf(1, { decision: { kind: 'none', question: null } }),
+        cardOf(2, { decision: { kind: 'none', question: null }, sameAs: 1, sure: true }),
+      ),
+    ),
+  )
+  assert.equal(registry.find(1)?.decision.kind, 'none')
+  assert.deepEqual(registry.find(2)?.decision, { kind: 'owner', question: 'Which expiry?' })
+  assert.equal(registry.find(2)?.state, 'open')
+  assert.deepEqual(registry.find(1)?.record.ties, [2])
+})

@@ -44,7 +44,7 @@ export class NoteRecorder {
     // An agent that concludes owes a report, field by field, and a fix only after what it looked into: the owner reads
     // both to decide. The owner writes what they want, and so does an agent that concludes nothing.
     const owed =
-      by.role === 'owner' || conclusion === null || conclusion === 'needs-owner' || text === ''
+      by.role === 'owner' || conclusion === null || NoteReport.kindOf(conclusion) === null || text === ''
         ? []
         : new NoteReport(conclusion, text).problems()
     const problems = [...note.problems(), ...owed]

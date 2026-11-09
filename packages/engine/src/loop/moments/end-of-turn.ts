@@ -4,7 +4,7 @@ import { CheckMemory } from '../../checks/results/check-memory.ts'
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import { WriterStart } from '../../flagging/writing/writer-start.ts'
-import { WaitingCards } from '../../noting/cards/waiting-cards.ts'
+import { CardResolution } from '../../noting/cards/card-resolution.ts'
 import type { Repository } from '../../lib/git/repository.ts'
 import { ReviewCards } from '../../review/cards/review-cards.ts'
 import type { ReviewRounds } from '../../review/rounds/review-rounds.ts'
@@ -79,18 +79,18 @@ export class EndOfTurn implements Moment {
 
   private async finish(session: Session, declaration: Declaration, lastMessage: string | null): Promise<Answer> {
     const unit = session.endTurn(lastMessage)
+    this.reviews.keepAnswers(session, unit, lastMessage)
     const finished = declaration.finish.declaresFinished(lastMessage)
 
     // A turn that changed no file follows the review of the work before it, whatever its last message says: the owner
     // who writes #review is answered by the review, not by how the agent words its reply.
     const turn = { session, unit: unit.number, finished }
 
+    const notes = finished && (!unit.isEmpty || unit.cards.resolutionAsked === true) ? this.notesWanted(session, unit, lastMessage) : null
+    if (notes !== null) return this.ended(turn, 'cards', Answer.blocking(notes))
+
     if (unit.isEmpty && this.reviews.follows(session, declaration, unit)) return this.check(turn, declaration, unit, lastMessage)
     if (!finished) return unit.isEmpty ? this.ended(turn, null, Answer.empty()) : this.pending(turn, declaration)
-
-    const notes = unit.isEmpty ? null : this.notesWanted(session, unit, lastMessage)
-
-    if (notes !== null) return this.ended(turn, 'cards', Answer.blocking(notes))
 
     // What maintenance let through waits for the owner in a report, even when no file changed.
     if (!unit.isEmpty || unit.lifted.length > 0) return this.check(turn, declaration, unit, lastMessage)
@@ -102,15 +102,10 @@ export class EndOfTurn implements Moment {
     return this.ended(turn, null, this.over(session, Answer.empty()))
   }
 
-  // Before its work is checked, the agent writes on the cards its task is about what it did about them, or names them
-  // in its final message, as `#12`, for a card its task leaves as it was. Cards are a help: failing to read them never
-  // holds the end of a task.
   private notesWanted(session: Session, unit: UnitOfWork, lastMessage: string | null): string | null {
     try {
-      const named = new Set([...(lastMessage ?? '').matchAll(/#(\d+)\b/g)].map(([, card]) => Number(card)))
-      const asked = session.askNotes(named)
-
-      return asked.length === 0 ? null : new CardNotesWanted(new WaitingCards(session.repo).among(asked), Object.keys(unit.files)).text
+      const cards = new CardResolution(session).prepare(unit, lastMessage)
+      return new CardNotesWanted(cards, Object.keys(unit.files)).text
     } catch {
       return null
     }

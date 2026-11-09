@@ -41,7 +41,7 @@ A card says where it comes from: a flag, a finding, a suspicion or the owner. Ea
 
 ## The flag
 
-A flag is the act of the one who finds, at the moment it finds. The agent runs `weaver flag` with the place and five fields, in a format Weaver imposes.
+A flag is the act of the one who finds, at the moment it finds. The agent runs `weaver flag` with the place, five report fields and `Decision: none | owner <the question>`, in a format Weaver imposes.
 
 | Field      | What it says                                                                     |
 | ---------- | -------------------------------------------------------------------------------- |
@@ -63,6 +63,8 @@ EOF
 ```
 
 The keywords are English, like the other words Weaver reads. The content is in the language the agent writes in. A field may say that it is unknown.
+
+Missing decisions, including older flags, read as unknown. The writer may suggest a decision for an unknown flag, but explicit flag decisions and later `needs-owner` / `no-decision` notes take precedence. An investigation does not clear an owner question. The question is visible on the card. Invalid decision text stays unknown without adding a refusal. A writer ties a duplicate instead of merging it when merging would hide an owner question.
 
 **What decides the fields.** A flag asks for what only the one who found it knows. It does not ask for a title, labels, duplicates, a severity, the git history or a proposed fix: the writer or Weaver find those, and every field more is a reason not to flag. A flag that was never made cannot be detected, so a short one with unknowns is worth more than a discovery that was dropped.
 
@@ -126,11 +128,11 @@ A card follows a strict schema, in two parts.
 **What can happen to it.**
 
 - The owner closes it, as `fixed`, `wontfix`, `issue` or `invalid`, with a reason. `invalid` is for a card whose flag proved not to be true. Weaver checks who closes: the command refuses to run under an agent.
-- It can be written on, as long as it exists: by an agent the owner asked to verify or to fix it, and by the owner. A note may conclude: `confirmed`, `refuted`, `unsure` or `fixed`.
+- It can be written on, as long as it exists: by an agent the owner asked to verify or to fix it, and by the owner. A note may conclude: `confirmed`, `refuted`, `unsure`, `fixed`, `needs-owner`, `no-decision` or `deferred`.
 - It can be corrected, and opened again.
 - When the thing is found again, the card gains an occurrence instead of a duplicate. A closed card that is found again is marked as seen since its closing; it is not reopened by itself.
 - When two cards may be about the same thing and it is not sure, they stay two cards tied together, and a tie can be undone: a wrong merge hides a discovery.
-- It has room for a closing that an agent proposes and that the owner accepts. Nothing writes it: see the life of a card, below.
+- A fixed or refuted conclusion produces a closing proposal for the owner to accept.
 
 A card keeps its flag word for word: what the agent said and what the writer made of it can always be compared.
 
@@ -153,17 +155,15 @@ An issue is therefore a card that proved true and cannot be handled now. Its lif
 
 A report is kept as the text it was typed as, and its fields are read when it is shown. A note written before reports existed is therefore still read, as the text it is, and the registry did not change. A card whose flag says `Did: fixed in the task` has no report of that fix: the flag asks for a sentence at most. Asking for the report there is a change of the flag, left for later.
 
-**How an agent knows.** What it is told is in three places, each with its own job (see the development guide). The guide of Weaver, which its runtime lists as a skill and `weaver guide` prints, says how to flag, how to read a card and its neighbours, and how to write the two reports. The briefing of every request names `weaver flag`, `weaver cards --file`, `weaver note` and `weaver check` at their moment. The hooks speak at the moment: the card as an agent reads it ends with the two commands that report on it, its number filled in; a call that changes the file of a card that waits names that card; a task that ends asks once for the notes it owes. The owner does not read those parts, and they are not in the issue a card becomes.
+**How an agent knows.** What it is told is in three places, each with its own job (see the development guide). The guide of Weaver, which its runtime lists as a skill and `weaver guide` prints, says how to flag, how to read a card and its neighbours, and how to write the two reports. The briefing asks agents to resolve actionable cards in scope and leave owner decisions explicit; the guide explains how. The hooks speak at the moment: the card as an agent reads it ends with the two commands that report on it, its number filled in; a call that changes the file of a card that waits names that card; a task that ends asks once for the notes it owes. The owner does not read those parts, and they are not in the issue a card becomes.
 
-**When an agent forgets.** Seen in Adaptive on 16 October: thirteen cards fixed over two days had nothing written on them until the owner asked, among them one the same agent had flagged, then fixed in the same unit of work. Told once, the command is forgotten by the time the card is settled, often after the context was compacted. So the unit of work keeps the cards it is about: those its agent read with `weaver cards <number>`, and those whose files its calls changed. A call that changes the files of a card that waits tells the agent of that card, once. When the agent says it has finished, the cards of the unit it wrote nothing on are listed for it, once, before its work is checked: it writes on those its task settled or advanced, and says in its final message which ones its task leaves as they were. A note that concludes nothing does not count: it is free text, not a report. A card closed, concluded `fixed`, or that is a suspicion, is not among them: a suspicion is the owner's alone. The briefing of every request names `weaver note` too.
+**The bounded card loop.** Agents investigate, fix and document discoveries that need no owner decision and are within the task’s reach, using `Did: fixed in the task` or investigation and fixed notes. After a call changes a file, Weaver injects its open cards once per card per unit, silently when none match. At task end the existing card prompt asks once per unit for at most two cards on the unit’s changed files and at most ten minutes. Eligible cards have `Decision: none`, including raw flags; unknown decisions and explicit owner questions are not automatically resolved. SQLite claims expire after ten minutes and exclude parallel resolution passes. Cards read without changes or flagged in the same unit create no note hold, and any note counts as written. The merged prompt also asks for documentation on other changed-file cards. Out-of-reach cards get `weaver note <number> deferred <reason>` and a final explanation; unresolved claimed cards are recorded as deferred on the next end of turn. Deferral is distinct from needing an owner decision. Only the owner closes.
 
 **How a card stands.** The last conclusion written on an open card is shown with its state, in the list and on its page: `open (confirmed)`. A flag that says `Did: fixed in the task` is the first conclusion of its card, so a card born fixed reads `open (fixed)` and waits for the owner all the same: two of the first three said that something was left. A card that is opened again is to be looked into again, and what was concluded before no longer stands. Nothing is decided by a conclusion: the owner closes.
 
 **Left out, each for a reason.**
 
 - A mark on a card the owner has read. The owner reads without judging, and does not open most cards: nearly all would keep the mark.
-- A mark on a card an agent is working on. Nothing would remove it when a session dies. To take up again if the owner hands one card to two agents.
-- Closings proposed in a batch by an agent, for which the record has room. They were meant to empty the pile, which is no longer a goal.
 
 ## The interface
 
@@ -272,3 +272,5 @@ The first seven steps are built. The owner asked for the first five in one go, s
 8. **Afterwards.** What waits is in [to do later](todo-later.md): the recall against regressions, guards decided by a program and the comparison with the base, and so does the distribution of Weaver. Putting Weaver in place of the source harness on the real work is the owner's to decide.
 
 An agent needs no path to the command: the hook answers in its place.
+
+Review submissions are retained before the 40-line rule routes new work to another review. The optional `submittedAnswers` history keeps every distinct answer, including partial or unvalidated ones; `answers` remains the validated set used for delivering findings. The next review receives the submitted answers. Older review records use their existing answers as the baseline.

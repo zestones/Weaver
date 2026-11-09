@@ -96,6 +96,11 @@ export class CardPage {
     return [
       ...this.wrapped.of(this.inline.typed(this.card.title, (word) => this.paint.bold(word))),
       ...this.stated(facts),
+      ...this.wrapped.of(
+        this.inline.typed(
+          `Decision: ${this.card.decision.kind}${this.card.decision.question === null ? '' : ` ${this.card.decision.question}`}`,
+        ),
+      ),
       ...this.alerts(),
       ...(places.length === 0 ? [] : ['', ...places.map((place) => `${INDENT}${this.paint.cyan(PlaceText.write(place))}`)]),
     ]

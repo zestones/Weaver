@@ -62,6 +62,7 @@ export class CardMarkdown {
       `- Card: #${String(number)}`,
       `- Origin: ${origin}`,
       `- State: ${this.state()}`,
+      `- Decision: ${this.card.decision.kind}${this.card.decision.question === null ? '' : ` ${this.card.decision.question}`}`,
       `- Resolution: ${this.record.lifecycle?.stage ?? 'uninvestigated'}`,
       `- Labels: ${labels.length === 0 ? 'none' : labels.join(', ')}`,
       `- Places: ${places.length === 0 ? 'none' : places.map((place) => `\`${PlaceText.write(place)}\``).join(', ')}`,

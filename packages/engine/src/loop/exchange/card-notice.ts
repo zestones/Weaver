@@ -11,9 +11,9 @@ export class CardNotice {
       cards.length === 0
         ? null
         : [
-            '[weaver] This call changed files of cards that wait for the owner:',
+            '[weaver] Open cards on changed files:',
             ...cards.map((card) => `- #${String(card.number)} ${card.title} (${this.filesOf(card, changed).join(', ')})`),
-            'When your task settles one of them, or finds more on it, write it on the card before you finish, with `weaver note`: `weaver cards <number>` shows the card and how. The end of your task asks for these notes before Weaver checks your work.',
+            'Read with `weaver cards <number>`; resolve actionable cards in scope and document with `weaver note`.',
           ].join('\n')
   }
 

@@ -41,8 +41,8 @@ test('the owner flags from a terminal: the places and the five fields are record
   assert.deepEqual([flag?.fields.seen, flag?.fields.did], ['no call of refresh() exists under src/.', 'left'])
   assert.equal(flag?.context[0]?.lineText, '  return cached')
   assert.deepEqual((await weaver(top, ['cards'])).lines.slice(2, 4), [
-    '  #1  raw · actionable  no call of refresh() exists under src/.',
-    '                        src/auth/token.ts:2 +1',
+    '  #1  raw · decision unknown  no call of refresh() exists under src/.',
+    '                              src/auth/token.ts:2 +1',
   ])
 })
 

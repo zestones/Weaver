@@ -78,6 +78,7 @@ export class WriterRequest {
       title: TEXT,
       labels: { type: 'array', items: this.shape({ family: this.oneOf(Object.keys(this.job.labels)), value: TEXT }) },
       sections: { type: 'array', items: this.shape({ name: this.oneOf(this.job.settings.sections), text: TEXT }) },
+      decision: this.shape({ kind: this.oneOf(['unknown', 'none', 'owner']), question: TEXT_OR_NONE }),
       look: this.shape({ verdict: this.oneOf(VERDICTS), note: TEXT }),
       sameAs: { type: ['integer', 'null'] },
       sure: { type: 'boolean' },
@@ -186,6 +187,7 @@ export class WriterRequest {
         ? '- `labels`: the labels that fit, each with its `family` and its `value`: for `type:bug` in the list above, the family is `type` and the value is `bug`. An empty list when none fits.'
         : '- `labels`: an empty list, since this project declares no label.',
       '- `sections`: every section named above, each with its `name` as written there and its `text`.',
+      '- `decision`: suggest `none` when no owner choice is needed, `owner` with its concrete `question`, or `unknown` with a null question. Preserve any explicit flag decision, especially owner decisions; only unknown decisions may be suggested.',
       '- `look`: what you saw when you looked at the place. `verdict` is `agrees` when what you read agrees with the flag, `contradicts` when it contradicts it, and `cannot-tell` when it does not let you tell. `note` says what you read.',
       '- `sameAs`: the number of a card already known, or of a flag earlier in this list, that is about the same thing; null when there is none. `sure` is true only when you are sure of it: two things that only look alike stay two cards. `sameNote` says in one sentence why they are the same thing, and is null when `sameAs` is.',
     ]

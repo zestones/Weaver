@@ -81,4 +81,13 @@ export const MIGRATIONS: readonly string[] = [
   CREATE TABLE writer_batches (id INTEGER PRIMARY KEY, record TEXT NOT NULL) STRICT;
   CREATE INDEX writer_batches_by_state ON writer_batches (json_extract(record, '$.state'));
   `,
+  `
+  CREATE TABLE resolution_claims (
+    card INTEGER PRIMARY KEY REFERENCES cards (number),
+    holder TEXT NOT NULL,
+    expires INTEGER NOT NULL
+  ) STRICT;
+  UPDATE cards SET record = json_set(record, '$.flag.fields.decision', json_object('kind', 'unknown', 'question', NULL))
+    WHERE json_type(record, '$.flag') = 'object' AND json_type(record, '$.flag.fields.decision') IS NULL;
+  `,
 ]

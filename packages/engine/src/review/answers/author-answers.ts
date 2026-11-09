@@ -26,6 +26,10 @@ export class AuthorAnswers {
     this.answers = new Map(answers)
   }
 
+  all(findings: number): FindingAnswer[] {
+    return [...this.answers.values()].filter((answer) => answer.finding >= 1 && answer.finding <= findings)
+  }
+
   // What keeps an answer from being taken, one line a finding.
   problems(findings: readonly ReviewFinding[], since: SinceReview): string[] {
     return findings.flatMap((finding, index) => this.problem(finding, index + 1, since) ?? [])

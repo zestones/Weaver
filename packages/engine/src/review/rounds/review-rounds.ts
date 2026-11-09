@@ -57,6 +57,13 @@ export class ReviewRounds {
     )
   }
 
+  keepAnswers(session: Session, unit: UnitOfWork, lastMessage: string | null): void {
+    if (unit.lastReviewed === null || lastMessage === null) return
+    const store = new ReviewStore(session.dir)
+    const record = store.find(unit.lastReviewed)
+    if (record !== null) this.capture(store, unit.lastReviewed, record, { session, unit, lastMessage })
+  }
+
   // null when nothing is to be reviewed: no reviewer declared, or no rule for one on these paths.
   async next(work: ReviewedWork): Promise<UnitReview | null> {
     const policy = work.declaration.review
@@ -72,12 +79,14 @@ export class ReviewRounds {
     const { session, declaration, unit, diff } = work
     const store = new ReviewStore(session.dir)
     const directives = new OwnerDirectives(unit.requests)
-    const given = unit.lastReviewed === null ? null : store.find(unit.lastReviewed)
+    let given = unit.lastReviewed === null ? null : store.find(unit.lastReviewed)
 
     // A review that is no longer kept cannot be waited for: the unit is reviewed as if none had started.
     if (unit.reviewing !== null && store.find(unit.reviewing) !== null) return this.delivered(store, unit.reviewing, work, policy)
-    if (given !== null && unit.lastReviewed !== null && !this.isNewWork(given, work))
-      return this.answered(store, unit.lastReviewed, given, work, policy)
+    if (given !== null && unit.lastReviewed !== null) {
+      given = this.capture(store, unit.lastReviewed, given, work)
+      if (!this.isNewWork(given, work)) return this.answered(store, unit.lastReviewed, given, work, policy)
+    }
     if (unit.isEmpty)
       return directives.review && session.failedReview !== null ? this.retried(store, session.failedReview, work, policy) : null
     if (declaration.reviewCriteria(diff.paths).length === 0) return null
@@ -109,7 +118,7 @@ export class ReviewRounds {
         patch: diff.patch(),
         skill: policy.skill,
         requests: unit.requests,
-        earlier: earlier === null ? [] : this.earlierLines(earlier, work),
+        earlier: earlier === null ? [] : this.earlierLines(earlier),
         candidates: candidates.map(
           ({ rule, file, line, message }) => `${rule} ${line === undefined ? file : `${file}:${String(line)}`}: ${message}`,
         ),
@@ -231,10 +240,36 @@ export class ReviewRounds {
     return !isAlive(record.worker)
   }
 
+  private capture(
+    store: ReviewStore,
+    content: string,
+    record: ReviewRecord,
+    work: Pick<ReviewedWork, 'session' | 'unit' | 'lastMessage'>,
+  ): ReviewRecord {
+    const given = new AuthorAnswers(work.lastMessage).all(record.outcome?.findings?.length ?? 0)
+    const submittedAnswers = [...(record.submittedAnswers ?? record.answers)]
+    for (const answer of given) {
+      const previous = submittedAnswers.findLast((earlier) => earlier.finding === answer.finding)
+      if (previous?.status !== answer.status || previous.why !== answer.why) submittedAnswers.push(answer)
+    }
+    const captured = { ...record, submittedAnswers }
+    store.keep(content, captured)
+    const answers = this.submitted(captured).taken(record.outcome?.findings ?? [], this.since(record, work))
+    const kept = { ...captured, answers }
+    store.keep(content, kept)
+    return kept
+  }
+
+  private submitted(record: ReviewRecord): AuthorAnswers {
+    return new AuthorAnswers(
+      (record.submittedAnswers ?? record.answers).map((answer) => `F${String(answer.finding)} ${answer.status}: ${answer.why}`).join('\n'),
+    )
+  }
+
   private answered(store: ReviewStore, content: string, record: ReviewRecord, work: ReviewedWork, policy: ReviewPolicy): UnitReview {
     const outcome = new ReviewOutcome(record.outcome ?? { runtime: record.assignment.runtime, seconds: 0 })
     const since = this.since(record, work)
-    const given = new AuthorAnswers(work.lastMessage)
+    const given = this.submitted(record)
     const problems = given.problems(outcome.findings, since)
     const about = { content, outcome, round: work.unit.reviewRounds, maxRefusals: policy.maxRefusals }
 
@@ -245,8 +280,6 @@ export class ReviewRounds {
     }
 
     const answers = given.taken(outcome.findings, since)
-
-    store.keep(content, { ...record, answers })
 
     return new UnitReview({ ...about, standing: 'answered', answers })
   }
@@ -269,18 +302,20 @@ export class ReviewRounds {
     }
   }
 
-  private earlierLines(record: ReviewRecord, work: ReviewedWork): string[] {
+  private earlierLines(record: ReviewRecord): string[] {
     const outcome = new ReviewOutcome(record.outcome ?? { runtime: record.assignment.runtime, seconds: 0 })
-    const answers = new AuthorAnswers(work.lastMessage).taken(outcome.findings, this.since(record, work))
+    const answers = record.submittedAnswers ?? record.answers
 
     return outcome.lines().map((line, index) => {
-      const answer = answers.find((each) => each.finding === index + 1)
+      const replies = answers.filter((each) => each.finding === index + 1)
 
-      return answer === undefined ? `${line} (no answer)` : `${line} (answered ${answer.status.replace('-', ' ')}: ${answer.why})`
+      return replies.length === 0
+        ? `${line} (no answer)`
+        : `${line} (${replies.map((answer) => `answered ${answer.status.replace('-', ' ')}: ${answer.why}`).join('; ')})`
     })
   }
 
-  private since(record: ReviewRecord, { session, unit }: ReviewedWork): SinceReview {
+  private since(record: ReviewRecord, { session, unit }: Pick<ReviewedWork, 'session' | 'unit'>): SinceReview {
     const unchanged = this.unchangedSince(record, session)
 
     return { unchanged, changed: Object.keys(unit.files).filter((path) => !unchanged.has(path)) }

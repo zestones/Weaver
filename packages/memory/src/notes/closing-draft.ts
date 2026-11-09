@@ -1,3 +1,4 @@
+import { Card } from '../cards/card.ts'
 import type { CardNote, CardRecord, ClosingProposal, Conclusion } from '../cards/card-record.ts'
 import { NoteReport } from './note-report.ts'
 
@@ -11,10 +12,17 @@ export class ClosingDraft {
   }
 
   proposal(conclusion: Conclusion | null, revision: number): ClosingProposal | null {
-    if (this.record.state !== 'open' || (conclusion !== 'fixed' && conclusion !== 'refuted')) return null
+    if (
+      new Card(this.record).decision.kind === 'owner' ||
+      this.record.state !== 'open' ||
+      (conclusion !== 'fixed' && conclusion !== 'refuted')
+    )
+      return null
 
-    const last = this.notes.findLast((note) => note.conclusion !== null)
-    const investigation = this.notes.findLast((note) => note.conclusion !== null && note.conclusion !== 'fixed')
+    const last = this.notes.findLast((note) => note.conclusion === conclusion)
+    const investigation = this.notes.findLast(
+      (note) => note.conclusion === 'confirmed' || note.conclusion === 'refuted' || note.conclusion === 'unsure',
+    )
     const field = (note: CardNote | undefined, name: string): string | null => {
       if (note?.conclusion == null) return null
       return new NoteReport(note.conclusion, note.text).fields.find((entry) => entry.name === name)?.said || null

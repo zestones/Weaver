@@ -12,7 +12,7 @@ const SECONDS_IN_A_MINUTE = 60
 export class WeaverGuide {
   // What the guide is for, in the words that make an agent open it.
   static readonly SUMMARY =
-    'How to work in this repository under Weaver, which supervises its coding agents: what Weaver does around your calls, its commands and when to use them, and what is the owner’s alone. Read it at the start of a task, before you change a file (the cards about it), when the owner names a card, when you find something your task does not settle, before you end a task that changed files, and when Weaver refuses a call or answers in place of a command.'
+    'How to work in this repository under Weaver, which supervises its coding agents: what Weaver does around your calls, its commands and when to use them, and what is the owner’s alone. Read it at the start of a task, when Weaver names cards on files you changed, when the owner names a card, when you find something your task does not settle, before you end a task that changed files, and when Weaver refuses a call or answers in place of a command.'
 
   private readonly declaration: Declaration
 
@@ -25,7 +25,7 @@ export class WeaverGuide {
       '# Working under Weaver',
       'Weaver supervises the coding agents of this repository through the hooks of their runtime. It sees each of your tool calls and the files they change, refuses what the project forbids, checks your work when your task ends, may have another agent review it, and keeps for the owner, as cards, what agents find along the way. The owner decides; you work, and you write what you did where the owner reads it. `weaver guide` prints this guide as it stands for this project.',
       this.course(),
-      this.beforeChanging(),
+      this.cardsOnChanges(),
       this.whileWorking(),
       this.onCard(),
       this.ending(),
@@ -49,11 +49,11 @@ export class WeaverGuide {
     ].join('\n')
   }
 
-  private beforeChanging(): string {
+  private cardsOnChanges(): string {
     return [
-      '## Before you change a file',
+      '## Cards on files you change',
       '',
-      'The owner keeps cards: a defect found earlier, a debt, a decision that waits. Look at those about the files you will change before you change them: `weaver cards --file <path>`, one file at a time, and `weaver cards --search <words>` for what they say. Read one with `weaver cards <number>`. What a card already says is not to be found again, and your change may settle it.',
+      'After a call changes a file, Weaver injects the open cards on that file, once per card per unit, and stays silent when none match. Read a named card with `weaver cards <number>`; search with `weaver cards --search <words>` when useful. What a card already says is not to be found again, and your change may settle it.',
     ].join('\n')
   }
 
@@ -67,15 +67,15 @@ export class WeaverGuide {
       '',
       ...this.checks(),
       '',
-      '### Flag what your task does not settle',
+      '### Investigate, fix and document what you find',
       '',
-      'When you come across something the owner will have to decide on later and your task does not settle, flag it: a defect or a risk in code your task did not write, a debt, a choice that is theirs. Flag it even when the request led you to it, and even when you also speak of it in your final message: that message is read once, and a flag waits until the owner decides. A flag changes no file, so make it in a task that only reads too. Do not flag a matter of taste, what a linter catches, nor what the owner only has to check in your own change.',
+      'When you discover a problem, investigate and fix it if it needs no owner decision and lies within your task’s reach, then document it. Flag what you found and did: a defect or a risk in code your task did not write, a debt, a choice that is theirs. Flag it even when the request led you to it, and even when you also speak of it in your final message: that message is read once, and a flag waits until the owner decides. A flag changes no file, so make it in a task that only reads too. Do not flag a matter of taste, what a linter catches, nor what the owner only has to check in your own change.',
       '',
       '```text',
       FlagText.FORMAT,
       '```',
       '',
-      'Run the command with your shell tool, as it is written. Weaver takes the call before it runs and answers in its place with the number of the flag: that answer is expected, not a failure, so do not run the command again. Name the flag by its number in your final message. Do not fix what you flag, unless your task cannot go on without it: flag it then with `Did: fixed in the task`.',
+      'Run the command with your shell tool, as it is written. Weaver takes the call before it runs and answers in its place with the number of the flag: that answer is expected, not a failure, so do not run the command again. Name the flag by its number in your final message. When a problem needs no owner decision and is within your task’s reach, investigate, fix and verify it, then flag it with `Decision: none` and `Did: fixed in the task`, or write investigation and fixed notes on an existing card. If it needs a choice from the owner, write `Decision: owner <the question>` and leave that choice explicit. Missing decisions on older flags are unknown. The writer may suggest a decision only for unknowns; it cannot replace an explicit owner decision.',
     ].join('\n')
   }
 
@@ -113,7 +113,7 @@ export class WeaverGuide {
       NoteText.FORMAT,
       '```',
       '',
-      'When a call changes a file of a card that waits, Weaver tells you. When you end your task, it asks once for the notes of the cards your task read or changed, before it checks your work: a card your task leaves as it was is named in your final message instead, as `#12`.',
+      'At task end Weaver asks once per unit to resolve at most two actionable cards on files the unit changed, within about ten minutes, and document each with notes. These cards have short shared claims so parallel agents do not take the same work; stop when the claim expires. Raw flags with no owner decision may be included. If a card is out of reach, write `weaver note <number> deferred <reason>` and name it and the reason in your final message; it stays open. Pending owner decisions are left explicit. The same prompt asks for notes on other cards whose files changed. Reading a card, flagging it in this unit, or writing any note (including free text) creates no note hold. Weaver never adds a second card hold in the unit.',
     ].join('\n')
   }
 
@@ -133,7 +133,7 @@ export class WeaverGuide {
       ...(review === null
         ? []
         : [
-            '- When a reviewer finds points, numbered F1, F2 and so on, fix each one or decide to leave it, and answer each in your final message, one line each: `F1 fixed: <what you changed>`, naming the file when the fix is in another file than the point, or `F1 not fixed: <why>`.',
+            '- When a reviewer finds points, numbered F1, F2 and so on, fix each one or decide to leave it, and answer each in your final message, one line each: `F1 fixed: <what you changed>`, naming the file when the fix is in another file than the point, or `F1 not fixed: <why>`. Every answer is kept before Weaver decides whether extra work requires another review; that review receives the prior answers.',
           ]),
       '- While a command or a watch you sent to the background runs, you may stop without ending the task: your runtime wakes you when it ends.',
     ].join('\n')
@@ -147,9 +147,9 @@ export class WeaverGuide {
       '',
       'Codex is the default card writer. It catches up raw flags in bounded batches on requests and at turn end. Use `weaver cards write --batches 4` for deliberate catch-up, and `--retry-failed` only when the cause of failed writing has been addressed. The owner can disable it with `enabled: false` in the writer declaration.',
       'Reviews that finish after their wait, and findings of the final review, are kept as cards even if the original session disappears. A later request or tool result names the cards in additional context. This notice does not add a refusal.',
-      'Resolution is uninvestigated, investigated, fixed, refuted or needs-owner. Use `weaver note <number> needs-owner <question>` for a concrete owner decision; a later investigation resumes work. Fixed means reported fixed. A latest fixed or refuted conclusion on an open card produces a deterministic closing proposal from its notes, including existing notes. It records cause, fix, verification and remaining work. Missing verification says "verification not run" with a warning; the owner can still accept it. Raw flags still wait for the writer.',
+      'Resolution is uninvestigated, investigated, fixed, refuted, deferred or needs-owner. Use `weaver note <number> needs-owner <question>` for a concrete owner decision; use `weaver note <number> no-decision <reason>` when no owner decision is needed. Investigation alone does not clear an explicit owner question. Fixed means reported fixed. A latest fixed or refuted conclusion on an open card produces a deterministic closing proposal from its notes, including existing notes. It records cause, fix, verification and remaining work. Missing verification says "verification not run" with a warning; the owner can still accept it. Raw flags still wait for the writer.',
       '',
-      'The list distinguishes actionable cards, cards needing the owner and proposals for closing. Read the full proposal with `weaver cards <number>`. Only the owner accepts it, with `weaver close <number>`, or supplies a disposition with `weaver close <number> fixed|wontfix|issue|invalid [reason]`. A changed card makes a previously shown proposal stale: read it again before accepting. In `weaver ui`, agents can read, note and label; only the owner closes. The c key accepts a proposal in one gesture and C opens the closing form. Issue bodies expand related problems without local card numbers. After checking the tracker for an interrupted filing, use `weaver cards issue-result <number> <url|not-filed>` to reconcile it before the owner retries closure.',
+      'The list distinguishes actionable cards, unknown decisions, deferred cards, cards needing the owner and proposals for closing. Read the full proposal with `weaver cards <number>`. Only the owner accepts it, with `weaver close <number>`, or supplies a disposition with `weaver close <number> fixed|wontfix|issue|invalid [reason]`. A changed card makes a previously shown proposal stale: read it again before accepting. In `weaver ui`, agents can read, note and label; only the owner closes. The c key accepts a proposal in one gesture and C opens the closing form. Issue bodies expand related problems without local card numbers. After checking the tracker for an interrupted filing, use `weaver cards issue-result <number> <url|not-filed>` to reconcile it before the owner retries closure.',
       '',
       '## What is the owner’s',
       '',

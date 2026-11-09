@@ -11,7 +11,7 @@ export class RequestBriefing {
 
     this.text = [
       '[weaver] Weaver supervises this repository: it checks your work when your task ends, and keeps for the owner, as cards, what agents find. Its commands, each at its moment:',
-      '- before you change a file: `weaver cards --file <path>` or `--search <words>`, what the owner already knows of it;',
+      '- resolve actionable cards in your scope and document them; leave owner decisions explicit. Weaver names cards after file changes;',
       '- something your task does not settle: `weaver flag` it;',
       ...(checks.length === 0 ? [] : [`- a check's verdict before the end: \`weaver check <name>\`, among ${checks.join(', ')};`]),
       '- card organization or correction: `weaver cards tie`, `untie`, `separate`, `reopen`, `retitle`, `label`, `rewrite`; inspect or restore with `revisions` and `restore`; only the owner closes proposals;',

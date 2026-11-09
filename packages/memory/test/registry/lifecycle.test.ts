@@ -28,7 +28,8 @@ test('resolution follows conclusions, drafts evidence without inventing verifica
     conclusion: 'confirmed',
     text: 'Cause: cached tokens outlive their expiry\nRan: expiry test fails\nRead: cache.ts\nShows: expiry is never checked',
   })
-  assert.equal(registry.find(1)?.record.lifecycle?.stage, 'investigated')
+  assert.equal(registry.find(1)?.record.lifecycle?.stage, 'needs-owner')
+  registry.note(1, { provenance: provenanceOf(), conclusion: 'no-decision', text: 'The existing policy specifies one hour' })
   const fix = {
     provenance: provenanceOf(),
     conclusion: 'fixed' as const,
@@ -42,7 +43,7 @@ test('resolution follows conclusions, drafts evidence without inventing verifica
   assert.equal(proposal.fix, 'checked expiry in cache.ts')
   assert.equal(proposal.verification, 'pnpm test passed')
   assert.equal(proposal.warning, false)
-  assert.deepEqual(proposal.evidence, ['note-1', 'note-2', 'note-3'])
+  assert.deepEqual(proposal.evidence, ['note-1', 'note-2', 'note-3', 'note-4'])
   assert.equal(registry.note(1, fix).known, true)
   assert.deepEqual(registry.find(1)?.record.proposal, proposal)
   registry.note(1, { provenance: provenanceOf(), conclusion: 'unsure', text: 'The new test contradicts the claimed fix' })

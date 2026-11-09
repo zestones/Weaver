@@ -22,6 +22,7 @@ export interface ReviewRecord {
   // The tree the reviewer saw, and what each file of the unit held then.
   readonly head: string
   readonly reviewed: Readonly<Record<string, Blob>>
+  readonly submittedAnswers?: readonly FindingAnswer[]
   readonly answers: readonly FindingAnswer[]
   // How many times the author was asked again for its answers.
   readonly asked: number

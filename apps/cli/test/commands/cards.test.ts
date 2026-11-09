@@ -71,11 +71,11 @@ test('cards lists the cards that wait, one line each, newest first; --all adds t
     lines: [
       '2 cards wait for you',
       '',
-      '  #2  open · actionable  The response is cast to User without being parsed.',
-      '                         src/api/user.ts:7',
+      '  #2  open · decision unknown  The response is cast to User without being parsed.',
+      '                               src/api/user.ts:7',
       '',
-      '  #1  raw · actionable   no call of refresh() exists under src/.',
-      '                         src/auth/token.ts:42',
+      '  #1  raw · decision unknown   no call of refresh() exists under src/.',
+      '                               src/auth/token.ts:42',
       '',
       HINT,
     ],
@@ -86,8 +86,8 @@ test('cards lists the cards that wait, one line each, newest first; --all adds t
   assert.deepEqual(cardsOf(all.lines), [
     '#4 merged into #1 | the cache is never emptied. | src/cache.ts',
     '#3 closed (wontfix) | the cache is never emptied. | reason: the cache lives as long as the process',
-    '#2 open · actionable | The response is cast to User without being parsed. | src/api/user.ts:7',
-    '#1 raw · actionable | no call of refresh() exists under src/. | src/auth/token.ts:42',
+    '#2 open · decision unknown | The response is cast to User without being parsed. | src/api/user.ts:7',
+    '#1 raw · decision unknown | no call of refresh() exists under src/. | src/auth/token.ts:42',
   ])
   assert.equal(all.lines.at(-1), HINT)
 })
@@ -98,14 +98,14 @@ test('the list is narrowed to a file, named from where the owner stands, and to 
   write(top, 1)
   mkdirSync(join(top, 'src/api'), { recursive: true })
 
-  const onFile = ['#2 open · actionable | The response is cast to User without being parsed. | src/api/user.ts:7']
+  const onFile = ['#2 open · decision unknown | The response is cast to User without being parsed. | src/api/user.ts:7']
   const narrowed = await weaver(top, ['cards', '--file', 'src/api/user.ts'])
 
   assert.equal(narrowed.lines[0], '1 card waits for you')
   assert.deepEqual(cardsOf(narrowed.lines), onFile)
   assert.deepEqual(cardsOf((await weaver(join(top, 'src/api'), ['cards', '--file', 'user.ts'])).lines), onFile)
   assert.deepEqual(cardsOf((await weaver(top, ['cards', '--label', 'area:auth'])).lines), [
-    '#1 open · actionable | Nothing refreshes the token | src/auth/token.ts:42',
+    '#1 open · decision unknown | Nothing refreshes the token | src/auth/token.ts:42',
   ])
   assert.deepEqual((await weaver(top, ['cards', '--label', 'area:api', '--file', 'src/auth/token.ts'])).lines, ['No card matches.'])
 })
@@ -125,21 +125,21 @@ test('the list is narrowed by several labels, by date and to what someone conclu
   const listed = async (...words: string[]): Promise<string[]> => cardsOf((await weaver(top, ['cards', ...words])).lines)
 
   assert.deepEqual(await listed('--label', 'area:api', '--label', 'area:auth'), [
-    '#2 open (confirmed) · actionable | The cache is never emptied',
-    '#1 open · actionable | Nothing refreshes the token | src/auth/token.ts:42',
+    '#2 open (confirmed) · decision unknown | The cache is never emptied',
+    '#1 open · decision unknown | Nothing refreshes the token | src/auth/token.ts:42',
   ])
   assert.deepEqual(await listed('--label', 'area:api', '--label', 'area:auth', '--label', 'level:low'), [
-    '#1 open · actionable | Nothing refreshes the token | src/auth/token.ts:42',
+    '#1 open · decision unknown | Nothing refreshes the token | src/auth/token.ts:42',
   ])
-  assert.deepEqual(await listed('--answered'), ['#2 open (confirmed) · actionable | The cache is never emptied'])
+  assert.deepEqual(await listed('--answered'), ['#2 open (confirmed) · decision unknown | The cache is never emptied'])
   assert.deepEqual((await listed('--since', '2026-10-01')).length, 3)
   assert.deepEqual((await weaver(top, ['cards', '--since', '2999-01-01'])).lines, ['No card matches.'])
   assert.deepEqual(
     (await weaver(top, ['cards', '--sort', 'level'])).lines.filter((line) => line.startsWith('  #')),
     [
-      '  #2  open (confirmed) · actionable  high  The cache is never emptied',
-      '  #1  open · actionable              low   Nothing refreshes the token',
-      '  #3  open · actionable              -     The response is cast to User without being parsed.',
+      '  #2  open (confirmed) · decision unknown  high  The cache is never emptied',
+      '  #1  open · decision unknown              low   Nothing refreshes the token',
+      '  #3  open · decision unknown              -     The response is cast to User without being parsed.',
     ],
   )
   assert.deepEqual(await listed('--sort', 'newest'), await listed())
@@ -175,7 +175,7 @@ test('the closed cards are listed alone, all of them or those closed one way, ea
     'the reason a card was closed for is searched too',
   )
   assert.deepEqual(cardsOf((await weaver(top, ['cards', '--search', 'cast to user'])).lines), [
-    '#3 open · actionable | The response is cast to User without being parsed. | src/api/user.ts:7',
+    '#3 open · decision unknown | The response is cast to User without being parsed. | src/api/user.ts:7',
   ])
   assert.deepEqual((await weaver(top, ['cards', '--search', 'nothing says this'])).lines, ['No card matches.'])
   assert.deepEqual(await weaver(top, ['cards', '--search']), { status: 2, lines: USAGE })
@@ -192,17 +192,17 @@ test('a card that waits and points at a line that no longer reads as it did says
   finding(top, { review: '3f9a2c1/F2', quote: 'const user = raw as User' }, { places: [{ file: 'src/api/user.ts', line: 1 }] })
 
   assert.deepEqual(cardsOf((await weaver(top, ['cards'])).lines), [
-    '#3 open · actionable | The response is cast to User without being parsed. | src/api/user.ts:1',
-    '#1 raw · actionable | no call of refresh() exists under src/. | src/token.ts:2',
+    '#3 open · decision unknown | The response is cast to User without being parsed. | src/api/user.ts:1',
+    '#1 raw · decision unknown | no call of refresh() exists under src/. | src/token.ts:2',
   ])
 
   writeFileSync(join(top, 'src/token.ts'), '// The token of the session.\nexport function getToken() {\n  return refreshed()\n}\n')
   rmSync(join(top, 'src/api/user.ts'))
 
   assert.deepEqual(cardsOf((await weaver(top, ['cards', '--all'])).lines), [
-    '#3 open · actionable | The response is cast to User without being parsed. | src/api/user.ts:1 | changed since: src/api/user.ts:1',
+    '#3 open · decision unknown | The response is cast to User without being parsed. | src/api/user.ts:1 | changed since: src/api/user.ts:1',
     '#2 closed (fixed) | The response is cast to User without being parsed. | src/api/user.ts:1',
-    '#1 raw · actionable | no call of refresh() exists under src/. | src/token.ts:2 | changed since: src/token.ts:2',
+    '#1 raw · decision unknown | no call of refresh() exists under src/. | src/token.ts:2 | changed since: src/token.ts:2',
   ])
   assert.equal(cardOf(top, 1).state, 'raw', 'a hint closes nothing')
 })
@@ -271,6 +271,10 @@ test('an agent that reads a card is told how to write on it what it finds, and t
     'Verified: how you checked it afterwards, and what that showed.',
     'Left: what is left to do.',
     'EOF',
+    '',
+    'weaver note 1 needs-owner "<question>"',
+    'weaver note 1 no-decision "<why no owner decision is needed>"',
+    'weaver note 1 deferred "<why it is out of reach>"',
     '',
     'The first reports an investigation: confirmed when what the card says is true, refuted when it is not, unsure when you could not tell. The second reports a fix. When you looked into the card and then fixed it, write both, in that order. Each keyword starts a line. A field may span lines, and may say that there is nothing to say. Without a word, a note concludes nothing and is free text.',
   ])

@@ -60,7 +60,7 @@ test('agents run every card change, including revisions and restore, and each re
 test('the CLI distinguishes work, owner decisions and proposals, shows warning and accepts without a disposition', async () => {
   note(top, 1, { conclusion: 'fixed', text: 'Changed: refresh the token\nLeft: nothing' })
   note(top, 2, { conclusion: 'needs-owner', text: 'Which response format should we keep?' })
-  flag(top, { text: 'Seen: new\nExpected: x\nFound: y\nChecked: z\nDid: left as it is.' })
+  flag(top, { text: 'Seen: new\nExpected: x\nFound: y\nChecked: z\nDid: left as it is.\nDecision: none' })
   const list = (await weaver(top, ['cards'])).lines.join('\n')
   assert.match(list, /actionable/)
   assert.match(list, /needs the owner/)

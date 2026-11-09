@@ -20,7 +20,7 @@ afterAll(() => {
 beforeEach(() => {
   counter += 1
   session = new Session(makeRepo(join(scratch, `repo-${String(counter)}`), SAMPLE_REPO), 's', 'claude')
-  refusalOf(session, bashCall(flagCommand([A_FILE])))
+  refusalOf(new Session(session.repo, 'earlier', 'claude'), bashCall(flagCommand([A_FILE], `${FLAG_BODY}Decision: none\n`)))
 })
 
 const told = (answer: ReturnType<typeof agentRuns>): string => {
@@ -41,15 +41,15 @@ test('a call that changes the file of a card that waits tells the agent of it on
 
   const first = told(edits(A_FILE, 'export const a = 2\n'))
 
-  assert.match(first, /^\[weaver\] This call changed files of cards that wait for the owner:\n- #1 .+ \(src\/a\.ts\)\n/)
-  assert.match(first, /write it on the card before you finish, with `weaver note`/)
+  assert.match(first, /^\[weaver\] Open cards on changed files:\n- #1 .+ \(src\/a\.ts\)\n/)
+  assert.match(first, /document with `weaver note`/)
   assert.equal(told(edits(A_FILE, 'export const a = 3\n')), '', 'the agent knows of the card already')
 
   const checks = stubChecks([PASSING])
   const asked = await finishWith(session, checks)
 
   assert.equal(asked.decision, 'block')
-  assert.match(asked.reason ?? '', /nothing was written on them during it:\n- #1 .+: your work changed src\/a\.ts\n/)
+  assert.match(asked.reason ?? '', /once for this unit\):\n- #1 .+: src\/a\.ts; claimed for resolution\./)
   assert.match(asked.reason ?? '', /weaver note <number> fixed <<'EOF'\nChanged:/)
   assert.equal(checks.calls.count, 0, 'the work is checked once the agent has written on its cards')
 
@@ -60,21 +60,14 @@ test('a call that changes the file of a card that waits tells the agent of it on
   assert.deepEqual(held(), ['cards', null])
 })
 
-test('a card the agent read in its task is asked for too, and a note written on it asks for nothing more', async () => {
+test('reading a card creates no note hold, even when another file changes', async () => {
   prompt(session, 'look at card 1')
   refusalOf(session, bashCall('weaver cards 1'))
   edits(B_FILE, 'export const b = 2\n')
-
-  assert.match((await finishWith(session, stubChecks([PASSING]))).reason ?? '', /- #1 .+: you read it\n/)
-  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
-
-  prompt(session, 'look at card 1 again')
-  refusalOf(session, bashCall('weaver cards 1'))
-  edits(B_FILE, 'export const b = 3\n')
-  refusalOf(session, bashCall(CONFIRMED))
-
-  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
-  assert.deepEqual(held(), ['cards', null, null])
+  const checks = stubChecks([PASSING])
+  assert.equal((await finishWith(session, checks)).decision, undefined)
+  assert.equal(checks.calls.count, 1)
+  assert.deepEqual(held(), [null])
 })
 
 test('a card closed, or concluded fixed, is no longer the agent’s to write on', async () => {
@@ -95,30 +88,77 @@ test('a card closed, or concluded fixed, is no longer the agent’s to write on'
   assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
 })
 
-test('a note that concludes nothing is free text: the card is still asked for its report', async () => {
+test('a free note counts as written on a changed-file card', async () => {
   prompt(session, 'look at card 1')
-  refusalOf(session, bashCall('weaver cards 1'))
-  edits(B_FILE, 'export const b = 2\n')
+  edits(A_FILE, 'export const a = 2\n')
   refusalOf(session, bashCall('weaver note 1 "looked at it"'))
-
-  assert.match((await finishWith(session, stubChecks([PASSING]))).reason ?? '', /- #1 .+: you read it\n/)
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
 })
 
-test('a card the final message names is answered for, and a card a subagent only read is its own to write on', async () => {
+test('an investigation note counts as written on a changed-file card', async () => {
+  prompt(session, 'look at card 1')
+  edits(A_FILE, 'export const a = 2\n')
+  refusalOf(session, bashCall(CONFIRMED))
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
+})
+
+test('merely naming an actionable card does not bypass the bounded resolution pass, and a deferral is kept', async () => {
   prompt(session, 'change a')
   edits(A_FILE, 'export const a = 2\n')
-
   const checks = stubChecks([PASSING])
+  assert.equal((await finishWith(session, checks, undefined, '## Request\nDone. Card #1 is left as it was.')).decision, 'block')
+  assert.equal(
+    (await finishWith(session, checks, undefined, '## Request\n#1 is out of reach: requires a larger redesign.')).decision,
+    undefined,
+  )
+  const card = cardsOf(session.repo)[0]
+  assert.equal(card?.conclusion?.as, 'deferred')
+  assert.equal(card?.decision.kind, 'none')
+  assert.match(card?.record.notes.at(-1)?.text ?? '', /larger redesign/)
+  assert.deepEqual(held(), ['cards', null])
+})
 
-  assert.equal((await finishWith(session, checks, undefined, '## Request\n\nDone. Card #1 is left as it was.\n')).decision, undefined)
-  assert.equal(checks.calls.count, 1)
-
-  prompt(session, 'have a subagent look at card 1, then change b')
-  refusalOf(session, { ...bashCall('weaver cards 1'), agent_id: 'a406db5d5f6bb15fe' })
+test('a flag raised by this unit creates no note hold', async () => {
+  prompt(session, 'change b')
   edits(B_FILE, 'export const b = 2\n')
-
+  refusalOf(session, bashCall(flagCommand([B_FILE], `${FLAG_BODY}Decision: none\n`)))
   assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
-  assert.deepEqual(held(), [null, null])
+})
+
+test('there is only one card prompt per unit, even when later work touches another card', async () => {
+  const earlier = new Session(session.repo, 'earlier-b', 'claude')
+  refusalOf(earlier, bashCall(flagCommand([B_FILE], `${FLAG_BODY}Decision: none\n`)))
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, 'block')
+  edits(B_FILE, 'export const b = 2\n')
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
+  assert.deepEqual(held(), ['cards', null])
+})
+
+test('pending owner questions and unknown decisions are documented but never claimed for resolution', async () => {
+  refusalOf(session, bashCall('weaver note 1 needs-owner "Which expiry?"'))
+  const other = new Session(session.repo, 'unknown', 'claude')
+  refusalOf(other, bashCall(flagCommand([A_FILE], FLAG_BODY.replace('no call of refresh()', 'no call of clear()'))))
+  session = new Session(session.repo, 'work', 'claude')
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  const asked = await finishWith(session, stubChecks([PASSING]))
+  assert.match(asked.reason ?? '', /owner decision: Which expiry/)
+  assert.match(asked.reason ?? '', /decision unknown/)
+  assert.doesNotMatch(asked.reason ?? '', /; claimed for resolution/)
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
+  assert.equal(cardsOf(session.repo).find((card) => card.number === 1)?.decision.kind, 'owner')
+})
+
+test('parallel agents do not receive the same resolution card', async () => {
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, 'block')
+  session = new Session(session.repo, 'parallel', 'codex')
+  prompt(session, 'also change a')
+  edits(A_FILE, 'export const a = 3\n')
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
 })
 
 test('card mutations pass through the hook and retain the runtime author and session without a refusal', () => {
@@ -134,4 +174,52 @@ test('card mutations pass through the hook and retain the runtime author and ses
     assert.deepEqual(registry.actor.requests, ['Reorganize the cards'])
   })
   assert.match(refusalOf(session, bashCall('weaver cards tie 1 2 && weaver close 1 fixed')) ?? '', /owner/)
+})
+
+test('agents can explicitly clear a decision or defer without owing an investigation report', () => {
+  prompt(session, 'classify the card')
+  assert.match(refusalOf(session, bashCall('weaver note 1 needs-owner "Which expiry?"')) ?? '', /Note written/)
+  assert.match(refusalOf(session, bashCall('weaver note 1 no-decision "Existing policy already specifies one hour"')) ?? '', /Note written/)
+  assert.match(refusalOf(session, bashCall('weaver note 1 deferred "Requires a broader redesign"')) ?? '', /Note written/)
+  const card = cardsOf(session.repo)[0]
+  assert.equal(card?.decision.kind, 'none')
+  assert.equal(card?.record.lifecycle?.stage, 'deferred')
+  assert.equal(card?.isInvestigated, false)
+})
+
+test('reading a card does not consume its later changed-file notice, and unrelated files stay silent', () => {
+  prompt(session, 'read then change a')
+  refusalOf(session, bashCall('weaver cards 1'))
+  assert.equal(told(edits(B_FILE, 'export const b = 2\n')), '')
+  assert.match(told(edits(A_FILE, 'export const a = 2\n')), /Open cards on changed files/)
+  assert.equal(told(edits(A_FILE, 'export const a = 3\n')), '')
+})
+
+test('a completed fix releases its claim and leaves the card open for the owner', async () => {
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, 'block')
+  refusalOf(session, bashCall(CONFIRMED))
+  refusalOf(session, bashCall("weaver note 1 fixed <<'EOF'\nChanged: refreshed the token.\nVerified: tests pass.\nLeft: nothing.\nEOF"))
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
+  const card = cardsOf(session.repo)[0]
+  assert.equal(card?.state, 'raw')
+  assert.equal(card?.conclusion?.as, 'fixed')
+  assert.equal(
+    card?.record.notes.some((note) => note.conclusion === 'deferred'),
+    false,
+  )
+})
+
+test('reverting all changed files still records a deferred resolution pass', async () => {
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, 'block')
+  edits(A_FILE, 'export const a = 1\n')
+  assert.equal(session.unit().isEmpty, true)
+  assert.equal(
+    (await finishWith(session, stubChecks([PASSING]), undefined, '## Request\n#1 deferred: needs a redesign.')).decision,
+    undefined,
+  )
+  assert.equal(cardsOf(session.repo)[0]?.conclusion?.as, 'deferred')
 })

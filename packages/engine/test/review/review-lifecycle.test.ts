@@ -333,7 +333,7 @@ test('the next reviewer of a file is told what its cards say, and a point that c
 
   assert.match(
     asked,
-    /\n- #1 two levels of abstraction in one function: your work changed src\/a\.ts\n/,
+    /\n- #1 two levels of abstraction in one function: src\/a\.ts; decision unknown\.\n/,
     'the finding left is a card to write on',
   )
   assert.doesNotMatch(asked, /#2/, 'a suspicion is the owner’s alone')

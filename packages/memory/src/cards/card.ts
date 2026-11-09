@@ -1,4 +1,4 @@
-import type { Place } from '../flags/flag-record.ts'
+import type { CardDecision, Place } from '../flags/flag-record.ts'
 import { PlaceText } from '../flags/place-text.ts'
 import { clip } from '../lib/text/clip.ts'
 import { CardMarkdown } from './card-markdown.ts'
@@ -48,14 +48,29 @@ export class Card {
     return this.state === 'raw' || this.state === 'open'
   }
 
+  get decision(): CardDecision {
+    const note = this.record.notes.findLast(({ conclusion }) => conclusion === 'needs-owner' || conclusion === 'no-decision')
+    if (note !== undefined)
+      return { kind: note.conclusion === 'needs-owner' ? 'owner' : 'none', question: note.conclusion === 'needs-owner' ? note.text : null }
+    const explicit = this.record.flag?.fields.decision
+    return explicit !== undefined && explicit.kind !== 'unknown'
+      ? explicit
+      : (this.record.written?.decision ?? { kind: 'unknown', question: null })
+  }
+
   // The last conclusion written on the card, which holds until the card is opened again: what was concluded before
   // is then to be looked into anew. A flag that says its author fixed the thing is the first conclusion of its card.
   get conclusion(): Concluded | null {
     const { notes, flag, provenance, history } = this.record
+    const needsOwner = this.decision.kind === 'owner'
     const reopened = history.findLast((event) => event.action === 'reopened')?.at ?? null
     const concluded = notes
       .slice(this.record.lifecycle?.noteStart ?? 0)
-      .flatMap(({ conclusion, provenance: by }): Concluded[] => (conclusion === null ? [] : [{ as: conclusion, by }]))
+      .flatMap(({ conclusion, provenance: by }): Concluded[] =>
+        conclusion === null || conclusion === 'no-decision' || (conclusion === 'needs-owner' && !needsOwner)
+          ? []
+          : [{ as: conclusion, by }],
+      )
     const last = concluded.findLast(({ by }) => this.record.lifecycle !== undefined || reopened === null || by.at > reopened)
 
     if (last !== undefined) return last
@@ -71,17 +86,17 @@ export class Card {
       .slice(this.record.lifecycle?.noteStart ?? 0)
       .some(
         ({ conclusion, provenance }) =>
-          conclusion !== null &&
-          conclusion !== 'fixed' &&
-          conclusion !== 'needs-owner' &&
+          (conclusion === 'confirmed' || conclusion === 'refuted' || conclusion === 'unsure') &&
           (this.record.lifecycle !== undefined || reopened === null || provenance.at > reopened),
       )
   }
 
   get workflow(): string {
     if (!this.isWaiting) return this.standing
+    if (this.decision.kind === 'owner') return 'needs the owner'
     if (this.record.proposal !== null) return 'proposed for closing'
-    return this.conclusion?.as === 'needs-owner' ? 'needs the owner' : 'actionable'
+    if (this.conclusion?.as === 'deferred') return 'deferred'
+    return this.decision.kind === 'none' ? 'actionable' : 'decision unknown'
   }
 
   oneLine(): string {
