@@ -105,7 +105,8 @@ test('a review that runs longer than the end of a turn waits for goes on by itse
 })
 
 test('a message the owner sends while the end of turn waits for the review takes the turn from it: the review goes on', async () => {
-  const slow: Reviewer = { review: () => sleep(1200).then(() => found) }
+  // The review outlasts the turn by far, so that a slow machine still tells the two apart.
+  const slow: Reviewer = { review: () => sleep(3000).then(() => found) }
   const project = reviewed({ waitSeconds: 60 })
   const began = Date.now()
   const ending = finish(slow, project)
@@ -115,11 +116,11 @@ test('a message the owner sends while the end of turn waits for the review takes
 
   const left = await ending
 
-  assert.ok(Date.now() - began < 1000, `the turn ended after ${String(Date.now() - began)} ms`)
+  assert.ok(Date.now() - began < 2500, `the turn ended after ${String(Date.now() - began)} ms`)
   assert.equal(left.decision, undefined)
   assert.match(left.systemMessage ?? '', /The review by codex is still running/)
 
-  await sleep(1200)
+  await sleep(3000)
 
   assert.equal((await finish(slow, project)).decision, 'block', 'its findings come with the next end of turn')
   assert.deepEqual(standings(), ['running', 'sent-back'])
