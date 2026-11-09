@@ -1,3 +1,5 @@
+import { ReviewDelivery } from '../delivery/review-delivery.ts'
+import { ReviewStore } from '../results/review-store.ts'
 import { CardRegistry, type Card, type Provenance } from '@weaver/memory'
 import type { Declaration } from '../../declaration/content/declaration.ts'
 import type { Repository } from '../../lib/git/repository.ts'
@@ -35,17 +37,14 @@ export class ReviewCards {
       at: new Date().toISOString(),
     }
 
-    return this.reading((registry) =>
-      points.map(({ origin, place, content }) => {
-        const statement = content.rule === null ? '' : declaration.statementOf(content.rule)
-
-        return registry.open({
-          origin,
-          places: place === null ? [] : [place],
-          content: { ...content, statement: statement === '' ? null : statement },
-          provenance,
-        })
-      }),
+    const record = new ReviewStore(session.dir).find(review.content)
+    return new ReviewDelivery(this.repo).publish(
+      review,
+      record?.origin ?? provenance,
+      record?.request.rules ??
+        points.flatMap((point) =>
+          point.content.rule === null ? [] : [{ id: point.content.rule, statement: declaration.statementOf(point.content.rule) }],
+        ),
     )
   }
 

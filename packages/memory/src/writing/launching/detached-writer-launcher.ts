@@ -1,3 +1,4 @@
+import { CardRegistry } from '../../registry/card-registry.ts'
 import { spawn } from 'node:child_process'
 import { extname, join } from 'node:path'
 import type { WriterJob } from '../request/writer-job.ts'
@@ -14,10 +15,43 @@ export class DetachedWriterLauncher implements WriterLauncher {
   }
 
   start(job: WriterJob): void {
+    const registry = new CardRegistry(job.stateDir)
+    let flags: { number: number; attempts: number }[]
+    try {
+      flags = registry
+        .awaitingWriter(2)
+        .slice(0, 5)
+        .map((flag) => ({ number: flag.number, attempts: flag.record.writing.attempts }))
+    } finally {
+      registry.close()
+    }
+    let reported = false
+    const failed = (failure: string): void => {
+      if (reported) return
+      reported = true
+      this.failed(job, flags, failure)
+    }
     const worker = spawn(process.execPath, [this.worker, JSON.stringify(job)], { detached: true, stdio: 'ignore' })
 
-    // A writer that cannot start leaves the flags raw: the next one writes them up.
-    worker.on('error', () => undefined)
+    worker.on('error', (error) => failed(`The writer could not start: ${error.message}`))
+    worker.on('exit', (code, signal) => {
+      if (code !== 0) failed(`The writer stopped: ${signal ?? String(code)}`)
+    })
     worker.unref()
+  }
+
+  private failed(job: WriterJob, flags: readonly { number: number; attempts: number }[], failure: string): void {
+    let registry: CardRegistry | null = null
+    try {
+      registry = new CardRegistry(job.stateDir)
+      for (const { number, attempts } of flags) {
+        const flag = registry.find(number)
+        if (flag?.state === 'raw' && flag.record.writing.attempts === attempts) registry.writingFailed(number, failure)
+      }
+    } catch {
+      // The next hook reports a registry that can no longer be opened.
+    } finally {
+      registry?.close()
+    }
   }
 }

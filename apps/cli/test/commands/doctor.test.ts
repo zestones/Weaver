@@ -7,7 +7,7 @@ import { Journal, Repository } from '@weaver/engine'
 import { afterAll, beforeEach, test } from 'vitest'
 import { EngineLink } from '../../src/link/engine-link.ts'
 import { RuntimeCatalog } from '../../src/runtimes/runtime-catalog.ts'
-import { finding, flag, write } from '../fixtures/cards.ts'
+import { finding, flag, inRegistry, write } from '../fixtures/cards.ts'
 import { LIMITS, makeProject, REVIEW, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-doctor-'))
@@ -67,13 +67,14 @@ test('after install everything is alive; a runtime left out is only noted', asyn
 
   const { status, lines, sections, closing } = await doctor()
 
-  assert.deepEqual(sections, ['Project', 'Runtimes'], 'nothing is said of a part of Weaver the project does not use')
+  assert.deepEqual(sections, ['Project', 'Cards', 'Runtimes'], 'nothing is said of a part of Weaver the project does not use')
   assert.equal(closing, '✓ Weaver is alive in this project.')
 
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines, [
     '  ✓ .weaver: 0 rules, 0 checks, 0 guards',
     '  ✓ The finish skill: .weaver/skills/wv-finish.md',
+    '  ✓ The writer codex starts',
     `  ✓ The hook starts: ${link.hook}`,
     '  ✓ Claude Code: wired in .claude/settings.local.json',
     '  ✓ Claude Code: the guide of Weaver in .claude/skills/weaver/SKILL.md',
@@ -338,10 +339,10 @@ test('a writer whose command does not start, or whose skill is missing, is a pro
 })
 
 test('without a writer, the flags that wait are a problem: they stay raw until one is declared', async () => {
-  const note =
-    '  X 1 flag waits and no writer is declared: a flag stays raw without one. .weaver/llm/writer.json says who writes the cards.'
+  const note = /1 flag waits and no writer is declared or usable; oldest \d+ seconds old/
 
   await weaver(top, ['install', 'claude'])
+  writeConfig(top, { writer: { enabled: false } })
   assert.ok(!(await doctor()).lines.some((line) => line.includes('registry')), 'nothing is said of a registry that is not there')
 
   flag(top)
@@ -350,15 +351,16 @@ test('without a writer, the flags that wait are a problem: they stay raw until o
   const { status, lines } = await doctor()
 
   assert.equal(status, 1, lines.join('\n'))
-  assert.deepEqual(lines.slice(2, 4), ['  ✓ The registry: 2 cards wait for you', note])
+  assert.ok(lines.includes('  ✓ The registry: 2 cards wait for you'))
+  assert.match(lines.join(' '), note)
 
   write(top, 1)
-  assert.ok(!(await doctor()).lines.includes(note), 'a flag closed or written up no longer waits for a writer')
+  assert.ok(!(await doctor()).lines.some((line) => note.test(line)), 'a flag closed or written up no longer waits for a writer')
 
   flag(top, {
     provenance: { author: 'owner', role: 'owner', session: null, subagent: null, unit: null, requests: [], commit: null, at: '' },
   })
-  writeConfig(top, { settings: SETTINGS, writer: WRITER })
+  writeConfig(top, { settings: SETTINGS, writer: { runtime: 'codex', timeoutSeconds: 300 } })
   assert.ok(!(await doctor()).lines.some((line) => line.includes('no writer is declared')))
 })
 
@@ -403,7 +405,7 @@ test('a project whose configuration lacks migrations is told which, and that not
   assert.equal(status, 1)
   assert.equal(
     lines[0],
-    '  X .weaver/ is 1 migration behind this Weaver (0002-check-commands): nothing is checked until weaver update brings it up to date.',
+    '  X .weaver/ is 2 migrations behind this Weaver (0002-check-commands, 0003-default-writer): nothing is checked until weaver update brings it up to date.',
   )
 })
 
@@ -534,4 +536,16 @@ test('reviewer activity does not establish author wiring; recent hook errors are
   assert.equal(status, 1)
   assert.match(lines.join('\n'), /1 hook error in the last 7 days, across 1 session.*Stop: disk full/)
   assert.doesNotMatch(closing, /alive/)
+})
+
+test('doctor reports count and oldest age for unavailable writers and exhausted writing attempts', async () => {
+  writeConfig(top, { settings: SETTINGS, writer: { runtime: 'claude', timeoutSeconds: 300 } })
+  flag(top)
+  assert.match((await doctor()).lines.join(' '), /1 flag waits.*no writer is declared or usable; oldest \d+ seconds old/)
+  writeConfig(top, { writer: { runtime: 'codex', timeoutSeconds: 300 } })
+  inRegistry(top, (registry) => {
+    registry.writingFailed(1, 'login expired')
+    registry.writingFailed(1, 'login expired')
+  })
+  assert.match((await doctor()).lines.join(' '), /1 flag has repeatedly failed writing; oldest \d+ seconds old/)
 })

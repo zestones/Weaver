@@ -235,7 +235,7 @@ weaver install     # the hooks of Claude Code and Codex, and a starter .weaver/ 
 weaver doctor      # is everything alive?
 ```
 
-Codex loads the hooks of a project only once it trusts the project, and runs each one only once you have approved it with `/hooks`: `weaver doctor` says where that stands. Who reviews and who writes the cards are yours to add in `.weaver/llm/`, since both cost money.
+Codex loads the hooks of a project only once it trusts the project, and runs each one only once you have approved it with `/hooks`: `weaver doctor` says where that stands. Reviewers are yours to declare in `.weaver/llm/`. Install and update add a Codex writer when none is declared, using Codex’s configured model and account. Existing writer declarations are preserved. To disable writing explicitly, put `{"enabled": false}` in `.weaver/llm/writer.json`.
 
 To stay up to date there is one command, `weaver update`, which you run in a supervised project whenever you like. It does three things in order: it installs the latest release of Weaver when you do not have it, it applies to `.weaver/` the migrations the project lacks, naming each and what it changed, and it wires the hooks to that release. `weaver update --dry-run` shows what it would do and writes nothing: when a later release is published, what that release says changed, and what it would change in this project, asked of a copy of it that is unpacked and never installed.
 
@@ -312,3 +312,7 @@ Orders of magnitude, not a benchmark: seen on one machine on 2026-10-11, a few r
 ## Working on Weaver
 
 Weaver is the rewrite, as a tool of its own, of a harness that first grew inside one project. `pnpm check` formats, builds, type-checks, lints, looks for unused code and tests. The [development guide](_docs/development.md) holds the commands and the conventions of the code.
+
+The writer catches up old raw flags on requests, at turn end, and after install or update. Each start handles at most four batches of five flags, with 300 seconds per batch by default; `batches` and `timeoutSeconds` are configurable. A flag gets two failed attempts before automatic writing leaves it for inspection. `weaver cards write --batches 10` runs deliberate catch-up; add `--retry-failed` to retry exhausted flags. Doctor reports flags with no usable writer and repeated writing failures, including their count and oldest age. New writing costs are stored once per batch; unknown costs stay unknown.
+
+A review that outlasts its wait files its findings and suspicions as cards when it finishes, even if its original session never returns. The last review beyond the refusal allowance also files cards. The next request or tool result gives the original agent the card numbers through additional context; a later session working on those files can receive them too. This adds no refusal. A bounded recovery pass imports finished reviews still referenced by saved session states, once per review, preserving existing cards. Registry migration v4 keeps all cards and adds delivery receipts, notices and writer batches; declaration migration v3 adds the default writer. Session format v9 and active units are unchanged.

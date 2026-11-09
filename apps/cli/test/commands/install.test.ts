@@ -69,7 +69,12 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
     LIMITS,
     'every limit Weaver applies is written in the settings, where the owner changes it',
   )
-  assert.equal(existsSync(join(top, '.weaver/llm')), false, 'who reviews and who writes the cards are the owner’s to add')
+  assert.deepEqual(readJson(top, '.weaver/llm/writer.json'), {
+    $schema: link.schemaOf('writer'),
+    runtime: 'codex',
+    timeoutSeconds: 300,
+    batches: 4,
+  })
   assert.deepEqual(readJson(top, '.weaver/project/labels.json'), { $schema: link.schemaOf('labels') })
   assert.deepEqual(DeclarationFolder.in(top).load()?.labels, {})
   assert.equal(existsSync(join(top, '.weaver/skills/wv-card.md')), false, 'a project that names no writer gets no skill for one')
@@ -163,7 +168,7 @@ test('the command install writes is one the runtime can run as it is', async () 
 
 test('install twice wires once, and leaves what the owner put in the files', async () => {
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine', timeout: 5 }] }
-  const declared = JSON.stringify({ version: 2, checks: { ...LIMITS, maxRefusals: 5 } })
+  const declared = JSON.stringify({ version: 3, checks: { ...LIMITS, maxRefusals: 5 } })
 
   writeJson(top, CLAUDE, { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine], Notification: [mine] } })
   writeJson(top, CONFIG, JSON.parse(declared))
@@ -288,7 +293,7 @@ test('install leaves a project whose configuration is in another format to weave
   ])
   assert.deepEqual(readJson(top, CONFIG), { version: 1, checks: { maxRefusals: 5, totalTimeoutSeconds: 600, parallel: 2 } })
 
-  writeJson(top, CONFIG, { version: 3, checks: LIMITS })
+  writeJson(top, CONFIG, { version: 4, checks: LIMITS })
 
   const ahead = await weaver(top, ['install', 'claude'])
 
@@ -321,4 +326,17 @@ test('a skill named weaver that Weaver did not write is left as it is: install w
 
   assert.equal(readFileSync(join(top, CLAUDE_GUIDE), 'utf8'), mine)
   assert.equal(existsSync(join(top, CODEX_GUIDE)), false)
+})
+
+test('install adds the Codex writer to an existing project but preserves custom writers and explicit disablement', async () => {
+  writeConfig(top, { settings: SETTINGS })
+  await weaver(top, ['install', 'claude'])
+  assert.equal(DeclarationFolder.in(top).load()?.writer?.runtime, 'codex')
+  for (const writer of [{ runtime: 'claude', model: 'custom', timeoutSeconds: 600 }, { enabled: false }]) {
+    writeJson(top, '.weaver/llm/writer.json', writer)
+    const before = readFileSync(join(top, '.weaver/llm/writer.json'), 'utf8')
+    await weaver(top, ['install'])
+    assert.equal(readFileSync(join(top, '.weaver/llm/writer.json'), 'utf8'), before)
+  }
+  assert.equal(DeclarationFolder.in(top).load()?.writer, null)
 })

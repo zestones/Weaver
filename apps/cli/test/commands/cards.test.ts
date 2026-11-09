@@ -1,3 +1,4 @@
+import { AgentResult, ExecutionCatalog, ScriptedExecution } from '@weaver/agent-sdk'
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -290,4 +291,42 @@ test('words that cards does not know are answered with how it is written', async
   assert.deepEqual(await weaver(top, ['cards', '--waiting']), { status: 2, lines: USAGE })
   assert.deepEqual(await weaver(top, ['cards', '--file']), { status: 2, lines: USAGE })
   assert.deepEqual(await weaver(top, ['cards', 'reopened', '1']), { status: 2, lines: USAGE })
+})
+
+test('cards write bounds deliberate catch-up and retries exhausted flags only when explicitly asked', async () => {
+  writeConfig(top, { settings: SETTINGS, writer: { runtime: 'codex', timeoutSeconds: 300 } })
+  for (let i = 0; i < 6; i += 1) flag(top, { callId: `flag-${String(i)}`, text: OTHER_FLAG.replace('cache', `cache${String(i)}`) })
+  const result = (numbers: number[]) =>
+    new AgentResult({
+      text: '',
+      seconds: 1,
+      answer: {
+        cards: numbers.map((number) => ({
+          flag: number,
+          title: `Card ${String(number)}`,
+          labels: [],
+          sections: ['Observation', 'Context', 'Trace', 'Uncertainties'].map((name) => ({ name, text: 'Evidence' })),
+          look: { verdict: 'agrees', note: 'Read it' },
+          sameAs: null,
+          sure: false,
+          sameNote: null,
+        })),
+      },
+    })
+  const writer = new ScriptedExecution('codex', [result([1, 2, 3, 4, 5]), result([6])])
+  const executions = new ExecutionCatalog([writer])
+  assert.equal((await weaver(top, ['cards', 'write', '--batches', '1'], { executions, under: 'codex' })).status, 0)
+  assert.equal(writer.tasks.length, 1)
+  assert.equal(cardOf(top, 6).state, 'raw')
+  inRegistry(top, (registry) => {
+    registry.writingFailed(6, 'login')
+    registry.writingFailed(6, 'login')
+  })
+  assert.equal((await weaver(top, ['cards', 'write'], { executions })).status, 1)
+  assert.equal(writer.tasks.length, 1)
+  assert.equal((await weaver(top, ['cards', 'write', '--retry-failed'], { executions })).status, 0)
+  assert.equal(cardOf(top, 6).state, 'open')
+  assert.equal((await weaver(top, ['cards', 'write', '--batches', '0'], { executions })).status, 2)
+  writeConfig(top, { writer: { enabled: false } })
+  assert.equal((await weaver(top, ['cards', 'write'], { executions })).status, 1)
 })

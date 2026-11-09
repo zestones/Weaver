@@ -92,7 +92,7 @@ export class DeclarationParts {
     const guards = Object.entries(guardsOf).map(([id, guard]): DeclaredGuard => ({ ...guard, id }))
     const { finish } = settings
     const headings = this.headings(finish.skill)
-    const writer = writerOf === null ? null : this.writerPolicy(writerOf)
+    const writer = writerOf === null || writerOf.enabled === false ? null : this.writerPolicy(writerOf)
 
     this.problems.push(...this.bindingProblems(checks, guards, rules, reviewers !== null))
     this.failOnProblems()
@@ -181,6 +181,7 @@ export class DeclarationParts {
   private writerPolicy(writer: WriterDocument): WriterPolicy {
     return new WriterPolicy({
       runtime: writer.runtime,
+      batches: writer.batches ?? 4,
       model: writer.model ?? null,
       effort: writer.effort ?? null,
       timeoutSeconds: writer.timeoutSeconds,

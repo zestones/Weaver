@@ -141,7 +141,7 @@ export class CommandLine {
       new CheckCommand(this.cwd, this.output, this.caller),
       new GuideCommand(this.cwd, this.output),
       new StatsCommand(this.cwd, this.output),
-      new CardsCommand(this.cwd, this.output, this.caller),
+      new CardsCommand(this.cwd, this.output, this.caller, this.executions),
       new UiCommand(this.cwd, this.output, this.caller),
       new FlagCommand(this.cwd, this.output, this.input, this.caller),
       new NoteCommand(this.cwd, this.output, this.input, this.caller),

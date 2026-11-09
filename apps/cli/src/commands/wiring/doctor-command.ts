@@ -293,11 +293,20 @@ export class DoctorCommand implements Command {
 
       if (waiting === null) return []
 
-      const raw = waiting.filter((card) => card.state === 'raw').length
+      const raw = waiting.filter((card) => card.state === 'raw')
+      const failed = raw.filter((card) => card.record.writing.attempts >= 2)
 
       return [
         { state: 'ok', text: `The registry: ${new Counted(waiting.length, 'card waits', 'cards wait').text} for you` },
-        ...(raw > 0 && this.lacksWriter(project) ? [this.unwritten(raw, project)] : []),
+        ...(raw.length > 0 && this.lacksWriter(project) ? [this.unwritten(raw, project)] : []),
+        ...(failed.length > 0
+          ? [
+              {
+                state: 'problem' as const,
+                text: `${new Counted(failed.length, 'flag has', 'flags have').text} repeatedly failed writing; oldest ${this.oldest(failed)}. Run weaver cards write --retry-failed.`,
+              },
+            ]
+          : []),
       ]
     } catch (error) {
       if (error instanceof RegistryError) return [{ state: 'problem', text: this.sentence(error.message) }]
@@ -316,17 +325,23 @@ export class DoctorCommand implements Command {
     }
   }
 
-  private unwritten(flags: number, project: Project): Finding {
+  private unwritten(flags: readonly Card[], project: Project): Finding {
     return {
       state: 'problem',
-      text: `${new Counted(flags, 'flag waits', 'flags wait').text} and no writer is declared: a flag stays raw without one. ${project.configName}/${DeclarationParts.FILES.writer} says who writes the cards.`,
+      text: `${new Counted(flags.length, 'flag waits', 'flags wait').text} and no writer is declared or usable; oldest ${this.oldest(flags)}: a flag stays raw without one. ${project.configName}/${DeclarationParts.FILES.writer} says who writes the cards.`,
     }
+  }
+
+  private oldest(cards: readonly Card[]): string {
+    const oldest = Math.min(...cards.map((card) => Date.parse(card.record.provenance.at)))
+    return Number.isFinite(oldest) ? `${String(Math.max(0, Math.floor((Date.now() - oldest) / 1000)))} seconds old` : 'age unknown'
   }
 
   // A declaration that cannot be read does not say whether it names a writer.
   private lacksWriter(project: Project): boolean {
     try {
-      return (project.declaration()?.writer ?? null) === null
+      const writer = project.declaration()?.writer ?? null
+      return writer === null || this.executions.find(writer.runtime)?.isAvailable() !== true || project.cardSkill()?.exists === false
     } catch {
       return false
     }

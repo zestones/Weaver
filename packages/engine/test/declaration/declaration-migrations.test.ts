@@ -69,9 +69,9 @@ test('files of an earlier format are brought to the one this Weaver reads, one m
   assert.equal(migrations.isBehind, true)
   assert.deepEqual(
     migrations.pending().map((migration) => migration.label),
-    ['0002-check-commands'],
+    ['0002-check-commands', '0003-default-writer'],
   )
-  assert.deepEqual(applied, [
+  assert.deepEqual(applied.slice(0, 1), [
     {
       label: '0002-check-commands',
       summary: 'The commands of a check are named for what they do, and a check may warn right after a call.',
@@ -82,7 +82,7 @@ test('files of an earlier format are brought to the one this Weaver reads, one m
       ],
     },
   ])
-  assert.deepEqual(Object.keys(texts).sort(), ['checks', 'settings'], 'a file no migration changed is not rewritten')
+  assert.deepEqual(Object.keys(texts).sort(), ['checks', 'settings', 'writer'], 'a file no migration changed is not rewritten')
   assert.deepEqual(JSON.parse(texts.settings ?? ''), {
     $schema: '/somewhere/settings.schema.json',
     version: DeclarationMigrations.LATEST,
@@ -110,10 +110,10 @@ test('a project in another format is not read: its owner is told which, and that
   const ahead = { settings: JSON.stringify({ version: DeclarationMigrations.LATEST + 1, checks: {} }) }
 
   assert.deepEqual(problemsOf(FIRST, 'behind'), [
-    'settings.json: these files are in the format of version 1, and this Weaver reads version 2: run weaver update, which brings them to it',
+    'settings.json: these files are in the format of version 1, and this Weaver reads version 3: run weaver update, which brings them to it',
   ])
   assert.deepEqual(problemsOf(ahead, 'ahead'), [
-    'settings.json: these files are in the format of version 3, and this Weaver reads version 2: run weaver update, which installs the release that reads them',
+    'settings.json: these files are in the format of version 4, and this Weaver reads version 3: run weaver update, which installs the release that reads them',
   ])
   assert.equal(new DeclarationMigrations(ahead).isAhead, true)
   assert.deepEqual(new DeclarationMigrations(ahead).run(), { texts: {}, applied: [] }, 'a format it does not know is not touched')
@@ -122,10 +122,10 @@ test('a project in another format is not read: its owner is told which, and that
 test('a file that is not JSON is left to the reading of the declaration, which says what is wrong with it', () => {
   const { texts, applied } = new DeclarationMigrations({ ...FIRST, checks: '{ "format": ' }).run()
 
-  assert.deepEqual(Object.keys(texts), ['settings'])
+  assert.deepEqual(Object.keys(texts), ['settings', 'writer'])
   assert.deepEqual(
     applied.map((migration) => migration.label),
-    ['0002-check-commands'],
+    ['0002-check-commands', '0003-default-writer'],
   )
   assert.equal(new DeclarationMigrations({ settings: 'not json' }).written, null)
 })
@@ -169,4 +169,18 @@ test('a renamed field keeps its place in each entry that carries it, and an adde
   assert.equal(added.apply(documents), null)
   assert.equal(documents.settings.checks.warnTimeoutSeconds, 5)
   assert.equal(new AddedField('settings', ['finish', 'skill'], 'x', 'a skill').apply(documents), null, 'a holder that is not there')
+})
+
+test('the default writer migration adds Codex and preserves custom, disabled and malformed declarations', () => {
+  const base = { settings: JSON.stringify({ version: 2, checks: {} }) }
+  const added = new DeclarationMigrations(base).run()
+  assert.deepEqual(JSON.parse(added.texts.writer ?? ''), { runtime: 'codex', timeoutSeconds: 300, batches: 4 })
+  assert.match(added.applied[0]?.changes.join(' ') ?? '', /Codex writer.*four batches of five/)
+  for (const writer of [
+    JSON.stringify({ runtime: 'claude', model: 'custom', timeoutSeconds: 900 }),
+    JSON.stringify({ enabled: false }),
+    '{broken',
+  ]) {
+    assert.equal(new DeclarationMigrations({ ...base, writer }).run().texts.writer, undefined)
+  }
 })

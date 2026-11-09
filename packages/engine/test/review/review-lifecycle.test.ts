@@ -1,5 +1,9 @@
+import { Loop } from '../../src/loop/dispatch/loop.ts'
+import { ReviewDelivery } from '../../src/review/delivery/review-delivery.ts'
+import { ReviewRecovery } from '../../src/review/delivery/review-recovery.ts'
+import { writeDeclaration } from '../fixtures/declaration.ts'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -396,4 +400,125 @@ test('the places a program of the project lists under a rule of the review reach
   await finishWith(session, stubChecks([PASSING, listing]), reviewed(), undefined, reviewer)
 
   assert.match(reviewer.requests[0]?.prompt(null) ?? '', /## Places to judge\n\n[^\n]*\n\n- N1 src\/a\.ts:1: new function: a/)
+})
+
+test('a one-shot session never returns: the worker files findings and suspicions with immutable launch provenance', async () => {
+  const slow: Reviewer = {
+    review: () =>
+      sleep(1200).then(
+        () => new ReviewOutcome({ ...BY, findings: [FINDING], suspicions: [{ file: A_FILE, note: 'check startup' }], seconds: 2 }),
+      ),
+  }
+  const originalHead = session.repo.head()
+  const output = await finish(slow, reviewed({ waitSeconds: 1 }))
+  assert.equal(output.decision, undefined)
+  rmSync(join(session.dir, 'state.json'))
+  await sleep(600)
+  const cards = cardsOf(session.repo)
+  assert.equal(cards.length, 2)
+  assert.equal(cards[0]?.record.provenance.session, session.id)
+  assert.equal(cards[0]?.record.provenance.unit, 1)
+  assert.equal(cards[0]?.record.provenance.commit, originalHead)
+  assert.equal(cards[0]?.record.review?.statement, REVIEW_RULES.N1.statement)
+  new ReviewRecovery(session.repo).run()
+  assert.equal(cardsOf(session.repo).length, 2)
+  const delivery = new ReviewDelivery(session.repo)
+  assert.equal(delivery.notice('other'), null)
+  assert.match(delivery.notice('other', [A_FILE]) ?? '', /These review findings were filed as cards:.*#1.*#2/)
+  assert.equal(delivery.notice(session.id), null)
+})
+
+test.each(['UserPromptSubmit', 'PostToolUse'])(
+  'the final review files cards and %s delivers additionalContext without a refusal',
+  async (event) => {
+    const reviewer = stubReviewer([found, found])
+    await finish(reviewer)
+    agentWrites(session, { [A_FILE]: 'export const a = 3\n', 'src/b.ts': 'export const b = 2\n'.repeat(60) })
+    const ended = await finish(reviewer, reviewed(), saying('F1 not fixed: owner should decide'))
+    assert.equal(ended.decision, undefined)
+    assert.deepEqual(standings(), ['sent-back', 'for-owner'])
+    assert.equal(cardsOf(session.repo).length, 1)
+    writeDeclaration(session.repo.top, {})
+    const loop = new Loop(stubChecks([]), { start: () => undefined }, { start: () => undefined })
+    const answer = await loop.handle(
+      event,
+      ['--agent=claude'],
+      JSON.stringify({
+        session_id: session.id,
+        cwd: session.repo.top,
+        prompt: 'next task',
+        tool_use_id: 'first-call',
+        tool_name: 'Read',
+        tool_input: { file_path: A_FILE },
+      }),
+    )
+    assert.match(answer.body?.hookSpecificOutput?.additionalContext ?? '', /These review findings were filed as cards:/)
+    assert.equal(answer.body?.decision, undefined)
+    const again = await loop.handle(
+      'PostToolUse',
+      ['--agent=claude'],
+      JSON.stringify({
+        session_id: session.id,
+        cwd: session.repo.top,
+        tool_use_id: 'later',
+        tool_name: 'Read',
+        tool_input: { file_path: A_FILE },
+      }),
+    )
+    assert.doesNotMatch(again.body?.hookSpecificOutput?.additionalContext ?? '', /These review findings/)
+  },
+)
+
+test('legacy state pointers recover finished reviews once, bounded, without rewriting active sessions or duplicating existing cards', async () => {
+  await finish(stubReviewer([found]))
+  const content = session.unit().lastReviewed ?? ''
+  const record = new ReviewStore(session.dir).find(content)
+  assert.ok(record)
+  const { origin: _origin, ...legacy } = record
+  void _origin
+  const stateText = readFileSync(join(session.dir, 'state.json'), 'utf8')
+  rmSync(join(session.repo.stateDir, 'registry.sqlite'))
+  for (let i = 0; i < 25; i += 1) {
+    const id = `legacy-${String(i).padStart(2, '0')}`
+    const dir = join(Session.rootIn(session.repo), id)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'state.json'), stateText)
+    new ReviewStore(dir).keep(content, legacy)
+  }
+  const recovery = new ReviewRecovery(session.repo)
+  recovery.run()
+  assert.equal(cardsOf(session.repo).length, 1)
+  assert.equal(cardsOf(session.repo)[0]?.record.occurrences.length, 19)
+  recovery.run()
+  const count = cardsOf(session.repo)[0]?.record.occurrences.length
+  assert.equal(count, 25)
+  recovery.run()
+  assert.equal(cardsOf(session.repo)[0]?.record.occurrences.length, count)
+  assert.equal(readFileSync(join(session.dir, 'state.json'), 'utf8'), stateText)
+  assert.equal(cardsOf(session.repo)[0]?.record.provenance.unit, 1)
+})
+
+test('recovery visits every saved review pointer in bounded slices and distinguishes hashes with the same prefix', async () => {
+  await finish(stubReviewer([found]))
+  const original = session.unit().lastReviewed ?? ''
+  const store = new ReviewStore(session.dir)
+  const record = store.find(original)
+  assert.ok(record)
+  const contents = Array.from({ length: 7 }, (_, i) => `abcdefg${String(i).padStart(57, '0')}`)
+  for (const content of contents) store.keep(content, record)
+  const path = join(session.dir, 'state.json')
+  const state = JSON.parse(readFileSync(path, 'utf8')) as { unit: { check: { reviewed: string[] } } }
+  state.unit.check.reviewed = contents
+  writeFileSync(path, JSON.stringify(state))
+  rmSync(join(session.repo.stateDir, 'registry.sqlite'))
+  const broken = join(Session.rootIn(session.repo), 'a-broken')
+  mkdirSync(broken)
+  writeFileSync(join(broken, 'state.json'), '{')
+  const recovery = new ReviewRecovery(session.repo)
+  recovery.run()
+  assert.equal(cardsOf(session.repo)[0]?.record.occurrences.length, 4)
+  recovery.run()
+  assert.equal(cardsOf(session.repo)[0]?.record.occurrences.length, 6)
+  recovery.run()
+  assert.equal(cardsOf(session.repo)[0]?.record.occurrences.length, 6)
 })

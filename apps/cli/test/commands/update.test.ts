@@ -183,6 +183,8 @@ test('with the latest release, update brings the project up to date itself: its 
     '    project/checks.json: `fix` is now `repair`, in 1 place',
     '    project/checks.json: `verify` is now `judge`, in 1 place',
     '    settings.json: checks.warnTimeoutSeconds added, at 30: the seconds the checks that warn are given after one call',
+    '  0003-default-writer: Codex writes waiting flags in bounded batches; an explicit disabled writer stays disabled.',
+    '    llm/writer.json: added the Codex writer, using its configured model, at four batches of five flags per start',
     '✓ Claude Code: hooks written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
     '✓ Claude Code: the guide of Weaver written to .claude/skills/weaver/SKILL.md',
     '✓ Claude Code: the mod that shows the end of a task in its chat written to .claude/skills/weaver-status',
@@ -313,7 +315,7 @@ test('a dry run runs nothing of an archive that is not the one its release publi
 })
 
 test('update looks for no release when it is told so, when GitHub does not answer, or from a checkout, and still brings the project up to date', async () => {
-  writeConfig(top, { settings: SETTINGS })
+  writeConfig(top, { settings: SETTINGS, writer: { enabled: false } })
 
   const offline = channel('0.1.0')
 
@@ -342,7 +344,7 @@ test('update says so where there is no supervised project, and refuses a configu
   assert.equal(nowhere.status, 0)
   assert.equal(nowhere.lines.at(-1), '- No supervised project here: weaver install puts Weaver on a project.')
 
-  writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: 3 })
+  writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: 4 })
 
   const ahead = await weaver(top, ['update'], { channel: channel('9.9.9') })
 
@@ -376,4 +378,25 @@ test('a release knows whether another came after it', () => {
   assert.equal(own.isOlderThan('v0.9.3'), false)
   assert.equal(own.isOlderThan('v0.9.2'), false)
   assert.equal(own.isOlderThan('nightly'), true, 'a tag that is not three numbers is what is published')
+})
+
+test('update previews and adds a missing writer, preserving custom and explicitly disabled writers', async () => {
+  writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: 2 })
+  const before = readFileSync(join(top, '.weaver/settings.json'), 'utf8')
+  const preview = await weaver(top, ['update', '--offline', '--dry-run'])
+  assert.match(preview.lines.join(' '), /0003-default-writer.*Codex writer/)
+  assert.equal(existsSync(join(top, '.weaver/llm/writer.json')), false)
+  assert.equal(readFileSync(join(top, '.weaver/settings.json'), 'utf8'), before)
+  await weaver(top, ['update', '--offline'])
+  assert.equal(DeclarationFolder.in(top).load()?.writer?.runtime, 'codex')
+  for (const writer of [{ runtime: 'claude', model: 'custom', timeoutSeconds: 600 }, { enabled: false }]) {
+    writeJson(top, '.weaver/llm/writer.json', writer)
+    writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: 2 })
+    const original = readFileSync(join(top, '.weaver/llm/writer.json'), 'utf8')
+    await weaver(top, ['update', '--offline'])
+    assert.equal(readFileSync(join(top, '.weaver/llm/writer.json'), 'utf8'), original)
+  }
+  rmSync(join(top, '.weaver/llm/writer.json'))
+  const current = await weaver(top, ['update', '--offline', '--dry-run'])
+  assert.match(current.lines.join(' '), /added the Codex writer/)
 })

@@ -75,4 +75,10 @@ export const MIGRATIONS: readonly string[] = [
       WHEN 'fixed' THEN 'fixed' WHEN 'refuted' THEN 'refuted' WHEN 'needs-owner' THEN 'needs-owner'
       WHEN 'confirmed' THEN 'investigated' WHEN 'unsure' THEN 'investigated' ELSE 'uninvestigated' END);
   `,
+  `
+  CREATE TABLE review_deliveries (id TEXT PRIMARY KEY, session TEXT NOT NULL, cards TEXT NOT NULL, notified TEXT) STRICT;
+  CREATE TABLE recovery_cursor (name TEXT PRIMARY KEY, position TEXT NOT NULL) STRICT;
+  CREATE TABLE writer_batches (id INTEGER PRIMARY KEY, record TEXT NOT NULL) STRICT;
+  CREATE INDEX writer_batches_by_state ON writer_batches (json_extract(record, '$.state'));
+  `,
 ]

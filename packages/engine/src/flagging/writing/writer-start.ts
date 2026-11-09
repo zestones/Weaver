@@ -19,12 +19,12 @@ export class WriterStart {
 
     if (writer === null || !this.flagsWait(repo)) return
 
-    const { runtime, model, effort, timeoutSeconds, skill, sections } = writer
+    const { runtime, model, effort, timeoutSeconds, skill, sections, batches } = writer
 
     this.launcher.start({
       top: repo.top,
       stateDir: repo.stateDir,
-      settings: { runtime, model, effort, timeoutSeconds, skill, sections },
+      settings: { runtime, model, effort, timeoutSeconds, skill, sections, batches },
       labels,
       environment: this.environment,
     })

@@ -1,3 +1,5 @@
+import { Loop } from '../../src/loop/dispatch/loop.ts'
+import { writeDeclaration } from '../fixtures/declaration.ts'
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -247,7 +249,7 @@ test('at the end of a turn the writer of the project is started on the flags tha
     {
       top: session.repo.top,
       stateDir: session.repo.stateDir,
-      settings: { ...WRITER, skill: null, sections: ['Observation', 'Context', 'Trace', 'Uncertainties'] },
+      settings: { ...WRITER, batches: 4, skill: null, sections: ['Observation', 'Context', 'Trace', 'Uncertainties'] },
       labels: LABELS,
       environment: { WEAVER_REVIEWER: '1' },
     },
@@ -273,7 +275,22 @@ test('a writer that names its skill is given it, with the sections the skill lis
     model: null,
     effort: null,
     timeoutSeconds: 600,
+    batches: 4,
     skill: '.weaver/skills/wv-card.md',
     sections: ['Seen', 'Why it matters'],
   })
+})
+
+test('a new request starts catch-up on old flags, without any new flags, and explicit disablement prevents it', async () => {
+  refusalOf(session, flag())
+  writeDeclaration(session.repo.top, { writer: { runtime: 'codex', timeoutSeconds: 300, batches: 3 } })
+  const writers = stubWriters()
+  const loop = new Loop(stubChecks([]), { start: () => undefined }, writers)
+  const request = JSON.stringify({ session_id: 'new-session', cwd: session.repo.top, prompt: 'read the project' })
+  await loop.handle('UserPromptSubmit', ['--agent=claude'], request)
+  assert.equal(writers.jobs.length, 1)
+  assert.equal(writers.jobs[0]?.settings.batches, 3)
+  writeDeclaration(session.repo.top, { writer: { enabled: false } })
+  await loop.handle('UserPromptSubmit', ['--agent=claude'], request)
+  assert.equal(writers.jobs.length, 1)
 })

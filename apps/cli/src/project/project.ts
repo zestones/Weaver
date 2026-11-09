@@ -1,3 +1,4 @@
+import { DefaultWriter } from './default-writer.ts'
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -10,7 +11,7 @@ import {
   type Declaration,
   type PartName,
 } from '@weaver/engine'
-import { CardRegistry, type Provenance } from '@weaver/memory'
+import { DetachedWriterLauncher, CardRegistry, type Provenance } from '@weaver/memory'
 import type { EngineLink } from '../link/engine-link.ts'
 import { Counted } from '../output/counted.ts'
 import { CardSkill } from '../skills/card-skill.ts'
@@ -60,13 +61,18 @@ export class Project {
   // another installation. What that changes, for the owner who reads the diff; nothing is written unless asked.
   bringUpToDate(link: EngineLink, write: boolean): string[] {
     const folder = DeclarationFolder.in(this.top)
-    const { texts, applied } = new DeclarationMigrations(folder.texts()).run()
+    const migrated = new DeclarationMigrations(folder.texts()).run()
+    const { applied } = migrated
+    const texts = { ...migrated.texts }
+    const missing = folder.texts().writer === undefined && texts.writer === undefined
+    if (missing) texts.writer = JSON.stringify({ runtime: 'codex', timeoutSeconds: 300, batches: 4 })
     const pointed = this.pointedAt(link, { ...folder.texts(), ...texts })
     const files = Object.keys(pointed).length
 
     if (write) folder.write({ ...texts, ...pointed })
 
     return [
+      ...(missing ? ['llm/writer.json: added the Codex writer, using its configured model, at four batches of five flags per start'] : []),
       ...applied.flatMap((migration) => [`${migration.label}: ${migration.summary}`, ...migration.changes.map((change) => `  ${change}`)]),
       ...(files === 0 ? [] : [`the \`$schema\` lines point at the schemas of this Weaver, in ${new Counted(files, 'file').text}`]),
     ]
@@ -98,8 +104,9 @@ export class Project {
   }
 
   // The settings, and one empty file for each part of what the project asks, each naming the schema an editor checks
-  // it against. Who reviews and who writes the cards are the owner's to add: both cost money.
+  // it against. Existing declarations, including an explicitly disabled writer, are kept.
   createConfig(link: EngineLink): boolean {
+    new DefaultWriter(this.top).create(link)
     const folder = DeclarationFolder.in(this.top)
     const starter: Readonly<Partial<Record<PartName, object>>> = {
       settings: { version: DeclarationMigrations.LATEST, finish: { skill: FinishSkill.PATH }, checks: STARTING_LIMITS },
@@ -119,6 +126,25 @@ export class Project {
     }
 
     return true
+  }
+
+  startWriter(): void {
+    const declaration = this.readableDeclaration()
+    const writer = declaration?.writer
+    if (writer === null || writer === undefined) return
+    const registry = this.recordedRegistry()
+    try {
+      if ((registry?.awaitingWriter(2).length ?? 0) === 0) return
+      new DetachedWriterLauncher().start({
+        top: this.top,
+        stateDir: this.repository.stateDir,
+        settings: writer,
+        labels: declaration?.labels ?? {},
+        environment: { WEAVER_REVIEWER: '1' },
+      })
+    } finally {
+      registry?.close()
+    }
   }
 
   // null when there is no configuration, or when it cannot be read: the doctor says why.

@@ -1,3 +1,5 @@
+import type { ExecutionCatalog } from '@weaver/agent-sdk'
+import { WriteCards } from './write-cards.ts'
 import { realpathSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import {
@@ -47,6 +49,7 @@ export class CardsCommand implements Command {
     description: 'List the cards that wait for you, newest first, or show one: drawn at a terminal, as Markdown for a program.',
     words: [
       ['[<number>]', 'Show this card'],
+      ['write [--batches <1..100>] [--retry-failed]', 'Write waiting flags, optionally retrying failed flags'],
       ['--all', 'List the closed and the merged cards too'],
       [`--closed [${Card.CLOSINGS.join('|')}]`, 'Only the closed cards; with a way of closing, only those closed that way'],
       ['--file <path>', 'Only the cards about this file'],
@@ -64,11 +67,13 @@ export class CardsCommand implements Command {
       'weaver cards --closed wontfix',
     ],
   } as const
+  private readonly executions: ExecutionCatalog
   private readonly cwd: string
   private readonly screen: Screen
   private readonly caller: Caller
 
-  constructor(cwd: string, output: Output, caller: Caller) {
+  constructor(cwd: string, output: Output, caller: Caller, executions: ExecutionCatalog) {
+    this.executions = executions
     this.cwd = cwd
     this.screen = new Screen(output)
     this.caller = caller
@@ -76,6 +81,7 @@ export class CardsCommand implements Command {
 
   run(args: readonly string[]): number | Promise<number> {
     const [first = ''] = args
+    if (first === 'write') return new WriteCards(this.cwd, this.screen, this.executions).run(args.slice(1))
 
     if (args.length === 1 && /^\d+$/.test(first)) return this.show(Number(first))
 

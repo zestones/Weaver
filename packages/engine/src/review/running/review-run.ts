@@ -1,3 +1,6 @@
+import { basename } from 'node:path'
+import { setTimeout as sleep } from 'node:timers/promises'
+import { ReviewDelivery } from '../delivery/review-delivery.ts'
 import { isAlive } from '../../lib/process/alive.ts'
 import type { Repository } from '../../lib/git/repository.ts'
 import { ReviewRequest } from '../request/review-request.ts'
@@ -44,7 +47,13 @@ export class ReviewRun {
       // A reviewer that answered before it could be stopped has its answer kept.
       const interrupted = stop.signal.aborted && outcome.failure !== null
 
-      store.keep(content, interrupted ? this.interrupted(asked, outcome) : this.ended(asked, outcome))
+      const ended = interrupted ? this.interrupted(asked, outcome) : this.ended(asked, outcome)
+      store.keep(content, ended)
+      // Give the waiting hook the result; a released or dead waiter cannot deliver it.
+      const handoffUntil = Date.now() + 5000
+      while (store.waiter(content) !== null && isAlive(store.waiter(content) ?? 0) && Date.now() < handoffUntil) await sleep(this.watchMs)
+      await sleep(20)
+      new ReviewDelivery(repo).finished(asked.origin?.session ?? basename(sessionDir), content, ended)
     } finally {
       clearInterval(watch)
     }

@@ -28,7 +28,9 @@ export class PartSchema {
 
   get problems(): string[] {
     // A refused key is reported twice: once for its pattern, once as a key.
-    return (this.validate.errors ?? []).filter((error) => error.propertyName === undefined).map((error) => this.problem(error))
+    return (this.validate.errors ?? [])
+      .filter((error) => error.propertyName === undefined && error.keyword !== 'if')
+      .map((error) => this.problem(error))
   }
 
   private kinds(type: unknown): string {

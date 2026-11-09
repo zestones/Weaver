@@ -1,4 +1,5 @@
 export interface WriterFields {
+  readonly batches?: number
   readonly runtime: 'claude' | 'codex'
   readonly model: string | null
   readonly effort: string | null
@@ -19,7 +20,10 @@ export class WriterPolicy {
   readonly skill: string | null
   readonly sections: readonly string[]
 
+  readonly batches: number
+
   constructor(fields: WriterFields) {
+    this.batches = fields.batches ?? 4
     this.runtime = fields.runtime
     this.model = fields.model
     this.effort = fields.effort

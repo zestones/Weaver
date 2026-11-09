@@ -138,3 +138,15 @@ test('a launcher whose worker is not there says nothing, and the flags stay raw'
   assert.equal(registry.find(1)?.state, 'raw')
   registry.close()
 })
+
+test('repeated writer startup failures are recorded on waiting flags and stop automatic retries', async () => {
+  const { stateDir, registry } = flagged()
+  const launcher = new DetachedWriterLauncher(join(scratch, 'missing-worker.mjs'))
+  launcher.start(jobOn(stateDir))
+  await until(() => registry.find(1)?.record.writing.attempts === 1)
+  launcher.start(jobOn(stateDir))
+  await until(() => registry.find(1)?.record.writing.attempts === 2)
+  assert.match(registry.find(1)?.record.writing.failure ?? '', /The writer stopped/)
+  assert.equal(registry.awaitingWriter(2).length, 0)
+  registry.close()
+})

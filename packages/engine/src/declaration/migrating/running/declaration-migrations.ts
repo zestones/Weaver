@@ -1,3 +1,4 @@
+import { DefaultWriter } from '../../migrations/0003-default-writer.ts'
 import { CheckCommands } from '../../migrations/0002-check-commands.ts'
 import { DeclarationParts, type PartTexts } from '../../reading/declaration-parts.ts'
 import type { PartName } from '../../schema/declaration-document.ts'
@@ -22,7 +23,7 @@ export interface MigrationRun {
 // new version, and comes with its migration.
 export class DeclarationMigrations {
   // In order, one per version. A migration is never edited once a release carries it.
-  static readonly ALL: readonly Migration[] = [new CheckCommands()]
+  static readonly ALL: readonly Migration[] = [new CheckCommands(), new DefaultWriter()]
   // The version before any migration.
   private static readonly FIRST = 1
   static readonly LATEST = DeclarationMigrations.ALL.at(-1)?.version ?? DeclarationMigrations.FIRST
@@ -64,6 +65,7 @@ export class DeclarationMigrations {
       const document = this.parsed(text)
 
       if (document !== null) documents[part] = document
+      else if (part === 'writer') documents[part] = {}
     }
 
     const before = Object.fromEntries(Object.entries(documents).map(([part, document]) => [part, JSON.stringify(document)]))

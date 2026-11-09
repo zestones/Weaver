@@ -1,3 +1,4 @@
+import { ReviewDelivery } from '../delivery/review-delivery.ts'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { isAlive } from '../../lib/process/alive.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
@@ -90,6 +91,18 @@ export class ReviewRounds {
 
     store.keep(content, {
       state: 'running',
+      origin: {
+        author: session.agent,
+        role: 'reviewer',
+        session: session.id,
+        subagent: null,
+        unit: unit.number,
+        requests: unit.requests,
+        commit: session.repo.head(),
+        at: new Date().toISOString(),
+      },
+      maxRefusals: policy.maxRefusals,
+      round: unit.reviewRounds + 1,
       request: {
         rules: declaration.reviewCriteria(diff.paths).map(({ id, statement, evidence }) => ({ id, statement, evidence })),
         files: diff.files,
@@ -167,6 +180,8 @@ export class ReviewRounds {
 
     if (record.state === 'interrupted') return new UnitReview({ ...about, standing: 'interrupted', outcome })
     if (record.state === 'failed' || outcome.failure !== null) return new UnitReview({ ...about, standing: 'failed', outcome })
+    if ((outcome.found && round <= policy.maxRefusals) || (!outcome.found && outcome.suspicions.length === 0))
+      new ReviewDelivery(work.session.repo).taken(work.session.id, content)
     if (!outcome.found) return new UnitReview({ ...about, standing: 'clean', outcome })
 
     return new UnitReview({ ...about, standing: round <= policy.maxRefusals ? 'sent-back' : 'for-owner', outcome })

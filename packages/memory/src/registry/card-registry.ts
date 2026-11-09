@@ -1,3 +1,4 @@
+import { isAlive } from '../lib/process/alive.ts'
 import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { DatabaseSync } from 'node:sqlite'
@@ -48,10 +49,25 @@ export interface Noted {
 }
 
 export interface NewReviewCard {
+  readonly identity?: string
+  readonly legacyPoint?: string
   readonly origin: 'finding' | 'suspicion'
   readonly places: readonly Place[]
   readonly content: ReviewContent
   readonly provenance: Provenance
+}
+
+interface WriterBatchRecord {
+  readonly state: 'running' | 'answered' | 'completed'
+  readonly pid: number
+  readonly flags: readonly number[]
+  readonly attempts: Readonly<Record<string, number>>
+  readonly runtime: string
+  readonly model: string | null
+  readonly seconds: number
+  readonly costUsd: number | null
+  readonly failure: string | null
+  readonly at: string
 }
 
 interface IssueAttempt {
@@ -95,6 +111,12 @@ export class CardRegistry {
     })
     this.cards = new CardTable(this.db)
     this.turn = new WriterTurn(this.db)
+    try {
+      this.recoverWriting()
+    } catch (error) {
+      this.db.close()
+      throw error
+    }
   }
 
   // Whether a registry was ever made there: opening one makes it.
@@ -149,28 +171,136 @@ export class CardRegistry {
   // A finding or a suspicion of a review becomes an open card at once. The same point of the same rule at the same
   // place as a card that waits is an occurrence of that card, not a new one.
   open(card: NewReviewCard): Card {
+    return this.write(() => this.opening(card))
+  }
+
+  private opening(card: NewReviewCard): Card {
+    const { origin, places, content, provenance } = card
+    // A caller that sends the same point of the same review again is given the card it went to.
+    const point = card.identity ?? JSON.stringify([content.review, content.message])
+    const taken = this.cards.cardOfPoint(point)
+
+    if (taken !== null) return new Card(this.existing(taken))
+
+    const legacy = card.legacyPoint === undefined ? null : this.cards.cardOfPoint(card.legacyPoint)
+    const previous = legacy === null ? null : this.existing(legacy)
+    const sameSession =
+      previous !== null &&
+      (previous.provenance.session === provenance.session ||
+        previous.occurrences.some(
+          (occurrence) =>
+            occurrence.provenance.session === provenance.session && occurrence.note === `${content.review}: ${content.message}`,
+        ))
+    if (legacy !== null && sameSession) {
+      this.cards.keepPoint(point, legacy)
+      return new Card(this.existing(legacy))
+    }
+    const reviewKey = this.reviewKey(card)
+    const waiting = this.cards.waitingAs(reviewKey)
+    const kept =
+      waiting === null
+        ? this.cards.insert({ ...this.blank(origin, 'open', places, provenance, 'opened'), review: content }, { callId: null, reviewKey })
+        : this.cards.update(
+            this.after(waiting, 'seen-again', content.review, {
+              occurrences: [...waiting.occurrences, { card: null, provenance, note: `${content.review}: ${content.message}` }],
+            }),
+          )
+
+    this.cards.keepPoint(point, kept.number)
+
+    return new Card(kept)
+  }
+
+  publishReview(id: string, session: string, points: readonly NewReviewCard[], unlessDelivered?: string): Card[] {
     return this.write(() => {
-      const { origin, places, content, provenance } = card
-      // A caller that sends the same point of the same review again is given the card it went to.
-      const point = JSON.stringify([content.review, content.message])
-      const taken = this.cards.cardOfPoint(point)
+      if (unlessDelivered !== undefined && this.reviewDelivered(unlessDelivered)) return []
+      const previous = this.db.prepare('SELECT cards FROM review_deliveries WHERE id = ?').get(id)
+      if (previous !== undefined) return (JSON.parse(String(previous.cards)) as number[]).map((number) => new Card(this.existing(number)))
+      const cards = points.map((point) => this.opening(point))
+      this.db
+        .prepare('INSERT INTO review_deliveries (id, session, cards) VALUES (?, ?, ?)')
+        .run(id, session, JSON.stringify(cards.map((card) => card.number)))
+      return cards
+    })
+  }
 
-      if (taken !== null) return new Card(this.existing(taken))
+  reviewDelivered(id: string): boolean {
+    return this.db.prepare('SELECT id FROM review_deliveries WHERE id = ?').get(id) !== undefined
+  }
 
-      const reviewKey = this.reviewKey(card)
-      const waiting = this.cards.waitingAs(reviewKey)
-      const kept =
-        waiting === null
-          ? this.cards.insert({ ...this.blank(origin, 'open', places, provenance, 'opened'), review: content }, { callId: null, reviewKey })
-          : this.cards.update(
-              this.after(waiting, 'seen-again', content.review, {
-                occurrences: [...waiting.occurrences, { card: null, provenance, note: `${content.review}: ${content.message}` }],
-              }),
-            )
+  reviewNotices(session: string, files: readonly string[]): Card[] {
+    return this.write(() => {
+      const rows = this.db
+        .prepare(
+          `SELECT id, cards FROM review_deliveries WHERE notified IS NULL AND cards != '[]'
+          AND (session = ? OR EXISTS (SELECT 1 FROM json_each(review_deliveries.cards) point
+            JOIN card_files ON card_files.card = point.value WHERE file IN (SELECT value FROM json_each(?))))
+          ORDER BY rowid LIMIT 20`,
+        )
+        .all(session, JSON.stringify(files))
+      const cards = new Map<number, Card>()
+      for (const row of rows) {
+        const listed = (JSON.parse(String(row.cards)) as number[]).map((number) => new Card(this.existing(number)))
+        for (const card of listed) cards.set(card.number, card)
+        this.db.prepare('UPDATE review_deliveries SET notified = ? WHERE id = ?').run(session, String(row.id))
+      }
+      return [...cards.values()]
+    })
+  }
 
-      this.cards.keepPoint(point, kept.number)
+  recoveryPosition(scope: string): string {
+    return String(this.db.prepare('SELECT position FROM recovery_cursor WHERE name = ?').get(scope)?.position ?? '')
+  }
 
-      return new Card(kept)
+  recoveredThrough(scope: string, position: string): void {
+    this.db.prepare('INSERT OR REPLACE INTO recovery_cursor (name, position) VALUES (?, ?)').run(scope, position)
+  }
+
+  recordWriterBatch(record: WriterBatchRecord): number {
+    return Number(this.db.prepare('INSERT INTO writer_batches (record) VALUES (?)').run(JSON.stringify(record)).lastInsertRowid)
+  }
+
+  writerBatches(): WriterBatchRecord[] {
+    return this.db
+      .prepare('SELECT record FROM writer_batches ORDER BY id')
+      .all()
+      .map((row) => JSON.parse(String(row.record)) as WriterBatchRecord)
+  }
+
+  updateWriterBatch(id: number, change: Partial<WriterBatchRecord>): void {
+    const row = this.db.prepare('SELECT record FROM writer_batches WHERE id = ?').get(id)
+    if (row === undefined) throw new RegistryError(`No writer batch ${String(id)}`)
+    const record = JSON.parse(String(row.record)) as WriterBatchRecord
+    this.db.prepare('UPDATE writer_batches SET record = ? WHERE id = ?').run(JSON.stringify({ ...record, ...change }), id)
+  }
+
+  private recoverWriting(): void {
+    this.write(() => {
+      const rows = this.db
+        .prepare(
+          "SELECT id, record FROM writer_batches WHERE json_extract(record, '$.state') IN ('running', 'answered') ORDER BY id LIMIT 20",
+        )
+        .all()
+      for (const row of rows) {
+        const batch = JSON.parse(String(row.record)) as WriterBatchRecord
+        if (isAlive(batch.pid)) continue
+        const failure = 'The writer stopped before applying its answer'
+        for (const number of batch.flags) {
+          const card = this.cards.read(number)
+          if (card?.state !== 'raw' || card.writing.attempts !== batch.attempts[String(number)]) continue
+          this.cards.update(this.after(card, 'writing-failed', failure, { writing: { attempts: card.writing.attempts + 1, failure } }))
+        }
+        this.updateWriterBatch(Number(row.id), { state: 'completed', failure })
+      }
+    })
+  }
+
+  retryWriting(): void {
+    this.write(() => {
+      for (const card of this.cards.select({ states: ['raw'] })) {
+        if (card.writing.attempts > 0)
+          this.cards.update(this.after(card, 'writing-failed', 'Explicit retry', { writing: { attempts: 0, failure: null } }))
+      }
     })
   }
 

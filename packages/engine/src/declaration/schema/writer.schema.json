@@ -1,10 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Weaver writer",
-  "description": "Who writes the cards. A flag is the raw report of a discovery an agent leaves aside. The writer is the agent Weaver starts at the end of a turn to turn the flags of that turn into cards, which the owner reads and decides on. It only reads: it runs no test and changes nothing. It has a limit of time and none of cost. Without this file no writer starts: flags stay raw, and nothing is spent.",
+  "description": "Who writes waiting flags. Install and update default to Codex using its configured model. Set enabled to false to disable writing explicitly.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["runtime", "timeoutSeconds"],
   "properties": {
     "$schema": {
       "type": "string",
@@ -33,6 +32,26 @@
       "type": "string",
       "minLength": 1,
       "description": "The file that tells the writer how this project wants its cards written, relative to the repository root. Its header lists the `sections` of the body of a card. Weaver guards the file. Without a skill, a card has the sections Observation, Context, Trace and Uncertainties."
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "batches": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "description": "Five flags per batch; four batches per automatic start by default."
     }
+  },
+  "if": {
+    "properties": {
+      "enabled": {
+        "const": false
+      }
+    },
+    "required": ["enabled"]
+  },
+  "else": {
+    "required": ["runtime", "timeoutSeconds"]
   }
 }

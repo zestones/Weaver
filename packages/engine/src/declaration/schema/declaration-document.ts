@@ -73,6 +73,8 @@ export interface ReviewersDocument {
 export type RulesDocument = Readonly<Record<string, DocumentReviewRule>>
 
 export interface WriterDocument {
+  readonly enabled?: boolean
+  readonly batches?: number
   readonly runtime: 'claude' | 'codex'
   readonly model?: string
   readonly effort?: string

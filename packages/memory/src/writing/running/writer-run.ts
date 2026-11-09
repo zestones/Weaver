@@ -47,14 +47,13 @@ export class WriterRun {
     }
   }
 
-  // Flags made while the writer works are written up before it leaves.
   private async write(registry: CardRegistry): Promise<void> {
     const tried = new Set<number>()
 
     try {
       let flags = this.next(registry, tried)
 
-      while (flags.length > 0) {
+      for (let batch = 0; flags.length > 0 && batch < (this.job.settings.batches ?? 4); batch += 1) {
         for (const flag of flags) tried.add(flag.number)
 
         await this.writeUp(registry, flags)
@@ -80,13 +79,27 @@ export class WriterRun {
       .about(files)
       .filter((card) => !numbers.includes(card.number))
       .slice(0, KNOWN_LIMIT)
+    const batch = registry.recordWriterBatch({
+      state: 'running',
+      pid: process.pid,
+      flags: numbers,
+      attempts: Object.fromEntries(flags.map((flag) => [String(flag.number), flag.record.writing.attempts])),
+      runtime: settings.runtime,
+      model: settings.model,
+      seconds: 0,
+      costUsd: null,
+      failure: null,
+      at: new Date().toISOString(),
+    })
     const result = await this.ask(new WriterRequest(this.job, flags, known))
     const reader = new AnswerReader(labels, settings.sections)
+    registry.updateWriterBatch(batch, { state: 'answered', seconds: result.seconds, costUsd: result.costUsd, failure: result.failure })
     const applier = new AnswerApplier(registry, {
+      batch,
       runtime: settings.runtime,
       model: settings.model,
       seconds: result.seconds,
-      costUsd: result.costUsd,
+      costUsd: null,
     })
 
     for (const flag of numbers) {
@@ -95,6 +108,7 @@ export class WriterRun {
 
       applier.apply(flag, result.failure ?? reader.read(result.answer, flag, same))
     }
+    registry.updateWriterBatch(batch, { state: 'completed' })
   }
 
   // Whatever goes wrong, the flags are told: one left without an answer would be asked again at every run.

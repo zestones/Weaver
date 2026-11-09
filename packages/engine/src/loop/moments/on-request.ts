@@ -1,3 +1,6 @@
+import { DetachedWriterLauncher, type WriterLauncher } from '@weaver/memory'
+import { WriterStart } from '../../flagging/writing/writer-start.ts'
+import { AgentReviewer } from '../../review/running/agent-reviewer.ts'
 import { ReleaseNotice } from '../exchange/release-notice.ts'
 import { TaskNotification } from '../../agents/events/task-notification.ts'
 import { RequestBriefing } from '../../guidance/briefing/request-briefing.ts'
@@ -11,6 +14,12 @@ import type { Moment } from './moment.ts'
 
 export class OnRequest implements Moment {
   readonly speaksToOwner = true
+
+  private readonly writers: WriterLauncher
+
+  constructor(writers: WriterLauncher = new DetachedWriterLauncher()) {
+    this.writers = writers
+  }
 
   run(turn: Turn): Answer {
     const prompt = turn.event.prompt ?? ''
@@ -26,6 +35,12 @@ export class OnRequest implements Moment {
     // requests, such as the end of a task, starts no work: it is not briefed again.
     if (turn.event.subagent) return briefed
     if (!request.isFromOwner) return Answer.silent()
+
+    try {
+      new WriterStart(this.writers, { [AgentReviewer.MARK]: '1' }).run(turn.repo, turn.declaration)
+    } catch (error) {
+      briefed = briefed.after(`[weaver] The writer could not start: ${String(error)}`)
+    }
 
     const release = new ReleaseNotice().forSession(session)
 

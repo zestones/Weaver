@@ -94,7 +94,7 @@ test('a flag the writer wrote up is an open card: its title, its labels, its sec
   assert.deepEqual([card?.state, card?.title, card?.labels()], ['open', 'The card of flag 1', ['type:bug']])
   assert.deepEqual(written?.sections, SECTIONS)
   assert.deepEqual(written?.look, { verdict: 'agrees', note: 'Read the file: nothing calls it.' })
-  assert.deepEqual(written?.writer, { runtime: 'codex', model: 'gpt-5.5', seconds: 12, costUsd: 0.02 })
+  assert.deepEqual(written?.writer, { batch: 1, runtime: 'codex', model: 'gpt-5.5', seconds: 12, costUsd: null })
   assert.match(written?.at ?? '', /^\d{4}-\d\d-\d\dT/)
   assert.match(card?.record.flag?.text ?? '', /^Seen: no call of call1\(\)/, 'the flag is kept word for word')
   assert.deepEqual(registry.awaitingWriter(WriterRun.MAX_ATTEMPTS), [])
@@ -358,4 +358,65 @@ test('a run that is given no registry opens the one of the job, and closes it', 
 
   assert.deepEqual([after.find(1)?.state, after.find(1)?.title], ['open', 'The card of flag 1'])
   after.close()
+})
+
+test('511 old flags are caught up in four batches of five per start, with cost counted once per batch', async () => {
+  const registry = flagged(511)
+  const writer: AgentExecution = {
+    runtime: 'codex',
+    isAvailable: () => true,
+    hooks: () => Promise.resolve(null),
+    run: (task) => Promise.resolve(answering(...[...task.prompt.matchAll(/### Flag #(\d+)/g)].map(([, n]) => cardOf(Number(n))))),
+  }
+  await run(registry, writer)
+  assert.equal(registry.awaitingWriter(2).length, 491)
+  assert.equal(registry.writerBatches().length, 4)
+  assert.equal(
+    registry.writerBatches().reduce((sum, batch) => sum + Number(batch.costUsd), 0),
+    0.08,
+  )
+  assert.equal(registry.find(1)?.record.written?.writer.batch, registry.find(5)?.record.written?.writer.batch)
+  assert.notEqual(registry.find(5)?.record.written?.writer.batch, registry.find(6)?.record.written?.writer.batch)
+  await run(registry, writer, { ...JOB, settings: { ...JOB.settings, batches: 2 } })
+  assert.equal(registry.awaitingWriter(2).length, 481)
+})
+
+test('only an explicit retry resets exhausted flags, and an unknown batch cost stays unknown', async () => {
+  const registry = flagged(1)
+  await run(registry, agent(failing('authentication failed')))
+  await run(registry, agent(failing('authentication failed')))
+  assert.equal(registry.awaitingWriter(2).length, 0)
+  assert.equal(registry.writerBatches()[0]?.costUsd, null)
+  registry.retryWriting()
+  await run(registry, agent(answering(cardOf(1))))
+  assert.equal(registry.find(1)?.state, 'open')
+})
+
+test('a dead writer leaves a durable unknown-cost batch, recovered once without losing its flags', async () => {
+  const stateDir = registries.folder()
+  const registry = new CardRegistry(stateDir)
+  registry.flag(flagOf())
+  registry.recordWriterBatch({
+    state: 'running',
+    pid: 2 ** 22 + 7,
+    flags: [1],
+    attempts: { '1': 0 },
+    runtime: 'codex',
+    model: null,
+    seconds: 0,
+    costUsd: null,
+    failure: null,
+    at: new Date().toISOString(),
+  })
+  registry.close()
+  const recovered = new CardRegistry(stateDir)
+  assert.deepEqual(stateOf(recovered, 1), ['raw', 1, 'The writer stopped before applying its answer'])
+  assert.equal(recovered.writerBatches()[0]?.costUsd, null)
+  recovered.close()
+  const again = new CardRegistry(stateDir)
+  assert.equal(again.find(1)?.record.writing.attempts, 1)
+  await run(again, agent(answering(cardOf(1))))
+  assert.equal(again.find(1)?.state, 'open')
+  assert.equal(again.writerBatches().length, 2)
+  again.close()
 })

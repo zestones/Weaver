@@ -1,3 +1,4 @@
+import type { Provenance } from '@weaver/memory'
 import type { Blob } from '../../lib/git/repository.ts'
 import type { FindingAnswer } from '../answers/finding-answer.ts'
 import type { ReviewRequestFields } from '../request/review-request.ts'
@@ -7,6 +8,9 @@ import type { ReviewOutcomeFields } from './review-outcome.ts'
 // A review as it is kept, from the moment it is asked: what was asked and of whom, what the reviewer saw, what it
 // found, and what the author answered.
 export interface ReviewRecord {
+  readonly origin?: Provenance
+  readonly maxRefusals?: number
+  readonly round?: number
   // interrupted: the end of turn that waited for it was, by the owner or by its runtime.
   readonly state: 'running' | 'reviewed' | 'failed' | 'interrupted'
   readonly request: ReviewRequestFields

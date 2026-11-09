@@ -13,7 +13,7 @@ const HOOK = join(import.meta.dirname, '../../src/bin/hook.ts')
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-warnings-'))
 
 const DECLARATION = {
-  version: 2,
+  version: 3,
   finish: { headings: ['Request', 'To validate'] },
   scope: { exclude: ['src/generated'] },
   checks: {

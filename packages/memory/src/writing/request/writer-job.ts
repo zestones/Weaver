@@ -2,6 +2,7 @@
 export type LabelCatalog = Readonly<Record<string, Readonly<Record<string, string>>>>
 
 export interface WriterSettings {
+  readonly batches?: number
   readonly runtime: 'claude' | 'codex'
   readonly model: string | null
   readonly effort: string | null

@@ -208,11 +208,13 @@ export class EndOfTurn implements Moment {
     }
 
     if (verdict.passed) {
+      const cards = review === null ? [] : new ReviewCards(session.repo).open(review, session, unit, declaration)
       session.settle(unit.files)
-      if (review !== null) new ReviewCards(session.repo).open(review, session, unit, declaration)
+      const filed =
+        cards.length === 0 ? null : `[weaver] Review findings filed as cards: ${cards.map((card) => `#${String(card.number)}`).join(', ')}.`
       progress.over(report.coverage.unchecked ? `${report.coverage.description}; settled without automated validation` : 'passed')
 
-      return this.ended(turn, null, this.over(session, Answer.saying(report.summary(reportPath))))
+      return this.ended(turn, null, this.over(session, Answer.saying(report.summary(reportPath)).before(filed)))
     }
 
     if (!declaration.checkLimits.isExhaustedAfter(session.failRound())) {

@@ -183,6 +183,7 @@ export class UpdateCommand implements Command {
 
     if (!changed) this.screen.done(`This project is up to date with Weaver ${own.tag}.`)
     if (dryRun && changed) this.screen.hint('Dry run: nothing was written.')
+    if (!dryRun) project.startWriter()
 
     return 0
   }

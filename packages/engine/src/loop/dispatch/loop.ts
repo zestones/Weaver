@@ -1,3 +1,5 @@
+import { ReviewDelivery } from '../../review/delivery/review-delivery.ts'
+import { ReviewRecovery } from '../../review/delivery/review-recovery.ts'
 import { DetachedWriterLauncher, type WriterLauncher } from '@weaver/memory'
 import { Payload } from '../../agents/events/payload.ts'
 import { AgentCatalog } from '../../agents/runtimes/agent-catalog.ts'
@@ -35,7 +37,7 @@ export class Loop {
   ) {
     this.sinceStart = sinceStart
     this.moments = new Map<string, Moment>([
-      ['UserPromptSubmit', new OnRequest()],
+      ['UserPromptSubmit', new OnRequest(writers)],
       ['PreToolUse', new BeforeCall()],
       ['PostToolUse', new AfterCall('PostToolUse', checks)],
       // A command that fails may have written files before it did.
@@ -69,7 +71,16 @@ export class Loop {
     }
 
     try {
-      let answer = await moment.run(new Turn(agent, event, repo, declaration))
+      const turn = new Turn(agent, event, repo, declaration)
+      const delivers =
+        event.sessionId !== null && !event.subagent && ['UserPromptSubmit', 'PostToolUse', 'PostToolUseFailure'].includes(eventName)
+      if (delivers) new ReviewRecovery(repo).run()
+      let answer = await moment.run(turn)
+      if (delivers && event.sessionId !== null) {
+        const files = Object.keys(turn.session()?.unit().files ?? {})
+        const notice = new ReviewDelivery(repo).notice(event.sessionId, files)
+        if (notice !== null) answer = answer.context(eventName, notice)
+      }
 
       if (repo.unavailable.size > 0) {
         answer = feedback.failure(

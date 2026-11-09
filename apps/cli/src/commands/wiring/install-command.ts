@@ -79,6 +79,10 @@ export class InstallCommand implements Command {
 
     this.screen.line()
     this.screen.hint(this.wired())
+    const writer = project.readableDeclaration()?.writer
+    if (writer !== null && writer !== undefined)
+      this.screen.note(`Writer: ${writer.runtime}, ${writer.model ?? 'its configured model'}, ${String(writer.batches)} batches per start.`)
+    project.startWriter()
 
     return 0
   }

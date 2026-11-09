@@ -49,6 +49,7 @@ export interface WrittenCard {
   readonly look: WriterLook
   // The time and the cost are those of the task that wrote it, which may have written several cards.
   readonly writer: {
+    readonly batch?: number
     readonly runtime: string
     readonly model: string | null
     readonly seconds: number

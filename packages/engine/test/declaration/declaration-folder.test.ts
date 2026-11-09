@@ -30,7 +30,7 @@ const problems = (project: Record<string, unknown>) => problemsOf(() => parse(pr
 const problemsIn = (texts: PartTexts) => problemsOf(() => new DeclarationParts('.weaver', texts).declaration())
 
 // The settings every project writes: its limits, with the values a new project starts with.
-const SETTINGS = '{"version":2,"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
+const SETTINGS = '{"version":3,"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
 
 const VALID = {
   scope: { exclude: ['design/lab'] },
@@ -185,7 +185,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
     }),
     [
       'settings.json: chekcs is not a known field',
-      'settings.json: version must be 2',
+      'settings.json: version must be 3',
       'settings.json: checks.maxRefusals must be at least 1',
       'project/guards.json: 9x is not a valid name',
       'project/guards.json: 9x.statement is missing',
@@ -209,7 +209,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
 
 test('a file writes every limit Weaver applies: one left out is a problem, never a value the file does not show', () => {
   const written = {
-    settings: '{"version":2,"checks":{}}',
+    settings: '{"version":3,"checks":{}}',
     checks: JSON.stringify({ c: { judge: ['true'], rules: { plain: 'x', owner: { statement: 'y' } } } }),
     reviewers: '{"runtime":"codex"}',
   }
@@ -343,7 +343,7 @@ test('the labels of a card, the command that files an issue and the writer are e
 
   assert.deepEqual(config?.labels, labels)
   assert.deepEqual(config?.issue, command)
-  assert.deepEqual({ ...config?.writer }, { ...writer, sections: ['What', 'Why it matters'] })
+  assert.deepEqual({ ...config?.writer }, { ...writer, batches: 4, sections: ['What', 'Why it matters'] })
   assert.deepEqual(config?.skills, ['.weaver/skills/wv-card.md'], 'the skill of the writer is guarded as the others are')
 })
 
@@ -352,7 +352,10 @@ test('a project that declares none of them has no label, no writer and no comman
   const plain = parse({ writer: { runtime: 'codex' } }).writer
 
   assert.deepEqual([bare.labels, bare.writer, bare.issue, bare.skills], [{}, null, null, []])
-  assert.deepEqual({ ...plain }, { runtime: 'codex', model: null, effort: null, timeoutSeconds: 600, skill: null, sections: CARD_SECTIONS })
+  assert.deepEqual(
+    { ...plain },
+    { runtime: 'codex', batches: 4, model: null, effort: null, timeoutSeconds: 600, skill: null, sections: CARD_SECTIONS },
+  )
 })
 
 test('the sections of a card are listed in the header of the skill of the writer; the four agreed ones stand until it is written', () => {
