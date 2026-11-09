@@ -101,6 +101,7 @@ export class DeclarationParts {
       exclude: scripts.scope.exclude,
       finish: new FinishPolicy({ headings, skill: finish.skill ?? null }),
       checkLimits: new CheckLimits(settings.checks),
+      cards: settings.cards,
       review: reviewers === null ? null : this.reviewPolicy(reviewers),
       scripts: { writers: scripts.writers, readers: scripts.readers },
       checks,

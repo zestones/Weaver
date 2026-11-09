@@ -405,7 +405,7 @@ test('a project whose configuration lacks migrations is told which, and that not
   assert.equal(status, 1)
   assert.equal(
     lines[0],
-    '  X .weaver/ is 2 migrations behind this Weaver (0002-check-commands, 0003-default-writer): nothing is checked until weaver update brings it up to date.',
+    '  X .weaver/ is 3 migrations behind this Weaver (0002-check-commands, 0003-default-writer, 0004-card-resolution): nothing is checked until weaver update brings it up to date.',
   )
 })
 

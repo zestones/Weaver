@@ -13,7 +13,8 @@ import { git, makeRepo } from '../fixtures/repo.ts'
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-guards-'))
 const catalog = new AgentCatalog()
 const DECLARATION = {
-  version: 3,
+  version: 4,
+  cards: { resolvePerTask: null },
   guards: {
     'tool-config': {
       statement: 'Tool configuration is the owner’s.',

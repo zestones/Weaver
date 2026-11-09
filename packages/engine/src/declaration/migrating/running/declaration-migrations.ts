@@ -1,3 +1,4 @@
+import { CardResolution } from '../../migrations/0004-card-resolution.ts'
 import { DefaultWriter } from '../../migrations/0003-default-writer.ts'
 import { CheckCommands } from '../../migrations/0002-check-commands.ts'
 import { DeclarationParts, type PartTexts } from '../../reading/declaration-parts.ts'
@@ -23,7 +24,7 @@ export interface MigrationRun {
 // new version, and comes with its migration.
 export class DeclarationMigrations {
   // In order, one per version. A migration is never edited once a release carries it.
-  static readonly ALL: readonly Migration[] = [new CheckCommands(), new DefaultWriter()]
+  static readonly ALL: readonly Migration[] = [new CheckCommands(), new DefaultWriter(), new CardResolution()]
   // The version before any migration.
   private static readonly FIRST = 1
   static readonly LATEST = DeclarationMigrations.ALL.at(-1)?.version ?? DeclarationMigrations.FIRST

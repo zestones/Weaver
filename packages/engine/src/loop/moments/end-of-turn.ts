@@ -89,7 +89,10 @@ export class EndOfTurn implements Moment {
     // who writes #review is answered by the review, not by how the agent words its reply.
     const turn = { session, unit: unit.number, finished }
 
-    const notes = finished && (!unit.isEmpty || unit.cards.resolutionAsked === true) ? this.notesWanted(session, unit, lastMessage) : null
+    const notes =
+      finished && (!unit.isEmpty || unit.cards.resolutionAsked === true)
+        ? this.notesWanted(session, unit, lastMessage, declaration.cards.resolvePerTask)
+        : null
     if (notes !== null) return this.ended(turn, 'cards', Answer.blocking(notes))
 
     if (unit.isEmpty && this.reviews.follows(session, declaration, unit)) return this.check(turn, declaration, unit, lastMessage)
@@ -125,10 +128,10 @@ export class EndOfTurn implements Moment {
     return `[weaver] The checks still fail after ${counted(declaration.checkLimits.maxRefusals, 'refusal')}; the agent may stop. Failures are left to the owner. Unchanged inputs are not checked again. Request #check or run weaver check to judge them again. Report: ${report}`
   }
 
-  private notesWanted(session: Session, unit: UnitOfWork, lastMessage: string | null): string | null {
+  private notesWanted(session: Session, unit: UnitOfWork, lastMessage: string | null, limit: number | null): string | null {
     try {
-      const cards = new CardResolution(session).prepare(unit, lastMessage)
-      return new CardNotesWanted(cards, Object.keys(unit.files)).text
+      const cards = new CardResolution(session, limit).prepare(unit, lastMessage)
+      return new CardNotesWanted(cards, Object.keys(unit.files), limit).text
     } catch {
       return null
     }

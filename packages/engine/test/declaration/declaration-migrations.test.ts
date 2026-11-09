@@ -69,7 +69,7 @@ test('files of an earlier format are brought to the one this Weaver reads, one m
   assert.equal(migrations.isBehind, true)
   assert.deepEqual(
     migrations.pending().map((migration) => migration.label),
-    ['0002-check-commands', '0003-default-writer'],
+    ['0002-check-commands', '0003-default-writer', '0004-card-resolution'],
   )
   assert.deepEqual(applied.slice(0, 1), [
     {
@@ -86,6 +86,7 @@ test('files of an earlier format are brought to the one this Weaver reads, one m
   assert.deepEqual(JSON.parse(texts.settings ?? ''), {
     $schema: '/somewhere/settings.schema.json',
     version: DeclarationMigrations.LATEST,
+    cards: { resolvePerTask: null },
     finish: { skill: '.weaver/skills/wv-finish.md' },
     checks: { maxRefusals: 5, totalTimeoutSeconds: 600, parallel: 2, warnTimeoutSeconds: 30 },
   })
@@ -110,10 +111,10 @@ test('a project in another format is not read: its owner is told which, and that
   const ahead = { settings: JSON.stringify({ version: DeclarationMigrations.LATEST + 1, checks: {} }) }
 
   assert.deepEqual(problemsOf(FIRST, 'behind'), [
-    'settings.json: these files are in the format of version 1, and this Weaver reads version 3: run weaver update, which brings them to it',
+    'settings.json: these files are in the format of version 1, and this Weaver reads version 4: run weaver update, which brings them to it',
   ])
   assert.deepEqual(problemsOf(ahead, 'ahead'), [
-    'settings.json: these files are in the format of version 4, and this Weaver reads version 3: run weaver update, which installs the release that reads them',
+    'settings.json: these files are in the format of version 5, and this Weaver reads version 4: run weaver update, which installs the release that reads them',
   ])
   assert.equal(new DeclarationMigrations(ahead).isAhead, true)
   assert.deepEqual(new DeclarationMigrations(ahead).run(), { texts: {}, applied: [] }, 'a format it does not know is not touched')
@@ -125,7 +126,7 @@ test('a file that is not JSON is left to the reading of the declaration, which s
   assert.deepEqual(Object.keys(texts), ['settings', 'writer'])
   assert.deepEqual(
     applied.map((migration) => migration.label),
-    ['0002-check-commands', '0003-default-writer'],
+    ['0002-check-commands', '0003-default-writer', '0004-card-resolution'],
   )
   assert.equal(new DeclarationMigrations({ settings: 'not json' }).written, null)
 })
@@ -182,5 +183,30 @@ test('the default writer migration adds Codex and preserves custom, disabled and
     '{broken',
   ]) {
     assert.equal(new DeclarationMigrations({ ...base, writer }).run().texts.writer, undefined)
+  }
+})
+
+test('version 4 adds unlimited card resolution while preserving settings and explicit limits', () => {
+  const settings = {
+    version: 3,
+    finish: { skill: 'finish.md' },
+    checks: { maxRefusals: 5, totalTimeoutSeconds: 600, parallel: 2, warnTimeoutSeconds: 30 },
+  }
+  const original = JSON.stringify(settings)
+  const added = new DeclarationMigrations({ settings: original }).run()
+  assert.deepEqual(Object.keys(added.texts), ['settings'])
+  assert.deepEqual(JSON.parse(added.texts.settings ?? ''), { ...settings, version: 4, cards: { resolvePerTask: null } })
+  assert.deepEqual(added.applied, [
+    {
+      label: '0004-card-resolution',
+      summary: 'The project chooses how many cards agents resolve per task, unlimited by default.',
+      changes: ['settings.json: cards added, at {"resolvePerTask":null}: all eligible cards are resolved at task end'],
+    },
+  ])
+  assert.equal(new DeclarationParts('.weaver', added.texts).declaration().cards.resolvePerTask, null)
+  assert.deepEqual(new DeclarationMigrations(added.texts).run(), { texts: {}, applied: [] })
+  for (const resolvePerTask of [null, 0, 1]) {
+    const kept = new DeclarationMigrations({ settings: JSON.stringify({ ...settings, cards: { resolvePerTask } }) }).run()
+    assert.deepEqual(JSON.parse(kept.texts.settings ?? ''), { ...settings, version: 4, cards: { resolvePerTask } })
   }
 })

@@ -10,6 +10,7 @@ import type { WriterPolicy } from './writer-policy.ts'
 export interface DeclarationFields {
   readonly exclude: readonly string[]
   readonly finish: FinishPolicy
+  readonly cards: { readonly resolvePerTask: number | null }
   readonly checkLimits: CheckLimits
   readonly review: ReviewPolicy | null
   readonly scripts: ScriptHints
@@ -24,6 +25,7 @@ export interface DeclarationFields {
 export class Declaration {
   readonly exclude: readonly string[]
   readonly finish: FinishPolicy
+  readonly cards: { readonly resolvePerTask: number | null }
   readonly checkLimits: CheckLimits
   // null when the project asks for no review.
   readonly review: ReviewPolicy | null
@@ -41,6 +43,7 @@ export class Declaration {
   constructor(fields: DeclarationFields) {
     this.exclude = fields.exclude
     this.finish = fields.finish
+    this.cards = fields.cards
     this.checkLimits = fields.checkLimits
     this.review = fields.review
     this.scripts = fields.scripts

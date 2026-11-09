@@ -46,7 +46,10 @@ test('the guide says how a task goes and each command with what the project decl
   assert.ok(text.includes(`\`\`\`text\n${NoteText.FORMAT}\n\`\`\``))
   assert.match(text, /After a call changes a file, Weaver injects the open cards/)
   assert.doesNotMatch(text, /Do not fix what you flag|one file at a time/)
-  assert.match(text, /at most two actionable cards/)
+  assert.match(text, /cards\.resolvePerTask/)
+  assert.match(text, /null includes every eligible card without a time box/)
+  assert.match(text, /0 turns the pass off/)
+  assert.match(text, /claims last one hour/)
   assert.match(text, /Investigation alone does not clear an explicit owner question/)
   assert.match(text, /A fix is refused on a card where nothing yet says what was looked into/)
   assert.match(

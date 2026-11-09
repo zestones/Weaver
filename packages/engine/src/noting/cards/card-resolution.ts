@@ -4,8 +4,10 @@ import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
 
 export class CardResolution {
   private readonly session: Session
+  private readonly limit: number | null
 
-  constructor(session: Session) {
+  constructor(session: Session, limit: number | null) {
+    this.limit = limit
     this.session = session
   }
 
@@ -20,6 +22,7 @@ export class CardResolution {
         registry.releaseResolution(holder)
         return []
       }
+      if (this.limit === 0) return []
       const cards = registry
         .about(Object.keys(unit.files))
         .reverse()
@@ -38,8 +41,11 @@ export class CardResolution {
       const resolving = registry.claimResolution(
         cards.filter((card) => card.decision.kind === 'none').map((card) => card.number),
         holder,
+        this.limit,
       )
-      const documenting = cards.filter((card) => card.decision.kind !== 'none').slice(0, 2 - resolving.length)
+      const documenting = cards
+        .filter((card) => card.decision.kind !== 'none')
+        .slice(0, this.limit === null ? undefined : this.limit - resolving.length)
       const selected = [...resolving, ...documenting]
       if (selected.length === 0) return []
       if (
@@ -67,7 +73,7 @@ export class CardResolution {
         continue
       registry.note(number, {
         conclusion: 'deferred',
-        text: `Deferred after the bounded resolution pass. ${lastMessage?.trim() || 'No final explanation was supplied.'}`,
+        text: `Deferred after the resolution pass. ${lastMessage?.trim() || 'No final explanation was supplied.'}`,
         provenance: {
           author: this.session.agent,
           role: 'author',

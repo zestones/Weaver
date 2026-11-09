@@ -32,14 +32,19 @@ function header(name: string, listed: readonly string[]): string {
 // in the header of its finish skill and of the skill of its writer.
 // `limits` are the ones the settings give the checks, `checks` the checks themselves.
 function split(project: Raw): Split {
-  const { finish, limits, scope, scripts, review, checks, guards, labels, issues, writer } = project
+  const { finish, limits, cards, scope, scripts, review, checks, guards, labels, issues, writer } = project
   const { headings, skill: named } = (finish ?? {}) as { headings?: readonly string[]; skill?: string }
   const skill = headings === undefined ? named : (named ?? FINISH_SKILL)
   const { rules, ...reviewers } = (review ?? {}) as Raw
   const { sections, ...writes } = (writer ?? {}) as { sections?: readonly string[]; skill?: string }
   const cardSkill = sections === undefined ? writes.skill : (writes.skill ?? CARD_SKILL)
   const parts: Partial<Record<PartName, unknown>> = {
-    settings: { version: 3, ...(skill === undefined ? {} : { finish: { skill } }), checks: { ...LIMITS, ...(limits as Raw | undefined) } },
+    settings: {
+      version: 4,
+      cards: cards ?? { resolvePerTask: null },
+      ...(skill === undefined ? {} : { finish: { skill } }),
+      checks: { ...LIMITS, ...(limits as Raw | undefined) },
+    },
     guards,
     checks:
       checks === undefined

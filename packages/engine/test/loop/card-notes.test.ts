@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
+import { declarationOf } from '../fixtures/declaration.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import { cardsOf, FLAG_BODY, flagCommand, withRegistry } from '../fixtures/cards.ts'
 import { makeRepo, SAMPLE_REPO, writeFiles } from '../fixtures/repo.ts'
@@ -102,7 +103,7 @@ test('an investigation note counts as written on a changed-file card', async () 
   assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
 })
 
-test('merely naming an actionable card does not bypass the bounded resolution pass, and a deferral is kept', async () => {
+test('merely naming an actionable card does not bypass the resolution pass, and a deferral is kept', async () => {
   prompt(session, 'change a')
   edits(A_FILE, 'export const a = 2\n')
   const checks = stubChecks([PASSING])
@@ -223,3 +224,40 @@ test('reverting all changed files still records a deferred resolution pass', asy
   )
   assert.equal(cardsOf(session.repo)[0]?.conclusion?.as, 'deferred')
 })
+
+for (const limit of [null, 1, 0]) {
+  test(`the project card limit ${String(limit)} controls the once-per-unit resolution pass`, async () => {
+    for (let n = 2; n <= 4; n++) {
+      const earlier = new Session(session.repo, `earlier-${String(n)}`, 'claude')
+      refusalOf(
+        earlier,
+        bashCall(flagCommand([A_FILE], `${FLAG_BODY.replace('no call of refresh()', `missing call ${String(n)}`)}Decision: none\n`)),
+      )
+    }
+    const unrelated = new Session(session.repo, 'unrelated', 'claude')
+    refusalOf(unrelated, bashCall(flagCommand([B_FILE], `${FLAG_BODY}Decision: none\n`)))
+    prompt(session, 'change a')
+    edits(A_FILE, 'export const a = 2\n')
+    const project = declarationOf({ cards: { resolvePerTask: limit } })
+    const checks = stubChecks([PASSING])
+    const asked = await finishWith(session, checks, project)
+    if (limit === 0) {
+      assert.equal(asked.decision, undefined)
+      assert.doesNotMatch(asked.reason ?? '', /Resolve|claimed for resolution/)
+      assert.deepEqual(session.unit().cards.resolving ?? [], [])
+      assert.deepEqual(held(), [null])
+    } else {
+      assert.equal(asked.decision, 'block')
+      assert.equal((asked.reason?.match(/claimed for resolution/g) ?? []).length, limit ?? 4)
+      assert.doesNotMatch(asked.reason ?? '', /#5 /)
+      assert.doesNotMatch(asked.reason ?? '', /minutes|stop work|Spend at most/)
+      if (limit === null) assert.doesNotMatch(asked.reason ?? '', /Handle at most/)
+      else assert.match(asked.reason ?? '', /Handle at most 1 card in this pass/)
+      assert.equal((await finishWith(session, checks, project)).decision, undefined)
+      assert.deepEqual(held(), ['cards', null])
+    }
+    withRegistry(session.repo, (registry) => {
+      assert.equal(registry.claimResolution([1, 2, 3, 4], 'later', null).length, 4, 'no claims remain after the next end of turn')
+    })
+  })
+}

@@ -109,7 +109,12 @@ export class Project {
     new DefaultWriter(this.top).create(link)
     const folder = DeclarationFolder.in(this.top)
     const starter: Readonly<Partial<Record<PartName, object>>> = {
-      settings: { version: DeclarationMigrations.LATEST, finish: { skill: FinishSkill.PATH }, checks: STARTING_LIMITS },
+      settings: {
+        version: DeclarationMigrations.LATEST,
+        finish: { skill: FinishSkill.PATH },
+        checks: STARTING_LIMITS,
+        cards: { resolvePerTask: null },
+      },
       guards: {},
       checks: {},
       scripts: {},

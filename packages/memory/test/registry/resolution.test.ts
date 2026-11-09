@@ -42,7 +42,7 @@ test('older flags are unknown, writers may suggest unknown decisions and later n
   registry.close()
 })
 
-test('claims take at most two eligible cards atomically across connections, expire and release', () => {
+test('claims honor the limit atomically across connections, last one hour and release', () => {
   const dir = registries.folder()
   const first = new CardRegistry(dir)
   const second = new CardRegistry(dir)
@@ -56,23 +56,27 @@ test('claims take at most two eligible cards atomically across connections, expi
   const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
   try {
     assert.deepEqual(
-      first.claimResolution([1, 2, 3, 4, 5], 'first').map((card) => card.number),
+      first.claimResolution([1, 2, 3, 4, 5], 'first', 2).map((card) => card.number),
       [1, 2],
     )
     assert.deepEqual(
-      second.claimResolution([1, 2, 3, 4, 5], 'second').map((card) => card.number),
+      second.claimResolution([1, 2, 3, 4, 5], 'second', 2).map((card) => card.number),
       [3],
     )
-    assert.deepEqual(second.claimResolution([1, 2], 'second'), [])
+    assert.deepEqual(second.claimResolution([1, 2], 'second', 2), [])
     now.mockReturnValue(601001)
+    assert.deepEqual(second.claimResolution([1, 2], 'second', null), [], 'claims outlast ten minutes')
+    now.mockReturnValue(3600999)
+    assert.deepEqual(second.claimResolution([1, 2], 'second', null), [], 'claims last the full hour')
+    now.mockReturnValue(3601000)
     assert.deepEqual(
-      second.claimResolution([1, 2], 'second').map((card) => card.number),
+      second.claimResolution([1, 2], 'second', 2).map((card) => card.number),
       [1, 2],
     )
     first.releaseResolution('first')
-    assert.deepEqual(first.claimResolution([1, 2], 'first'), [], 'an old holder cannot release a newer claim')
+    assert.deepEqual(first.claimResolution([1, 2], 'first', 2), [], 'an old holder cannot release a newer claim')
     second.releaseResolution('second')
-    assert.equal(first.claimResolution([1, 2], 'first').length, 2)
+    assert.equal(first.claimResolution([1, 2], 'first', 2).length, 2)
   } finally {
     now.mockRestore()
     first.close()
@@ -102,10 +106,39 @@ test('version 4 upgrades decisions and claims without losing any registry conten
   )
   assert.equal(after.find(1)?.decision.kind, 'unknown')
   assert.equal(after.find(2)?.record.closing?.reason, 'Keep the existing behavior')
-  assert.equal(after.claimResolution([1], 'later').length, 0)
+  assert.equal(after.claimResolution([1], 'later', 2).length, 0)
   const db = new DatabaseSync(join(dir, 'registry.sqlite'))
   assert.equal(db.prepare('PRAGMA user_version').get()?.user_version, 5)
   assert.equal(db.prepare('SELECT count(*) AS total FROM review_deliveries').get()?.total, 1)
   db.close()
   after.close()
 })
+
+for (const limit of [null, 1, 0]) {
+  test(`claims with limit ${String(limit)} select the eligible cards`, () => {
+    const registry = new CardRegistry(registries.folder())
+    try {
+      for (let n = 1; n <= 5; n++) {
+        const flag = flagOf({ callId: `flag-${String(n)}`, text: `flag ${String(n)}` })
+        registry.flag({
+          ...flag,
+          fields: {
+            ...flag.fields,
+            decision: { kind: n === 4 ? 'owner' : n === 5 ? 'unknown' : 'none', question: n === 4 ? 'Which?' : null },
+          },
+        })
+      }
+      const expected = limit === null ? [1, 2, 3] : limit === 1 ? [1] : []
+      assert.deepEqual(
+        registry.claimResolution([1, 2, 3, 4, 5], 'holder', limit).map((card) => card.number),
+        expected,
+      )
+      assert.deepEqual(
+        registry.claimResolution([1, 2, 3, 4, 5], 'parallel', null).map((card) => card.number),
+        [1, 2, 3].filter((number) => !expected.includes(number)),
+      )
+    } finally {
+      registry.close()
+    }
+  })
+}

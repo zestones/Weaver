@@ -113,7 +113,7 @@ export class WeaverGuide {
       NoteText.FORMAT,
       '```',
       '',
-      'At task end Weaver asks once per unit to resolve at most two actionable cards on files the unit changed, within about ten minutes, and document each with notes. These cards have short shared claims so parallel agents do not take the same work; stop when the claim expires. Raw flags with no owner decision may be included. If a card is out of reach, write `weaver note <number> deferred <reason>` and name it and the reason in your final message; it stays open. Pending owner decisions are left explicit. The same prompt asks for notes on other cards whose files changed. Reading a card, flagging it in this unit, or writing any note (including free text) creates no note hold. Weaver never adds a second card hold in the unit.',
+      'At task end Weaver asks once per unit to resolve actionable cards on files the unit changed and document each with notes. The project sets `cards.resolvePerTask` in `settings.json`: null includes every eligible card without a time box, an integer limits the number, and 0 turns the pass off. Shared claims last one hour and are released at the next end of turn so parallel agents do not take the same work. Raw flags with no owner decision may be included. If a card is out of reach, write `weaver note <number> deferred <reason>` and name it and the reason in your final message; it stays open. Pending owner decisions are left explicit. The same prompt asks for notes on other cards whose files changed. Reading a card, flagging it in this unit, or writing any note (including free text) creates no note hold. Weaver never adds a second card hold in the unit.',
     ].join('\n')
   }
 

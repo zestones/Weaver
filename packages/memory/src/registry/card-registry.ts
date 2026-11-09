@@ -321,13 +321,13 @@ export class CardRegistry {
     return this.guarded(() => this.cards.naming(files).map((record) => new Card(record)))
   }
 
-  claimResolution(numbers: readonly number[], holder: string): Card[] {
+  claimResolution(numbers: readonly number[], holder: string, limit: number | null): Card[] {
     return this.write(() => {
       const now = Date.now()
       this.db.prepare('DELETE FROM resolution_claims WHERE expires <= ?').run(now)
       const claimed: Card[] = []
       for (const number of numbers) {
-        if (claimed.length === 2) break
+        if (limit !== null && claimed.length >= limit) break
         const record = this.cards.read(number)
         if (record === null) continue
         const card = new Card(record)
@@ -341,7 +341,7 @@ export class CardRegistry {
           continue
         const result = this.db
           .prepare('INSERT OR IGNORE INTO resolution_claims (card, holder, expires) VALUES (?, ?, ?)')
-          .run(number, holder, now + 10 * 60 * 1000)
+          .run(number, holder, now + 60 * 60 * 1000)
         if (result.changes > 0) claimed.push(card)
       }
       return claimed

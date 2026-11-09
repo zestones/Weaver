@@ -30,7 +30,8 @@ const problems = (project: Record<string, unknown>) => problemsOf(() => parse(pr
 const problemsIn = (texts: PartTexts) => problemsOf(() => new DeclarationParts('.weaver', texts).declaration())
 
 // The settings every project writes: its limits, with the values a new project starts with.
-const SETTINGS = '{"version":3,"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
+const SETTINGS =
+  '{"version":4,"cards":{"resolvePerTask":null},"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
 
 const VALID = {
   scope: { exclude: ['design/lab'] },
@@ -169,6 +170,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
     problemsIn({
       settings: JSON.stringify({
         version: '2',
+        cards: { resolvePerTask: null },
         checks: { maxRefusals: 0, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 },
         chekcs: {},
       }),
@@ -185,7 +187,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
     }),
     [
       'settings.json: chekcs is not a known field',
-      'settings.json: version must be 3',
+      'settings.json: version must be 4',
       'settings.json: checks.maxRefusals must be at least 1',
       'project/guards.json: 9x is not a valid name',
       'project/guards.json: 9x.statement is missing',
@@ -199,7 +201,11 @@ test('everything wrong with the shape of the files is reported at once, each wit
     'the links between entries are judged once the shape is right',
   )
   assert.deepEqual(problemsIn({ settings: '[]' }), ['settings.json: the file must be an object'])
-  assert.deepEqual(problemsIn({ settings: '{}' }), ['settings.json: version is missing', 'settings.json: checks is missing'])
+  assert.deepEqual(problemsIn({ settings: '{}' }), [
+    'settings.json: version is missing',
+    'settings.json: checks is missing',
+    'settings.json: cards is missing',
+  ])
   assert.match(problemsIn({ settings: SETTINGS, guards: '{' }).join(' '), /^project\/guards\.json: .*JSON/)
   assert.throws(
     () => new DeclarationParts('.weaver', { settings: '{' }).declaration(),
@@ -209,7 +215,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
 
 test('a file writes every limit Weaver applies: one left out is a problem, never a value the file does not show', () => {
   const written = {
-    settings: '{"version":3,"checks":{}}',
+    settings: '{"version":4,"cards":{"resolvePerTask":null},"checks":{}}',
     checks: JSON.stringify({ c: { judge: ['true'], rules: { plain: 'x', owner: { statement: 'y' } } } }),
     reviewers: '{"runtime":"codex"}',
   }
@@ -496,4 +502,17 @@ test('a check may carry the command that warns right after a call, whose time is
     'project/checks.json: c.verify is not a known field',
     'project/checks.json: c.fix is not a known field',
   ])
+})
+
+test('card resolution requires an explicit nonnegative integer or null', () => {
+  for (const resolvePerTask of [null, 0, 1, 12]) {
+    const settings = JSON.stringify({ ...(JSON.parse(SETTINGS) as object), cards: { resolvePerTask } })
+    assert.equal(new DeclarationParts('.weaver', { settings }).declaration().cards.resolvePerTask, resolvePerTask)
+  }
+  for (const cards of [{}, { resolvePerTask: -1 }, { resolvePerTask: 1.5 }, { resolvePerTask: '1' }, { resolvePerTask: true }]) {
+    const settings = JSON.stringify({ ...(JSON.parse(SETTINGS) as object), cards })
+    assert.ok(problemsIn({ settings }).some((problem) => problem.includes('cards.resolvePerTask')))
+  }
+  const settings = SETTINGS.replace(',"cards":{"resolvePerTask":null}', '')
+  assert.deepEqual(problemsIn({ settings }), ['settings.json: cards is missing'])
 })

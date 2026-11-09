@@ -4,14 +4,14 @@
   "description": "How Weaver works in this project. A repository is supervised as soon as this file exists; the other files of `.weaver/` are optional. Every limit Weaver applies is written here: none has a value the file does not show.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "checks"],
+  "required": ["version", "checks", "cards"],
   "properties": {
     "$schema": {
       "type": "string",
       "description": "The schema this file follows, for the editor."
     },
     "version": {
-      "const": 3,
+      "const": 4,
       "description": "The version of this format. `weaver update` brings the files of an earlier version to this one."
     },
     "finish": {
@@ -54,6 +54,19 @@
         }
       },
       "required": ["maxRefusals", "totalTimeoutSeconds", "parallel", "warnTimeoutSeconds"]
+    },
+    "cards": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The card resolution pass at the end of a task, requested once per unit on files the unit changed.",
+      "properties": {
+        "resolvePerTask": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "How many open cards needing no owner decision the agent may resolve at task end on files the unit changed. null selects every eligible card without a time box; an integer limits the number, and 0 turns the resolution pass off. Cards claimed by another agent are skipped. Claims last one hour and are released at the unit\u2019s next end of turn."
+        }
+      },
+      "required": ["resolvePerTask"]
     }
   }
 }

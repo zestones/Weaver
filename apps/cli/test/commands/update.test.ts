@@ -185,6 +185,8 @@ test('with the latest release, update brings the project up to date itself: its 
     '    settings.json: checks.warnTimeoutSeconds added, at 30: the seconds the checks that warn are given after one call',
     '  0003-default-writer: Codex writes waiting flags in bounded batches; an explicit disabled writer stays disabled.',
     '    llm/writer.json: added the Codex writer, using its configured model, at four batches of five flags per start',
+    '  0004-card-resolution: The project chooses how many cards agents resolve per task, unlimited by default.',
+    '    settings.json: cards added, at {"resolvePerTask":null}: all eligible cards are resolved at task end',
     '✓ Claude Code: hooks written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
     '✓ Claude Code: the guide of Weaver written to .claude/skills/weaver/SKILL.md',
     '✓ Claude Code: the mod that shows the end of a task in its chat written to .claude/skills/weaver-status',
@@ -249,6 +251,10 @@ test('a dry run says what an update would do and writes nothing, in the project 
   const here = await weaver(top, ['update', '--dry-run'], { channel: channel('9.9.9') })
 
   assert.equal(here.status, 0)
+  assert.ok(
+    here.lines.includes('  0004-card-resolution: The project chooses how many cards agents resolve per task, unlimited by default.'),
+  )
+  assert.ok(here.lines.includes('    settings.json: cards added, at {"resolvePerTask":null}: all eligible cards are resolved at task end'))
   assert.equal(here.lines[1], '- .weaver/ would be brought up to date:')
   assert.deepEqual(here.lines.slice(-3), [
     '- Claude Code: hooks would be written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
@@ -344,7 +350,7 @@ test('update says so where there is no supervised project, and refuses a configu
   assert.equal(nowhere.status, 0)
   assert.equal(nowhere.lines.at(-1), '- No supervised project here: weaver install puts Weaver on a project.')
 
-  writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: 4 })
+  writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: 5 })
 
   const ahead = await weaver(top, ['update'], { channel: channel('9.9.9') })
 

@@ -1,9 +1,10 @@
 import { NoteText, type Card } from '@weaver/memory'
+import { counted } from '../../lib/text/counted.ts'
 
 export class CardNotesWanted {
   readonly text: string | null
 
-  constructor(cards: readonly Card[], changed: readonly string[]) {
+  constructor(cards: readonly Card[], changed: readonly string[], limit: number | null) {
     this.text =
       cards.length === 0
         ? null
@@ -19,7 +20,8 @@ export class CardNotesWanted {
                   )}; ${card.decision.kind === 'none' ? 'claimed for resolution' : card.decision.kind === 'owner' ? `owner decision: ${card.decision.question ?? ''}` : 'decision unknown'}.`,
             ),
             '',
-            'Resolve the claimed cards within your task’s reach: investigate, fix and verify, then document each with notes. Spend at most 10 minutes on this pass and handle at most 2 cards. Claims expire after 10 minutes; stop work on the card then.',
+            'Resolve the claimed cards within your task’s reach: investigate, fix and verify, then document each with notes.',
+            ...(limit === null ? [] : [`Handle at most ${counted(limit, 'card')} in this pass.`]),
             'For other cards, document only what this task settled or advanced. Leave pending owner decisions explicit; do not resolve them on the owner’s behalf.',
             'If a claimed card is out of reach, write a deferred note with the reason and name it in your final message. It stays open, distinct from needs-owner. Only the owner closes.',
             '',
