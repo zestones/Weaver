@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { accessSync, constants, existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import type { PartName } from '@weaver/engine'
@@ -31,6 +31,20 @@ export class EngineLink {
 
   owns(command: string): boolean {
     return command.split(' ').includes(MARK)
+  }
+
+  matches(command: string, event: string, agent: string): boolean {
+    const match = /^("(?:\\.|[^"\\])*")( .+)$/.exec(command)
+
+    if (match?.[1] === undefined || match[2] !== ` ${JSON.stringify(this.hook)} ${event} --agent=${agent} ${MARK}`) return false
+
+    try {
+      accessSync(JSON.parse(match[1]) as string, constants.X_OK)
+
+      return true
+    } catch {
+      return false
+    }
   }
 
   // An event the loop does not know makes the hook start, load everything and answer nothing.

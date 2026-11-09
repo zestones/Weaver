@@ -3,6 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test, vi } from 'vitest'
+import { ProjectChecks } from '../../src/checks/running/project-checks.ts'
 import { CheckOutcome } from '../../src/checks/results/check-outcome.ts'
 import { EndOfTaskProgress } from '../../src/loop/progress/end-of-task-progress.ts'
 import type { ProgressRecord } from '../../src/loop/progress/progress-record.ts'
@@ -115,35 +116,70 @@ test('a check that fails without holding the task is listed for the owner under 
   assert.match(reportOf(systemMessage), /\n- F1 the check format reports: src\/a\.ts is not formatted\n/)
 })
 
-test('after the refusals the project allows the agent may stop, with its unit still open; a new request starts them again', async () => {
+test('unchanged failures exhaust their refusals across requests, and explicit judgement remains available', async () => {
   const project = declaration({ limits: { maxRefusals: 2 } })
   const checks = stubChecks([FAILING])
-
   prompt(session, 'change it')
   agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
-
   assert.equal((await finishWith(session, checks, project)).decision, 'block')
+  prompt(session, 'continue')
   assert.equal((await finishWith(session, checks, project)).decision, 'block')
-
   const third = await finishWith(session, checks, project)
-
   assert.equal(third.decision, undefined)
-  assert.match(third.systemMessage ?? '', /still fail after 2 refusals; the agent may stop/)
+  assert.match(third.systemMessage ?? '', /Failures are left to the owner/)
+  assert.equal(checks.calls.count, 2)
+  assert.match(EndOfTaskProgress.read(session.dir)?.outcome ?? '', /failures left to the owner/)
+  prompt(session, 'another request')
+  assert.equal((await finishWith(session, checks, project)).decision, undefined)
+  assert.equal(checks.calls.count, 2)
   assert.deepEqual(unitFiles(session), [A_FILE])
-
-  prompt(session, 'try again')
-
-  assert.equal((await finishWith(session, checks, project)).decision, 'block')
   assert.deepEqual(
-    checksOf().map(({ round, passed, failed }) => ({ round, passed, failed })),
-    [1, 2, 3, 1].map((round) => ({ round, passed: false, failed: ['lint'] })),
+    checksOf().map(({ round }) => round),
+    [1, 2],
   )
-  assert.deepEqual(readdirSync(join(session.dir, 'reports')), [
-    '0001-unit-1-round-1.md',
-    '0002-unit-1-round-2.md',
-    '0003-unit-1-round-3.md',
-    '0004-unit-1-round-1.md',
-  ])
+  assert.equal(readdirSync(join(session.dir, 'reports')).length, 2)
+
+  prompt(session, '#check please')
+  assert.equal((await finishWith(session, checks, project)).decision, 'block')
+  assert.equal(checks.calls.count, 3)
+})
+
+test('after exhaustion changed inputs are judged without giving unchanged failing work another refusal budget', async () => {
+  const project = declaration({ limits: { maxRefusals: 1 }, finish: { headings: ['Request'] } })
+  const timed = stubChecks([new CheckOutcome({ ...FAILING, status: 'timeout' })])
+  prompt(session, 'change it')
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  await finishWith(session, timed, project)
+  await finishWith(session, timed, project)
+  assert.equal(timed.calls.count, 1, 'even a timeout is not automatically repeated after exhaustion')
+  agentWrites(session, { [B_FILE]: 'export const b = 2\n' })
+  const waiting = await finishWith(session, timed, project, 'I need the owner’s answer.')
+  assert.equal(waiting.decision, undefined)
+  assert.match(waiting.systemMessage ?? '', /Earlier check failures are left to the owner/)
+  assert.equal(timed.calls.count, 1, 'unfinished work is not checked merely because earlier failures exhausted their allowance')
+  assert.equal((await finishWith(session, timed, project)).decision, undefined)
+  assert.equal(timed.calls.count, 2)
+  const passing = stubChecks([PASSING])
+  agentWrites(session, { [A_FILE]: 'export const a = 3\n' })
+  await finishWith(session, passing, project)
+  assert.deepEqual(unitFiles(session), [])
+})
+
+test('validation reports put new items first and retain repeated items after them, within the same unit', async () => {
+  prompt(session, 'change it')
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  const old = { file: A_FILE, rule: 'H1', line: 1, message: 'ask the owner' }
+  const added = { ...old, message: 'new point' }
+  await finishWith(session, stubChecks([new CheckOutcome({ ...FAILING, toValidate: [old] })]))
+  const answer = await finishWith(session, stubChecks([new CheckOutcome({ ...PASSING, toValidate: [old, added] })]))
+  const report = reportOf(answer.systemMessage ?? '')
+  assert.match(answer.systemMessage ?? '', /1 item to validate new since the previous report.*1 item already listed/)
+  assert.ok(report.indexOf('new point') < report.indexOf('To validate — already listed'))
+  assert.ok(report.indexOf('To validate — already listed') < report.indexOf('ask the owner'))
+  prompt(session, 'next unit')
+  agentWrites(session, { [A_FILE]: 'export const a = 3\n' })
+  const next = await finishWith(session, stubChecks([new CheckOutcome({ ...PASSING, toValidate: [old] })]))
+  assert.doesNotMatch(next.systemMessage ?? '', /already listed/)
 })
 
 test('a pass settles the unit: the next one starts empty, and a file changed during the check stays for it', async () => {
@@ -361,4 +397,39 @@ test('all skipped checks settle without claiming a pass', async () => {
 
   assert.match(systemMessage, /All checks were skipped; nothing was checked/)
   assert.doesNotMatch(reportOf(systemMessage), /checks passed/)
+})
+
+test('a Codex question reply continues the request without briefing or rearming its reminder', async () => {
+  const project = declaration({ finish: { headings: ['Request'] } })
+  prompt(session, 'change it', project)
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  const checks = stubChecks([PASSING])
+  await finishWith(session, checks, project, 'Which name?')
+  const before = stateOf(session)
+  const answer = prompt(session, '<send_user_message_question_reply>[{"answer":"b"}]</send_user_message_question_reply>', project)
+  assert.deepEqual(stateOf(session), before)
+  assert.equal(eventsOf(session, 'request').length, 1)
+  assert.equal(answer.hookSpecificOutput, undefined)
+  assert.equal((await finishWith(session, checks, project, 'I will use b.')).decision, undefined)
+})
+
+test('an explicit #check request bypasses the check cache after refusals are exhausted', async () => {
+  const path = join(scratch, `explicit-count-${String(counter)}`)
+  const project = declaration({
+    limits: { maxRefusals: 1 },
+    checks: {
+      lint: {
+        judge: ['node', '-e', `require('fs').appendFileSync(${JSON.stringify(path)}, 'x'); process.exitCode = 1`],
+        rules: { L1: 'Pass lint.' },
+      },
+    },
+  })
+  prompt(session, 'change a', project)
+  agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
+  await finishWith(session, new ProjectChecks(), project)
+  await finishWith(session, new ProjectChecks(), project)
+  assert.equal(readFileSync(path, 'utf8'), 'x')
+  prompt(session, '#check', project)
+  assert.equal((await finishWith(session, new ProjectChecks(), project)).decision, 'block')
+  assert.equal(readFileSync(path, 'utf8'), 'xx')
 })

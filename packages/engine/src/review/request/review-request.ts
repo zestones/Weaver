@@ -1,3 +1,4 @@
+import { boundedPatch } from '../../lib/text/bounded-patch.ts'
 import type { AnswerSchema } from '@weaver/agent-sdk'
 import type { ChangedFile } from '../../lib/git/tree-diff.ts'
 import { FINDINGS_LIMIT } from '../findings/review-finding.ts'
@@ -24,7 +25,6 @@ export interface ReviewRequestFields {
   readonly history: readonly string[]
 }
 
-const PATCH_LIMIT = 200_000
 const TEXT = { type: 'string' }
 const TEXT_OR_NONE = { type: ['string', 'null'] }
 
@@ -32,7 +32,7 @@ export class ReviewRequest {
   readonly fields: ReviewRequestFields
 
   constructor(fields: ReviewRequestFields) {
-    this.fields = fields
+    this.fields = { ...fields, patch: boundedPatch(fields.patch) }
   }
 
   get rules(): readonly ReviewCriterion[] {
@@ -151,8 +151,12 @@ export class ReviewRequest {
   private shown(): string[] {
     const { patch } = this.fields
 
-    return patch.length <= PATCH_LIMIT
-      ? ['Each line of the diff carries its number in the new file.', '', '```diff', patch, '```']
-      : ['The patch is too long to show here: read the changed files, and compare them with `git diff` when you need to.']
+    return [
+      'Each line of the diff carries its number in the new file. Omitted patches name their byte size; read those files as needed.',
+      '',
+      '```diff',
+      patch,
+      '```',
+    ]
   }
 }

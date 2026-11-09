@@ -1,12 +1,23 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeEach, test } from 'vitest'
 import type { Repository } from '../../src/lib/git/repository.ts'
 import { Session } from '../../src/unit-of-work/session/session.ts'
 import { SAMPLE_REPO, makeRepo } from '../fixtures/repo.ts'
-import { A_FILE, agentWrites, eventsOf, prompt, stateOf, unitFiles } from '../fixtures/session.ts'
+import {
+  A_FILE,
+  agentWrites,
+  declaration,
+  eventsOf,
+  FAILING,
+  finishWith,
+  prompt,
+  stateOf,
+  stubChecks,
+  unitFiles,
+} from '../fixtures/session.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-continued-'))
 const LEFT = '12fba60f-4971-4c98-8ee0-09bb1bd821c0'
@@ -79,18 +90,45 @@ test('a new session that continues none starts with nothing, and leaves the othe
 
 test('version 9 units without resolution fields keep their files, requests and unit number', () => {
   const left = leftWithWork()
+  left.failRound()
+  left.reviewRound('review-content')
+  left.reviewRunning('pending-review')
+  left.asked(['syntax'])
   const before = stateOf(left)
   assert.ok(before)
-  assert.equal(before.version, 9)
+  assert.equal(before.version, 10)
+  const oldCheck = Object.fromEntries(Object.entries(before.unit.check).filter(([key]) => !['retry', 'judged', 'validation'].includes(key)))
+  const legacy = { ...before, version: 9, unit: { ...before.unit, check: oldCheck } }
+  writeFileSync(join(left.dir, 'state.json'), JSON.stringify(legacy))
   assert.equal(before.unit.cards.resolutionAsked, undefined)
   assert.equal(before.unit.cards.resolving, undefined)
   const reopened = new Session(repo, LEFT, 'claude')
   assert.equal(reopened.askNotes([12], [12]), true)
   const after = stateOf(reopened)
+  assert.equal(after?.version, 10)
+  assert.deepEqual(after?.pending, before.pending)
+  assert.equal(after?.maintenance, before.maintenance)
+  assert.deepEqual(after?.asked, before.asked)
+  assert.deepEqual(after?.unit.check, before.unit.check)
   assert.deepEqual(after?.unit.files, before.unit.files)
   assert.deepEqual(after?.unit.intents, before.unit.intents)
   assert.equal(after?.unit.number, before.unit.number)
   assert.equal(after?.unit.cards.resolutionAsked, true)
   assert.deepEqual(after?.unit.cards.resolving, [12])
   assert.equal(reopened.askNotes([13], [13]), false)
+})
+
+test('an exhausted unit keeps its refusals and report when its session continues under a new id', async () => {
+  const left = leftWithWork()
+  const project = declaration({ limits: { maxRefusals: 1 } })
+  const checks = stubChecks([FAILING])
+  await finishWith(left, checks, project)
+  transcript(LEFT, { type: 'continued-in', sessionId: LEFT, continuedInSessionId: NEW })
+  const continued = Session.met(repo, NEW, 'claude', join(transcripts, `${NEW}.jsonl`))
+  const answer = await finishWith(continued, checks, project)
+  assert.equal(answer.decision, undefined)
+  assert.equal(checks.calls.count, 1)
+  const report = /Report: (\S+)/.exec(answer.systemMessage ?? '')?.[1] ?? ''
+  assert.match(readFileSync(report, 'utf8'), /checks failed/)
+  assert.ok(report.startsWith(continued.dir))
 })

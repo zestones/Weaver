@@ -30,6 +30,9 @@ export interface LiftedCall {
 }
 
 interface CheckProgress {
+  readonly retry: boolean
+  readonly judged: { readonly key: string; readonly report: string } | null
+  readonly validation: readonly string[]
   readonly rounds: number
   readonly result: 'pass' | 'fail' | null
   // The agent was told how to end the work, for the request in progress.

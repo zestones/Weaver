@@ -92,10 +92,11 @@ export abstract class RuntimeSettings {
     if (Object.keys(hooks).every((event) => ours(event).length === 0)) return 'absent'
 
     const wired = this.agent.events.every((event) => {
-      const { matcher, hooks: [expected] = [] } = this.group(event)
+      const { matcher } = this.group(event)
 
       return ours(event).some(
-        (group) => group.matcher === matcher && (group.hooks ?? []).some((hook) => hook.command === expected?.command),
+        (group) =>
+          group.matcher === matcher && (group.hooks ?? []).some((hook) => this.link.matches(hook.command ?? '', event, this.agent.name)),
       )
     })
 
@@ -116,9 +117,15 @@ export abstract class RuntimeSettings {
     return this.agent.name
   }
 
-  // The hooks an install writes, one an event.
+  // Use the installed commands: the runtime's approvals belong to their exact text, including its Node executable.
   commands(): string[] {
-    return this.agent.events.map((event) => this.link.command(event, this.agent.name))
+    const hooks = this.read().hooks ?? {}
+
+    return this.agent.events.flatMap((event) =>
+      (hooks[event] ?? []).flatMap((group) =>
+        (group.hooks ?? []).flatMap((hook) => (this.link.matches(hook.command ?? '', event, this.agent.name) ? [hook.command ?? ''] : [])),
+      ),
+    )
   }
 
   private get path(): string {

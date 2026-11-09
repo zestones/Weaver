@@ -41,14 +41,14 @@ const ORDERS: readonly CardOrder[] = ['newest', 'level']
 
 export class CardsCommand implements Command {
   readonly name = 'cards'
-  readonly usage = `cards [<number>] [--all] [--closed [${Card.CLOSINGS.join('|')}]] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--search <words>] [--sort newest|level]`
-  readonly summary = 'List the cards that wait for you, or show one'
+  readonly usage = `cards [<number>...] [--all] [--closed [${Card.CLOSINGS.join('|')}]] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--search <words>] [--sort newest|level]`
+  readonly summary = 'List the cards that wait for you, or show selected cards'
   readonly ownerOnly = false
   readonly help = {
     group: 'Cards',
-    description: 'List the cards that wait for you, newest first, or show one: drawn at a terminal, as Markdown for a program.',
+    description: 'List the cards that wait for you, newest first, or show selected cards: drawn at a terminal, as Markdown for a program.',
     words: [
-      ['[<number>]', 'Show this card'],
+      ['[<number>...]', 'Show these cards in the given order'],
       ['write [--batches <1..100>] [--retry-failed]', 'Write waiting flags, optionally retrying failed flags'],
       ['--all', 'List the closed and the merged cards too'],
       [`--closed [${Card.CLOSINGS.join('|')}]`, 'Only the closed cards; with a way of closing, only those closed that way'],
@@ -61,7 +61,7 @@ export class CardsCommand implements Command {
     ],
     examples: [
       'weaver cards',
-      'weaver cards 12',
+      'weaver cards 12 9 4',
       'weaver cards --all --file src/auth/token.ts',
       'weaver cards --label level:high --label area:api --sort level',
       'weaver cards --closed wontfix',
@@ -83,7 +83,7 @@ export class CardsCommand implements Command {
     const [first = ''] = args
     if (first === 'write') return new WriteCards(this.cwd, this.screen, this.executions).run(args.slice(1))
 
-    if (args.length === 1 && /^\d+$/.test(first)) return this.show(Number(first))
+    if (args.length > 0 && args.every((arg) => /^\d+$/.test(arg))) return this.showAll(args.map(Number))
 
     const asked = this.asked(args)
 
@@ -131,6 +131,22 @@ export class CardsCommand implements Command {
     }
 
     return asked
+  }
+
+  private async showAll(numbers: readonly number[]): Promise<number> {
+    let status = 0
+
+    for (const number of numbers) {
+      try {
+        await this.show(number)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        this.screen.error(`${message.charAt(0).toUpperCase()}${message.slice(1)}`)
+        status = 1
+      }
+    }
+
+    return status
   }
 
   private async show(number: number): Promise<number> {

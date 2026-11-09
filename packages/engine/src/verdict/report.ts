@@ -44,7 +44,7 @@ export class Report {
 
     mkdirSync(reports, { recursive: true })
 
-    // A new request starts the rounds again: the sequence keeps an earlier report from being overwritten.
+    // Several reports may describe one round, including reviews that are still running.
     const sequence = String(readdirSync(reports).length + 1).padStart(4, '0')
     const path = join(reports, `${sequence}-unit-${String(unit)}-round-${String(round)}.md`)
 
@@ -104,7 +104,6 @@ export class Report {
 
   summary(reportPath: string): string {
     const { outcomes, diff, unattributed } = this.verdict
-    const waiting = this.verdict.toValidate().count
     const ran = outcomes.filter((outcome) => outcome.ran).length
     const parts =
       diff.files.length === 0
@@ -125,9 +124,23 @@ export class Report {
       parts.push(
         `Changed during its commands, not charged: ${unattributed.join(', ')}, which another session works on or the command did not name.`,
       )
-    if (waiting > 0) parts.push(`${counted(waiting, 'item')} to validate.`)
+    parts.push(...this.validationSummary())
 
     return [...parts, ...this.took(), `Report: ${reportPath}`].join(' ')
+  }
+
+  validationSummary(): string[] {
+    const validation = this.verdict.toValidate()
+    const waiting = validation.since(this.verdict.previousValidation, false).count
+    const listed = validation.since(this.verdict.previousValidation, true).count
+    return [
+      ...(waiting === 0
+        ? []
+        : [
+            `${counted(waiting, 'item')} to validate${this.verdict.previousValidation.length > 0 ? ' new since the previous report' : ''}.`,
+          ]),
+      ...(listed === 0 ? [] : [`${counted(listed, 'item')} already listed in the previous report.`]),
+    ]
   }
 
   // Where the time of a long end of task went, the longest first: what to make shorter.
@@ -176,7 +189,8 @@ export class Report {
         this.coverage.unchecked ? [this.coverage.description] : verdict.outcomes.flatMap((outcome) => this.checkLines(outcome)),
       ),
       ...this.section('Review', this.reviewSection()),
-      ...this.section('To validate', verdict.toValidate().lines()),
+      ...this.section('To validate', verdict.toValidate().since(verdict.previousValidation, false).lines()),
+      ...this.section('To validate — already listed', verdict.toValidate().since(verdict.previousValidation, true).lines()),
       ...this.section(
         'Rules for a reviewer, which no review judged',
         (verdict.review?.judged === true ? [] : declaration.reviewCriteria(diff.paths)).map((rule) => `- ${rule.id}: ${rule.statement}`),

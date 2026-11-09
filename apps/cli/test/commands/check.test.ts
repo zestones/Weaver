@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { Journal, Loop, Repository, type EventOf } from '@weaver/engine'
@@ -146,4 +146,78 @@ test('a check the hook did not see go by checks nothing, and a name the project 
 
   assert.equal(unknown.status, 1)
   assert.match(unknown.lines[0] ?? '', /The project declares no check named lint: its checks are syntax, docs, other/)
+})
+
+test('an on-demand check in a read-only Weaver state reports its verdict without changing state', async () => {
+  await hook('UserPromptSubmit', { prompt: 'change a' })
+  await agentWrites('src/a.js', 'export const a = ;\n')
+  await hook('PreToolUse', { tool_name: 'Bash', tool_input: { command: 'weaver check syntax' }, tool_use_id: 'readonly-check' })
+  const root = join(top, '.git')
+  const paths = [root, ...readdirSync(root, { recursive: true }).map((path) => join(root, path.toString()))]
+  const modes = paths.map((path) => [path, statSync(path).mode] as const)
+  const files = paths.filter((path) => statSync(path).isFile())
+  const before = files.map((path) => readFileSync(path))
+  for (const [path, mode] of modes) chmodSync(path, mode & ~0o222)
+  try {
+    const result = await weaver(top, ['check', 'syntax'], { under: 'claude' })
+    assert.equal(result.status, 1)
+    assert.match(result.lines.join('\n'), /Weaver state is read-only: this verdict was not recorded/)
+    assert.match(result.lines.join('\n'), /unit of work 1/)
+    assert.match(result.lines.join('\n'), /syntax failed/)
+    assert.deepEqual(
+      files.map((path) => readFileSync(path)),
+      before,
+    )
+    assert.equal(readdirSync(root, { recursive: true }).length, paths.length - 1)
+  } finally {
+    for (const [path, mode] of modes) chmodSync(path, mode)
+  }
+})
+
+test('weaver check explicitly reruns an unchanged check and refreshes the end-of-task verdict', async () => {
+  const count = join(scratch, `check-count-${String(counter)}`)
+  writeConfig(top, {
+    settings: SETTINGS,
+    checks: {
+      counted: {
+        ...CHECK,
+        judge: ['node', '-e', `require('fs').appendFileSync(${JSON.stringify(count)}, 'x')`],
+        rules: { C: 'Count checks.' },
+      },
+    },
+  })
+  await hook('UserPromptSubmit', { prompt: 'change a' })
+  await agentWrites('src/a.js', 'export const a = 2\n')
+  await agentChecks(['counted'])
+  await agentChecks(['counted'])
+  assert.equal(readFileSync(count, 'utf8'), 'xx')
+  await hook('Stop', { last_assistant_message: FINISHED })
+  assert.equal(readFileSync(count, 'utf8'), 'xx', 'the following end of task uses the explicit result')
+})
+
+test('an explicit timeout replaces an older cached pass instead of resurrecting it at task end', async () => {
+  const marker = join(scratch, `timeout-${String(counter)}`)
+  const count = join(scratch, `timeout-count-${String(counter)}`)
+  writeConfig(top, {
+    settings: SETTINGS,
+    checks: {
+      timed: {
+        ...CHECK,
+        timeoutSeconds: 1,
+        judge: [
+          'node',
+          '-e',
+          `const fs = require('fs'); fs.appendFileSync(${JSON.stringify(count)}, 'x'); if (fs.existsSync(${JSON.stringify(marker)})) setTimeout(() => {}, 5000)`,
+        ],
+        rules: { T: 'The check completes.' },
+      },
+    },
+  })
+  await hook('UserPromptSubmit', { prompt: 'change a' })
+  await agentWrites('src/a.js', 'export const a = 2\n')
+  assert.equal((await agentChecks(['timed'])).status, 0)
+  writeFileSync(marker, '')
+  assert.equal((await agentChecks(['timed'])).status, 1)
+  assert.match(await hook('Stop', { last_assistant_message: FINISHED }), /TIMEOUT timed/)
+  assert.equal(readFileSync(count, 'utf8'), 'xxx')
 })

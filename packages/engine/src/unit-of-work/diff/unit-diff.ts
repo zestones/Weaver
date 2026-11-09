@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { Repository } from '../../lib/git/repository.ts'
 import { TreeDiff, type ChangedFile, type ExcludedFolder } from '../../lib/git/tree-diff.ts'
 import { WorkingTreeSnapshot } from '../../lib/git/working-tree-snapshot.ts'
+import { boundedPatch } from '../../lib/text/bounded-patch.ts'
 import { numberedDiff } from '../../lib/text/numbered-diff.ts'
 import type { UnitFile } from '../unit/unit-record.ts'
 import { BaseTree } from './base-tree.ts'
@@ -56,7 +57,9 @@ export class UnitDiff {
 
   // The changes as a reader takes them in: a patch whose lines carry their number in the new file.
   patch(): string {
-    return numberedDiff(new TreeDiff(this.repo, this.base, this.head).patch(this.files.flatMap((file) => [file.path, file.oldPath])))
+    const diff = new TreeDiff(this.repo, this.base, this.head)
+
+    return boundedPatch(this.files.map((file) => numberedDiff(diff.patch([...new Set([file.path, file.oldPath])]))).join('\n'))
   }
 
   changesUnder(folder: string): boolean {

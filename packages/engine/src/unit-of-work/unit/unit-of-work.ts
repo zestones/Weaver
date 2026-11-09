@@ -18,7 +18,7 @@ export class UnitOfWork {
       openedAt: new Date().toISOString(),
       files: {},
       intents: [],
-      check: { rounds: 0, result: null, reminded: false, reviewed: [], reviewing: null },
+      check: { retry: false, judged: null, validation: [], rounds: 0, result: null, reminded: false, reviewed: [], reviewing: null },
       unattributed: [],
       lifted: [],
       returned: {},
@@ -94,7 +94,12 @@ export class UnitOfWork {
     return new UnitOfWork({
       ...this.record,
       intents: known ? intents : [...intents, intent],
-      check: { ...check, rounds: 0, reminded: false, reviewed: [] },
+      check: {
+        ...check,
+        reminded: false,
+        reviewed: [],
+        ...(/(?:^|\s)#check(?=$|[\s.,;:!?)])/i.test(intent.text) ? { rounds: 0, judged: null, retry: true } : {}),
+      },
     })
   }
 
@@ -145,7 +150,10 @@ export class UnitOfWork {
   }
 
   withFiles(files: Files): UnitOfWork {
-    return new UnitOfWork({ ...this.record, files: this.changed(files) })
+    const changed = this.changed(files)
+    const check = Object.keys(changed).length === 0 ? { ...this.record.check, rounds: 0, judged: null } : this.record.check
+
+    return new UnitOfWork({ ...this.record, files: changed, check })
   }
 
   // A git action of the owner may change what HEAD holds: what a file returned to is then no base to go by.

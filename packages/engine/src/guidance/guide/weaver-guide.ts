@@ -53,7 +53,7 @@ export class WeaverGuide {
     return [
       '## Cards on files you change',
       '',
-      'After a call changes a file, Weaver injects the open cards on that file, once per card per unit, and stays silent when none match. Read a named card with `weaver cards <number>`; search with `weaver cards --search <words>` when useful. What a card already says is not to be found again, and your change may settle it.',
+      'After a call changes a file, Weaver injects the open cards on that file, once per card per unit, and stays silent when none match. Read named cards with `weaver cards <number>...`; search with `weaver cards --search <words>` when useful. What a card already says is not to be found again, and your change may settle it.',
     ].join('\n')
   }
 
@@ -63,7 +63,7 @@ export class WeaverGuide {
       '',
       '### Hear a check before the end',
       '',
-      'When your task ends, Weaver runs the checks of the project on what you changed, and a failure sends you back. `weaver check <name>...` runs some of them now, on your unit of work, as the end of the task will, without ending it and without counting as a refusal; `weaver check` alone runs all of them. A check runs after the one it waits for. Run a long one in the background if your runtime can, and go on meanwhile. A check that reads nothing changed since it ran gives its verdict again at the end, without running.',
+      'When your task ends, Weaver runs the checks of the project on what you changed, and a failure sends you back. `weaver check <name>...` runs some of them now, on your unit of work, as the end of the task will, without ending it and without counting as a refusal; `weaver check` alone runs all of them. A check runs after the one it waits for. Run a long one in the background if your runtime can, and go on meanwhile. A check that reads nothing changed since it ran gives its verdict again at the end, without running. An explicit `weaver check` always reruns the selected checks. If Weaver state is read-only, it reports the verdict without recording it and says so.',
       '',
       ...this.checks(),
       '',
@@ -135,6 +135,7 @@ export class WeaverGuide {
         : [
             '- When a reviewer finds points, numbered F1, F2 and so on, fix each one or decide to leave it, and answer each in your final message, one line each: `F1 fixed: <what you changed>`, naming the file when the fix is in another file than the point, or `F1 not fixed: <why>`. Every answer is kept before Weaver decides whether extra work requires another review; that review receives the prior answers.',
           ]),
+      '- The check refusal allowance belongs to the unit across requests. After it is exhausted, unchanged inputs are not checked again: failures are left to the owner and you may stop. An owner request containing #check asks for fresh judgement, or run `weaver check` explicitly. Changed inputs are still judged; they do not reset the allowance. Reports put new validation items first and count previously listed items separately.',
       '- While a command or a watch you sent to the background runs, you may stop without ending the task: your runtime wakes you when it ends.',
     ].join('\n')
   }

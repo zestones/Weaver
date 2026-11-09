@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { UnitOfWork } from '../unit/unit-of-work.ts'
+import { SessionMigration } from './session-migration.ts'
 import type { SessionRecord } from './session-record.ts'
 
 export interface Transaction<Value> {
@@ -8,7 +9,7 @@ export interface Transaction<Value> {
   readonly value: Value
 }
 
-const VERSION = 9
+const VERSION = 10
 const LOCK_WAIT_MS = 5000
 const LOCK_POLL_MS = 20
 
@@ -26,9 +27,7 @@ export class SessionStore {
   load(): SessionRecord | null {
     if (!existsSync(this.path)) return null
 
-    const record = JSON.parse(readFileSync(this.path, 'utf8')) as Partial<SessionRecord>
-
-    return record.version === VERSION ? (record as SessionRecord) : null
+    return new SessionMigration().read(JSON.parse(readFileSync(this.path, 'utf8')) as unknown)
   }
 
   // When the state last changed, which is when the session was last seen at work; null without a state.
@@ -87,7 +86,8 @@ export class SessionStore {
         writeFileSync(this.lock, String(process.pid), { flag: 'wx' })
 
         return
-      } catch {
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
         if (Date.now() > deadline) rmSync(this.lock, { force: true })
         else Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_POLL_MS)
       }

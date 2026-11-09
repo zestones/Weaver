@@ -9,6 +9,7 @@ const SYSTEM_PREFIXES = [
   '<system-reminder',
   '<user_shell_command>',
   '<codex_internal_context',
+  '<send_user_message_question_reply>',
   'Another Claude session sent a message',
 ]
 

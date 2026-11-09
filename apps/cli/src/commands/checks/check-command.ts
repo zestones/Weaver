@@ -16,7 +16,7 @@ export class CheckCommand implements Command {
   readonly help = {
     group: 'Supervision',
     description:
-      'Run the checks of the project on the work in progress, as the end of a task runs them, without ending it or counting as a refusal. Under an agent, the work is the unit of work of its session; from your terminal, every file that differs from HEAD. Repairs wait for the end of the task. What a check says is kept: a task that ends with nothing changed since gets its verdict again at once.',
+      'Run the checks of the project on the work in progress, as the end of a task runs them, without ending it or counting as a refusal. Under an agent, the work is the unit of work of its session; from your terminal, every file that differs from HEAD. Repairs wait for the end of the task. An explicit check always runs again. What it says is kept for the end of the task when state is writable; in a read-only state the verdict is printed without recording it.',
     words: [
       ['<name>...', 'The checks to run, as the project names them; a check runs after the one it waits for. All of them without a name'],
     ],
@@ -64,6 +64,8 @@ export class CheckCommand implements Command {
   }
 
   private shown(verdict: AskedVerdict): void {
+    if (!verdict.recorded) this.screen.note('Weaver state is read-only: this verdict was not recorded.')
+
     const whose = verdict.unit === null ? 'of your changes against HEAD' : `of the unit of work ${String(verdict.unit)} of this session`
 
     if (verdict.files.length === 0) {

@@ -20,9 +20,10 @@ test('a request keeps the reply it answers, and the same text twice is one reque
   assert.equal(twice.record.intents[0]?.answering, 'Should I also rename it?')
 })
 
-test('a new request gives the checks their rounds again', () => {
+test('a new request preserves refusals; an explicit #check asks for fresh judgement', () => {
   const refused = UnitOfWork.fresh(1).withFailedRound().withFailedRound()
 
   assert.equal(refused.rounds, 2)
-  assert.equal(refused.withRequest(new OwnerRequest('try again').intent(null)).rounds, 0)
+  assert.equal(refused.withRequest(new OwnerRequest('continue').intent(null)).rounds, 2)
+  assert.equal(refused.withRequest(new OwnerRequest('#check please').intent(null)).rounds, 0)
 })

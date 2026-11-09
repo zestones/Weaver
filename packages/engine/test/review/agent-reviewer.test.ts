@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AgentResult, ExecutionCatalog, ScriptedExecution, type AgentExecution } from '@weaver/agent-sdk'
 import { afterAll, test } from 'vitest'
 import type { ChangedFile } from '../../src/lib/git/tree-diff.ts'
 import { ReviewRequest, type ReviewRequestFields } from '../../src/review/request/review-request.ts'
+import { ReviewStore } from '../../src/review/results/review-store.ts'
+import type { ReviewRecord } from '../../src/review/results/review-record.ts'
 import type { ReviewAssignment } from '../../src/review/routing/review-routing.ts'
 import { AgentReviewer } from '../../src/review/running/agent-reviewer.ts'
 import { declarationOf } from '../fixtures/declaration.ts'
@@ -228,6 +230,39 @@ test('a review that is stopped ends its reviewer, leaves no copy behind, and is 
 test('a change too long to show is left for the reviewer to read in the files', () => {
   const asked = request({ patch: '+x\n'.repeat(120_000) }).prompt(null)
 
-  assert.match(asked, /The patch is too long to show here: read the changed files/)
+  assert.match(asked, /Patch omitted: 360000 bytes/)
   assert.ok(asked.length < 6000)
+})
+
+test('large file patches are capped before storage and prompting while small file patches remain', () => {
+  const patch = `diff --git a/assets/huge.json b/assets/huge.json\n+${'x'.repeat(1_000_000)}\ndiff --git a/src/a.ts b/src/a.ts\n+const changed = 1\n`
+  const asked = request({ patch })
+  assert.ok(Buffer.byteLength(asked.fields.patch) < 1000)
+  assert.match(asked.prompt(null), /assets\/huge.json[\s\S]*Patch omitted: \d+ bytes/)
+  assert.match(asked.prompt(null), /const changed = 1/)
+  assert.doesNotMatch(asked.prompt(null), /x{100}/)
+  const dir = join(scratch, 'capped-review')
+  const store = new ReviewStore(dir)
+  const record: ReviewRecord = {
+    state: 'reviewed',
+    request: { ...asked.fields, patch },
+    assignment: READS,
+    startedAt: '2026-01-01',
+    worker: null,
+    outcome: null,
+    head: 'tree',
+    reviewed: { 'src/a.ts': 'blob' },
+    answers: [],
+    asked: 2,
+  }
+  store.keep('content', record)
+  const path = join(dir, 'reviews/content.json')
+  assert.ok(readFileSync(path).length < 5000)
+  assert.equal(store.find('content')?.asked, 2)
+  // Legacy records are normalized without resetting their lifecycle or rewriting a read-only read.
+  writeFileSync(path, JSON.stringify(record))
+  assert.equal(JSON.stringify(store.find('content')), JSON.stringify({ ...record, request: asked.fields }))
+  assert.ok(readFileSync(path).length > 1_000_000)
+  store.keep('content', store.find('content') ?? record)
+  assert.ok(readFileSync(path).length < 5000)
 })

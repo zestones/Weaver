@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { ReviewRequest } from '../request/review-request.ts'
 import type { ReviewRecord } from './review-record.ts'
 
 const WAITER = '.waiter'
@@ -16,11 +17,17 @@ export class ReviewStore {
   find(content: string): ReviewRecord | null {
     const path = join(this.dir, `${content}.json`)
 
-    return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as ReviewRecord) : null
+    if (!existsSync(path)) return null
+
+    const record = JSON.parse(readFileSync(path, 'utf8')) as ReviewRecord
+    return { ...record, request: new ReviewRequest(record.request).fields }
   }
 
   keep(content: string, record: ReviewRecord): void {
-    this.replace(join(this.dir, `${content}.json`), JSON.stringify(record, null, 2))
+    this.replace(
+      join(this.dir, `${content}.json`),
+      JSON.stringify({ ...record, request: new ReviewRequest(record.request).fields }, null, 2),
+    )
   }
 
   // The end of turn that waits for a review is named beside it, apart from the record that its reviewer rewrites.

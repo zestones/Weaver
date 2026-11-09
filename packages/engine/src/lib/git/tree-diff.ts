@@ -1,3 +1,9 @@
+import { execFileSync } from 'node:child_process'
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { linePrefixes } from '../files/line-prefixes.ts'
+import { FILE_PATCH_LIMIT } from '../text/bounded-patch.ts'
 import type { Repository } from './repository.ts'
 
 type LineRange = [number, number]
@@ -57,18 +63,50 @@ export class TreeDiff {
   patch(paths: readonly string[]): string {
     if (paths.length === 0) return ''
 
-    return this.repo.git([
-      ...PINNED,
-      'diff',
-      '-M',
-      '--no-color',
-      '--no-ext-diff',
-      '--no-textconv',
-      this.base,
-      this.head,
-      '--',
-      ...paths.map((path) => `:(top,literal)${path}`),
-    ])
+    return this.withDiff(
+      paths.map((file) => `:(top,literal)${file}`),
+      [],
+      (path) => {
+        const bytes = statSync(path).size
+        return bytes > FILE_PATCH_LIMIT
+          ? `diff --git ${paths.join(' -> ')}\nPatch omitted: ${String(bytes)} bytes (file limit ${String(FILE_PATCH_LIMIT)} bytes).`
+          : readFileSync(path, 'utf8')
+      },
+    )
+  }
+
+  private withDiff<Value>(pathspec: readonly string[], options: readonly string[], read: (path: string) => Value): Value {
+    const dir = mkdtempSync(join(tmpdir(), 'weaver-patch-'))
+    const path = join(dir, 'diff')
+    const output = openSync(path, 'w')
+    try {
+      execFileSync(
+        'git',
+        [
+          '-C',
+          this.repo.top,
+          ...PINNED,
+          'diff',
+          '-M',
+          '--no-color',
+          '--no-ext-diff',
+          '--no-textconv',
+          ...options,
+          this.base,
+          this.head,
+          '--',
+          ...pathspec,
+        ],
+        {
+          env: this.repo.env(),
+          stdio: ['ignore', output, 'pipe'],
+        },
+      )
+      return read(path)
+    } finally {
+      closeSync(output)
+      rmSync(dir, { recursive: true, force: true })
+    }
   }
 
   // Lines added and lines removed in these paths; a file that is not text counts for none.
@@ -118,30 +156,18 @@ export class TreeDiff {
   }
 
   private addedRanges(pathspec: readonly string[]): Map<string, LineRange[]> {
-    const diff = this.repo.git([
-      ...PINNED,
-      'diff',
-      '-U0',
-      '-M',
-      '--no-color',
-      '--no-ext-diff',
-      '--no-textconv',
-      this.base,
-      this.head,
-      '--',
-      ...pathspec,
-    ])
-    const ranges = new Map<string, LineRange[]>()
-    let current: LineRange[] | null = null
+    return this.withDiff(pathspec, ['-U0'], (path) => {
+      const ranges = new Map<string, LineRange[]>()
+      let current: LineRange[] | null = null
 
-    for (const line of diff.split('\n')) {
-      if (line === '+++ /dev/null') current = null
-      else if (line.startsWith('+++ ')) {
-        current = []
-        ranges.set(line.slice(NEW_PATH_OFFSET), current)
-      } else current?.push(...hunkRanges(line))
-    }
-
-    return ranges
+      for (const line of linePrefixes(path, 8192)) {
+        if (line === '+++ /dev/null') current = null
+        else if (line.startsWith('+++ ')) {
+          current = []
+          ranges.set(line.slice(NEW_PATH_OFFSET), current)
+        } else current?.push(...hunkRanges(line))
+      }
+      return ranges
+    })
   }
 }

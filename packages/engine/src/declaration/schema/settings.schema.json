@@ -35,7 +35,7 @@
         "maxRefusals": {
           "type": "integer",
           "minimum": 1,
-          "description": "How many times in a row the checks may refuse the end of a turn. When they fail once more, the agent may stop, its unit of work still open."
+          "description": "How many times checks may refuse the end of this unit across requests. After the limit, unchanged inputs are not checked again and failures are left to the owner. An explicit #check request or weaver check asks for fresh judgement."
         },
         "totalTimeoutSeconds": {
           "type": "integer",

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ExecutionCatalog, ScriptedExecution, type AgentExecution, type RuntimeHook } from '@weaver/agent-sdk'
@@ -559,4 +559,19 @@ test('doctor notes the old finish prohibition and preserves the owner skill byte
   assert.equal(result.status, 0)
   assert.match(result.lines.join('\n'), /still prohibits fixing discoveries.*Weaver preserves your custom skill/)
   assert.equal(readFileSync(path, 'utf8'), text)
+})
+
+test('doctor uses the Node executable installed in hooks, including Codex approvals', async () => {
+  await weaver(top, ['install'])
+  const node = join(top, 'another-node')
+  symlinkSync(process.execPath, node)
+  for (const file of ['.codex/hooks.json', '.claude/settings.local.json']) {
+    const path = join(top, file)
+    writeFileSync(path, readFileSync(path, 'utf8').replaceAll(JSON.stringify(process.execPath).slice(1, -1), node))
+  }
+  const result = await doctor({ executions: codexHolding(['runs', 'runs', 'runs', 'runs']) })
+  assert.equal(result.status, 0, result.lines.join('\n'))
+  assert.ok(result.lines.includes('  ✓ Codex runs these hooks'))
+  rmSync(node)
+  assert.equal((await doctor()).status, 1, 'a removed executable is still broken wiring')
 })

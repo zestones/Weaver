@@ -147,6 +147,12 @@ export class Session {
     }).value
   }
 
+  wasAsked(names: readonly string[], since: string): boolean {
+    const asked = this.state()?.asked
+
+    return asked !== null && asked !== undefined && asked.at >= since && asked.names.join('\0') === names.join('\0')
+  }
+
   // What a guard would have refused waits for the owner with the unit of work it was made in.
   lift(tool: string, call: LiftedCall): void {
     this.store.update((latest) => ({ ...latest, unit: new UnitOfWork(latest.unit).withLifted(call).record }))
@@ -163,6 +169,29 @@ export class Session {
       ...record,
       unit: new UnitOfWork(record.unit).withRequest(request.intent(record.lastReply)).record,
     })).unit.number
+  }
+
+  reported(key: string, report: string, validation: readonly string[], passed: boolean): void {
+    this.store.update((latest) => ({
+      ...latest,
+      unit: {
+        ...latest.unit,
+        check: {
+          ...latest.unit.check,
+          judged: { key, report: basename(report) },
+          retry: false,
+          validation,
+          result: passed ? 'pass' : 'fail',
+        },
+      },
+    }))
+  }
+
+  checkAgain(): void {
+    this.store.update((latest) => ({
+      ...latest,
+      unit: { ...latest.unit, check: { ...latest.unit.check, judged: null } },
+    }))
   }
 
   checkRelease(): boolean {

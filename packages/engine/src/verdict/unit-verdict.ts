@@ -26,6 +26,7 @@ const MAINTENANCE_RULE = 'weaver:maintenance'
 const WRITTEN = /^Writing (.+)$/
 
 export class UnitVerdict {
+  readonly previousValidation: readonly string[]
   readonly unit: number
   readonly round: number
   readonly maxRefusals: number
@@ -41,6 +42,7 @@ export class UnitVerdict {
   readonly ms: number
 
   constructor(fields: VerdictFields) {
+    this.previousValidation = fields.unit.record.check.validation
     this.unit = fields.unit.number
     this.round = fields.unit.rounds + 1
     this.maxRefusals = fields.maxRefusals

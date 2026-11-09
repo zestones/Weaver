@@ -1,11 +1,12 @@
-import { mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CheckMemory } from '../../checks/results/check-memory.ts'
 import type { CheckOutcome } from '../../checks/results/check-outcome.ts'
 import type { CheckRunner } from '../../checks/running/check-runner.ts'
 import { ProjectChecks } from '../../checks/running/project-checks.ts'
 import type { Declaration } from '../../declaration/content/declaration.ts'
-import type { Repository } from '../../lib/git/repository.ts'
+import { Repository } from '../../lib/git/repository.ts'
 import { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { EventBody } from '../../unit-of-work/journal/journal-event.ts'
 import { Journal } from '../../unit-of-work/journal/journal.ts'
@@ -15,10 +16,11 @@ import type { UnitFile } from '../../unit-of-work/unit/unit-record.ts'
 
 // A runtime may ask its owner before it runs a command: the command claims what its hook saw that long after.
 const ASKED_WITHIN_MS = 10 * 60 * 1000
-// Where the owner's own checks keep their trees and what they said, apart from every session.
+// Where the owner's own checks keep their verdicts, apart from every session.
 const OWNER_DIR = 'owner-checks'
 
 export interface AskedVerdict {
+  readonly recorded: boolean
   // The unit of work judged; null for the owner's changes, judged against HEAD.
   readonly unit: number | null
   readonly files: readonly string[]
@@ -35,6 +37,7 @@ export class ChecksOnDemand {
 
   private readonly repo: Repository
   private readonly checks: CheckRunner
+  private writable = true
 
   constructor(repo: Repository, checks: CheckRunner = new ProjectChecks()) {
     this.repo = repo
@@ -51,38 +54,68 @@ export class ChecksOnDemand {
   sessionAsking(names: readonly string[]): Session | null {
     const since = new Date(Date.now() - ASKED_WITHIN_MS).toISOString()
 
-    return new RepositorySessions(this.repo).all().find((session) => session.takeAsked(names, since)) ?? null
+    for (const session of new RepositorySessions(this.repo).all()) {
+      if (!session.wasAsked(names, since)) continue
+      try {
+        if (session.takeAsked(names, since)) return session
+      } catch (error) {
+        if (!this.readOnly(error)) throw error
+        this.writable = false
+        return session
+      }
+    }
+    return null
   }
 
   // A check runs after the one it waits for, which runs too. Without a name, every check runs.
   async run(declaration: Declaration, names: readonly string[], session: Session | null): Promise<AskedVerdict> {
     const startedAt = Date.now()
     const chosen = names.length === 0 ? declaration : declaration.withChecks(this.withPrerequisites(declaration, names))
-    const unit = session?.unit() ?? null
-    const files = unit?.files ?? this.ownerFiles()
-    const dir = session === null ? join(this.repo.stateDir, OWNER_DIR) : join(session.dir, 'asked')
+    const dir = mkdtempSync(join(tmpdir(), 'weaver-check-'))
+    const repo = new Repository(this.repo.top, this.repo.gitDir, this.repo.commonDir, join(dir, 'objects'))
 
-    // Its own index and trees: the end of a task may be building the session's at the same time.
-    mkdirSync(dir, { recursive: true })
+    try {
+      const unit = session?.unit() ?? null
+      const files = unit?.files ?? this.ownerFiles(repo)
+      const diff = UnitDiff.of(repo, dir, files, declaration.exclude)
+      const memory = new CheckMemory(dir, true)
+      const outcomes =
+        diff.files.length === 0 ? [] : await this.checks.judge(chosen, diff, declaration.checkLimits.deadlineFrom(startedAt), memory)
+      const event: EventBody = {
+        kind: 'asked',
+        unit: unit?.number ?? null,
+        passed: !outcomes.some((outcome) => outcome.blocking),
+        failed: outcomes.filter((outcome) => outcome.blocking).map((outcome) => outcome.id),
+        files: diff.files.length,
+        ms: Date.now() - startedAt,
+        checks: outcomes.map((outcome) => outcome.run),
+      }
 
-    const diff = UnitDiff.of(this.repo, dir, files, declaration.exclude)
-    const memory = new CheckMemory(session?.dir ?? dir)
-    const outcomes =
-      diff.files.length === 0 ? [] : await this.checks.judge(chosen, diff, declaration.checkLimits.deadlineFrom(startedAt), memory)
-    const event: EventBody = {
-      kind: 'asked',
-      unit: unit?.number ?? null,
-      passed: !outcomes.some((outcome) => outcome.blocking),
-      failed: outcomes.filter((outcome) => outcome.blocking).map((outcome) => outcome.id),
-      files: diff.files.length,
-      ms: Date.now() - startedAt,
-      checks: outcomes.map((outcome) => outcome.run),
+      if (this.writable) {
+        try {
+          memory.copyTo(
+            session?.dir ?? join(this.repo.stateDir, OWNER_DIR),
+            chosen.checks.map((check) => check.id),
+          )
+          if (session === null) new Journal(this.repo).append({ session: null, agent: null }, event)
+          else {
+            session.checkAgain()
+            session.log(event)
+          }
+        } catch (error) {
+          if (!this.readOnly(error)) throw error
+          this.writable = false
+        }
+      }
+
+      return { recorded: this.writable, unit: unit?.number ?? null, files: diff.paths, unattributed: unit?.unattributed ?? [], outcomes }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
+  }
 
-    if (session === null) new Journal(this.repo).append({ session: null, agent: null }, event)
-    else session.log(event)
-
-    return { unit: unit?.number ?? null, files: diff.paths, unattributed: unit?.unattributed ?? [], outcomes }
+  private readOnly(error: unknown): boolean {
+    return ['EROFS', 'EACCES', 'EPERM'].includes((error as NodeJS.ErrnoException).code ?? '')
   }
 
   private withPrerequisites(declaration: Declaration, names: readonly string[]): Set<string> {
@@ -107,10 +140,10 @@ export class ChecksOnDemand {
   }
 
   // Outside a session, the changes are the owner's: every file that differs from HEAD.
-  private ownerFiles(): Record<string, UnitFile> {
-    const paths = this.repo.dirtyPaths()
-    const atHead = this.repo.blobsAt('HEAD', paths)
-    const now = this.repo.hashPaths(paths)
+  private ownerFiles(repo: Repository): Record<string, UnitFile> {
+    const paths = repo.dirtyPaths()
+    const atHead = repo.blobsAt('HEAD', paths)
+    const now = repo.hashPaths(paths)
 
     return Object.fromEntries(
       paths

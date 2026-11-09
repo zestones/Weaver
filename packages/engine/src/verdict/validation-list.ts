@@ -25,6 +25,16 @@ export class ValidationList {
     this.items = items
   }
 
+  get keys(): string[] {
+    return this.items.map((item) => JSON.stringify([item.file, item.rule, item.line, item.message]))
+  }
+
+  since(previous: readonly string[], known: boolean): ValidationList {
+    const keys = new Set(previous)
+    const current = this.keys
+    return new ValidationList(this.items.filter((_, index) => keys.has(current[index] ?? '') === known))
+  }
+
   get entries(): Validation[] {
     const files = [...new Set(this.items.flatMap((item) => (item.file === null ? [] : [item.file])))]
     const placed = new Map<string, { files: string[]; reasons: string[] }>()

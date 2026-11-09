@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { join } from 'node:path'
 import { counted } from '../../lib/text/counted.ts'
 import type { WriterLauncher } from '@weaver/memory'
 import { CheckMemory } from '../../checks/results/check-memory.ts'
@@ -11,6 +13,7 @@ import type { ReviewRounds } from '../../review/rounds/review-rounds.ts'
 import { AgentReviewer } from '../../review/running/agent-reviewer.ts'
 import { UnitDiff } from '../../unit-of-work/diff/unit-diff.ts'
 import type { EventOf } from '../../unit-of-work/journal/journal-event.ts'
+import { EngineManifest } from '../../unit-of-work/journal/engine-manifest.ts'
 import { Journal } from '../../unit-of-work/journal/journal.ts'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
@@ -102,6 +105,26 @@ export class EndOfTurn implements Moment {
     return this.ended(turn, null, this.over(session, Answer.empty()))
   }
 
+  private inputKey(declaration: Declaration, diff: UnitDiff): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify([
+          new EngineManifest().version,
+          diff.base,
+          diff.head,
+          declaration.checks,
+          declaration.rules,
+          declaration.checkLimits,
+          declaration.exclude,
+        ]),
+      )
+      .digest('hex')
+  }
+
+  private leftToOwner(declaration: Declaration, report: string): string {
+    return `[weaver] The checks still fail after ${counted(declaration.checkLimits.maxRefusals, 'refusal')}; the agent may stop. Failures are left to the owner. Unchanged inputs are not checked again. Request #check or run weaver check to judge them again. Report: ${report}`
+  }
+
   private notesWanted(session: Session, unit: UnitOfWork, lastMessage: string | null): string | null {
     try {
       const cards = new CardResolution(session).prepare(unit, lastMessage)
@@ -134,6 +157,11 @@ export class EndOfTurn implements Moment {
   // The only way to speak to an agent that has stopped is to refuse its stop. One that waits for a task it left
   // running is not reminded: it is woken when the task ends.
   private pending(turn: EndingTurn, declaration: Declaration): Answer {
+    const unit = turn.session.unit()
+    if (unit.record.check.result === 'fail' && unit.rounds >= declaration.checkLimits.maxRefusals) {
+      return this.ended(turn, null, Answer.saying(`${PENDING} Earlier check failures are left to the owner; the agent may stop.`))
+    }
+
     if (turn.session.waitsInBackground) return this.ended(turn, null, Answer.saying(PENDING))
 
     return turn.session.remind()
@@ -153,6 +181,22 @@ export class EndOfTurn implements Moment {
       usual: new UsualTimes(new Journal(session.repo).read()),
     })
 
+    const previous = finished.record.check.judged
+
+    if (
+      finished.record.check.result === 'fail' &&
+      finished.rounds >= declaration.checkLimits.maxRefusals &&
+      previous !== null &&
+      previous.key === this.inputKey(declaration, UnitDiff.of(session.repo, session.dir, finished.files, declaration.exclude))
+    ) {
+      progress.over('failures left to the owner; unchanged inputs were not checked again')
+      return this.ended(
+        turn,
+        null,
+        this.over(session, Answer.saying(this.leftToOwner(declaration, join(session.dir, 'reports', previous.report)))),
+      )
+    }
+
     if (!finished.isEmpty && this.checks.repairs(declaration)) progress.repairing()
 
     const repaired = finished.isEmpty ? [] : await this.repair(session, declaration, finished, deadline)
@@ -161,7 +205,9 @@ export class EndOfTurn implements Moment {
 
     progress.checking()
 
-    const outcomes = unit.isEmpty ? [] : await this.checks.judge(declaration, diff, deadline, new CheckMemory(session.dir), progress)
+    const outcomes = unit.isEmpty
+      ? []
+      : await this.checks.judge(declaration, diff, deadline, new CheckMemory(session.dir, unit.record.check.retry), progress)
     // The reviewer judges what the checks let through: a change they refuse will be rewritten anyway.
     const blocked = outcomes.some((outcome) => outcome.blocking)
     const candidates = outcomes.flatMap((outcome) => outcome.candidates)
@@ -184,6 +230,7 @@ export class EndOfTurn implements Moment {
     })
     const report = new Report(declaration, verdict)
     const reportPath = report.write(session.dir)
+    session.reported(this.inputKey(declaration, diff), reportPath, verdict.toValidate().keys, verdict.passed)
 
     if (!unit.isEmpty) session.log(verdict.event())
 
@@ -218,7 +265,7 @@ export class EndOfTurn implements Moment {
       return this.ended(turn, 'checks', Answer.blocking(report.refusal(reportPath)))
     }
 
-    const given = `[weaver] The checks still fail after ${counted(declaration.checkLimits.maxRefusals, 'refusal')}; the agent may stop. Report: ${reportPath}`
+    const given = [this.leftToOwner(declaration, reportPath), ...report.validationSummary()].join(' ')
 
     progress.over('the checks still fail; the agent may stop')
 

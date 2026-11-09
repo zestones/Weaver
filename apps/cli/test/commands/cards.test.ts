@@ -9,7 +9,7 @@ import { makeProject, SETTINGS, weaver, writeConfig } from '../fixtures/project.
 
 const HINT = 'Read one with weaver cards <number>; accept its proposal with weaver close <number>.'
 const USAGE = [
-  'Usage: weaver cards [<number>] [--all] [--closed [fixed|wontfix|issue|invalid]] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--search <words>] [--sort newest|level]',
+  'Usage: weaver cards [<number>...] [--all] [--closed [fixed|wontfix|issue|invalid]] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--search <words>] [--sort newest|level]',
   'Run weaver help cards for what each word means.',
 ]
 const OTHER_FLAG = [
@@ -333,4 +333,15 @@ test('cards write bounds deliberate catch-up and retries exhausted flags only wh
   assert.equal((await weaver(top, ['cards', 'write', '--batches', '0'], { executions })).status, 2)
   writeConfig(top, { writer: { enabled: false } })
   assert.equal((await weaver(top, ['cards', 'write'], { executions })).status, 1)
+})
+
+test('several card numbers print each card in order, including after a missing number', async () => {
+  flag(top)
+  finding(top)
+  const one = await weaver(top, ['cards', '1'])
+  const two = await weaver(top, ['cards', '2'])
+  assert.deepEqual(await weaver(top, ['cards', '2', '1']), { status: 0, lines: [...two.lines, ...one.lines] })
+  const missing = await weaver(top, ['cards', '2', '999', '1'])
+  assert.equal(missing.status, 1)
+  assert.deepEqual(missing.lines, [...two.lines, 'X No card has the number 999', ...one.lines])
 })

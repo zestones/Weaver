@@ -19,12 +19,15 @@ type Memory = Readonly<Record<string, Kept>>
 export class CheckMemory {
   private readonly path: string
   private readonly version = new EngineManifest().version
+  private readonly fresh: boolean
 
-  constructor(dir: string) {
+  constructor(dir: string, fresh = false) {
     this.path = join(dir, 'checks.json')
+    this.fresh = fresh
   }
 
   recall(check: Check, unit: UnitDiff): CheckOutcome | null {
+    if (this.fresh) return null
     const kept = this.load()[check.id]
 
     if (kept?.key !== this.key(check, unit)) return null
@@ -32,15 +35,26 @@ export class CheckMemory {
     return new CheckOutcome({ ...kept.outcome, keptFrom: kept.at })
   }
 
+  copyTo(dir: string, checked: readonly string[]): void {
+    const destination = new CheckMemory(dir)
+    const earlier = Object.fromEntries(Object.entries(destination.load()).filter(([id]) => !checked.includes(id)))
+    destination.save({ ...earlier, ...this.load() })
+  }
+
   keep(check: Check, unit: UnitDiff, outcome: CheckOutcome): void {
-    if (!outcome.isVerdict) return
+    if (!outcome.isVerdict) {
+      if (this.fresh) this.save(Object.fromEntries(Object.entries(this.load()).filter(([id]) => id !== check.id)))
+      return
+    }
 
     const kept: Kept = { key: this.key(check, unit), at: new Date().toISOString(), outcome: outcome.fields }
+    this.save({ ...this.load(), [check.id]: kept })
+  }
 
+  private save(memory: Memory): void {
     mkdirSync(dirname(this.path), { recursive: true })
     const draft = `${this.path}.${String(process.pid)}.tmp`
-
-    writeFileSync(draft, JSON.stringify({ ...this.load(), [check.id]: kept }, null, 2))
+    writeFileSync(draft, JSON.stringify(memory, null, 2))
     renameSync(draft, this.path)
   }
 

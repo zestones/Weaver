@@ -1,5 +1,6 @@
 const HUNK = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/
-const FILE_HEADER = /^(diff --git|index |--- |\+\+\+ |new file mode|deleted file mode|old mode|new mode|similarity|rename |Binary files )/
+const FILE_HEADER =
+  /^(diff --git|index |--- |\+\+\+ |new file mode|deleted file mode|old mode|new mode|similarity|rename |Binary files |Patch omitted:)/
 const WIDTH = 5
 
 // A unified diff whose lines each carry their number in the new file: a reader that has to count from the hunk headers

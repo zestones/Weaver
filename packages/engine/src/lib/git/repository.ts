@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { lstatSync, mkdirSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 export type Blob = string | null
@@ -26,11 +26,13 @@ export class Repository {
   readonly top: string
   readonly gitDir: string
   readonly commonDir: string
+  private readonly temporaryObjects: string | undefined
 
-  constructor(top: string, gitDir: string, commonDir: string) {
+  constructor(top: string, gitDir: string, commonDir: string, temporaryObjects?: string) {
     this.top = top
     this.gitDir = gitDir
     this.commonDir = commonDir
+    this.temporaryObjects = temporaryObjects
   }
 
   static locate(cwd: string): Repository | null {
@@ -54,7 +56,7 @@ export class Repository {
 
   // Snapshot objects go to a store layered over the repository's own, so `.git/objects` never grows.
   get objectStore(): string {
-    return join(this.stateDir, 'objects')
+    return this.temporaryObjects ?? join(this.stateDir, 'objects')
   }
 
   git(args: readonly string[], options: GitOptions = {}): string {
@@ -72,7 +74,12 @@ export class Repository {
       ...process.env,
       ...BASE_ENV,
       GIT_OBJECT_DIRECTORY: this.objectStore,
-      GIT_ALTERNATE_OBJECT_DIRECTORIES: join(this.commonDir, 'objects'),
+      GIT_ALTERNATE_OBJECT_DIRECTORIES: [
+        join(this.commonDir, 'objects'),
+        ...(this.temporaryObjects === undefined || !existsSync(join(this.stateDir, 'objects')) ? [] : [join(this.stateDir, 'objects')]),
+      ]
+        .map((path) => JSON.stringify(path))
+        .join(':'),
     }
 
     mkdirSync(this.objectStore, { recursive: true })
