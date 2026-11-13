@@ -90,4 +90,11 @@ export const MIGRATIONS: readonly string[] = [
   UPDATE cards SET record = json_set(record, '$.flag.fields.decision', json_object('kind', 'unknown', 'question', NULL))
     WHERE json_type(record, '$.flag') = 'object' AND json_type(record, '$.flag.fields.decision') IS NULL;
   `,
+  `
+  CREATE TABLE resolution_questions (
+    card INTEGER PRIMARY KEY REFERENCES cards (number),
+    question TEXT NOT NULL,
+    cycle INTEGER NOT NULL
+  ) STRICT;
+  `,
 ]

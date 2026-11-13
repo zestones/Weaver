@@ -35,8 +35,9 @@ interface CheckProgress {
   readonly validation: readonly string[]
   readonly rounds: number
   readonly result: 'pass' | 'fail' | null
-  // The agent was told how to end the work, for the request in progress.
+  // Re-armed only by an attributed file change.
   readonly reminded: boolean
+  readonly capNotified?: boolean
   // The contents whose review sent the agent back, for the request in progress.
   readonly reviewed: readonly string[]
   // The content whose review is still running.

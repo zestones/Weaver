@@ -61,7 +61,8 @@ export class Loop {
     const journal = new Journal(repo)
     const source = { session: event.sessionId, agent: agent.name }
     const feedback = new HookFeedback(journal, source)
-    const declaration = this.declarationOf(repo)
+    const folder = DeclarationFolder.in(repo.top)
+    const declaration = this.declarationOf(folder)
 
     // A repository that declares nothing is not supervised, and nothing is kept of what happens there.
     if (declaration === null) return Answer.silent()
@@ -90,7 +91,7 @@ export class Loop {
         )
       }
 
-      return feedback.pending(eventName, answer)
+      return feedback.pending(eventName, event.subagent ? answer : feedback.notice(eventName, folder.formatNotice, answer))
     } catch (error) {
       return feedback.pending(eventName, feedback.failure(eventName, error instanceof Error ? error.message : String(error)))
     } finally {
@@ -109,9 +110,9 @@ export class Loop {
     }
   }
 
-  private declarationOf(repo: Repository): Declaration | DeclarationError | null {
+  private declarationOf(folder: DeclarationFolder): Declaration | DeclarationError | null {
     try {
-      return DeclarationFolder.in(repo.top).load()
+      return folder.load()
     } catch (error) {
       if (error instanceof DeclarationError) return error
 

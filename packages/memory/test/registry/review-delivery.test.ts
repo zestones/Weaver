@@ -70,7 +70,7 @@ test('registry v3 to v4 preserves every existing card and point mapping', () => 
   registry.close()
   const db = new DatabaseSync(join(dir, 'registry.sqlite'))
   db.exec(
-    'DROP TABLE resolution_claims; DROP TABLE review_deliveries; DROP TABLE recovery_cursor; DROP TABLE writer_batches; PRAGMA user_version = 3',
+    'DROP TABLE resolution_questions; DROP TABLE resolution_claims; DROP TABLE review_deliveries; DROP TABLE recovery_cursor; DROP TABLE writer_batches; PRAGMA user_version = 3',
   )
   db.close()
   const migrated = new CardRegistry(dir)

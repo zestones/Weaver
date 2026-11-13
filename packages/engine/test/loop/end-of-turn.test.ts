@@ -126,42 +126,55 @@ test('unchanged failures exhaust their refusals across requests, and explicit ju
   assert.equal((await finishWith(session, checks, project)).decision, 'block')
   const third = await finishWith(session, checks, project)
   assert.equal(third.decision, undefined)
-  assert.match(third.systemMessage ?? '', /Failures are left to the owner/)
+  assert.match(third.systemMessage ?? '', /checks are left to the owner/)
   assert.equal(checks.calls.count, 2)
-  assert.match(EndOfTaskProgress.read(session.dir)?.outcome ?? '', /failures left to the owner/)
+  assert.match(EndOfTaskProgress.read(session.dir)?.outcome ?? '', /Checks not re-run after the refusal cap/)
   prompt(session, 'another request')
   assert.equal((await finishWith(session, checks, project)).decision, undefined)
   assert.equal(checks.calls.count, 2)
   assert.deepEqual(unitFiles(session), [A_FILE])
   assert.deepEqual(
     checksOf().map(({ round }) => round),
-    [1, 2],
+    [1, 2, 2, 2],
   )
-  assert.equal(readdirSync(join(session.dir, 'reports')).length, 2)
+  assert.equal(readdirSync(join(session.dir, 'reports')).length, 4)
 
   prompt(session, '#check please')
   assert.equal((await finishWith(session, checks, project)).decision, 'block')
   assert.equal(checks.calls.count, 3)
 })
 
-test('after exhaustion changed inputs are judged without giving unchanged failing work another refusal budget', async () => {
+test('after exhaustion changed inputs skip repairs and checks until an explicit retry', async () => {
   const project = declaration({ limits: { maxRefusals: 1 }, finish: { headings: ['Request'] } })
   const timed = stubChecks([new CheckOutcome({ ...FAILING, status: 'timeout' })])
   prompt(session, 'change it')
   agentWrites(session, { [A_FILE]: 'export const a = 2\n' })
   await finishWith(session, timed, project)
   await finishWith(session, timed, project)
+  vi.spyOn(timed, 'repairs').mockReturnValue(true)
+  const repair = vi.spyOn(timed, 'repair')
   assert.equal(timed.calls.count, 1, 'even a timeout is not automatically repeated after exhaustion')
   agentWrites(session, { [B_FILE]: 'export const b = 2\n' })
   const waiting = await finishWith(session, timed, project, 'I need the owner’s answer.')
   assert.equal(waiting.decision, undefined)
-  assert.match(waiting.systemMessage ?? '', /Earlier check failures are left to the owner/)
+  assert.match(waiting.systemMessage ?? '', /Earlier check failures are left to the owner; the agent may stop\./)
   assert.equal(timed.calls.count, 1, 'unfinished work is not checked merely because earlier failures exhausted their allowance')
   assert.equal((await finishWith(session, timed, project)).decision, undefined)
-  assert.equal(timed.calls.count, 2)
+  assert.equal(timed.calls.count, 1)
   const passing = stubChecks([PASSING])
   agentWrites(session, { [A_FILE]: 'export const a = 3\n' })
+  const deferred = await finishWith(session, passing, project)
+  assert.equal(passing.calls.count, 0)
+  assert.equal(repair.mock.calls.length, 0)
+  assert.doesNotMatch(deferred.systemMessage ?? '', /checks? passed|Request #check/)
+  assert.match(reportOf(deferred.systemMessage ?? ''), /## To validate[^]*Checks not re-run after 1 refusal/)
+  assert.match(reportOf(deferred.systemMessage ?? ''), /left to the owner: lint/)
+  assert.equal(checksOf().at(-1)?.afterCap, true)
+  assert.equal(checksOf().at(-1)?.passed, false)
+  assert.deepEqual(checksOf().at(-1)?.checks, [])
+  prompt(session, '#check', project)
   await finishWith(session, passing, project)
+  assert.equal(passing.calls.count, 1)
   assert.deepEqual(unitFiles(session), [])
 })
 
@@ -256,11 +269,16 @@ test('with a finish skill, a turn that ends without its headings checks nothing;
   assert.equal(told.decision, 'block')
   assert.equal(
     told.reason,
-    '[weaver] This unit of work has changed files, and your last message does not end it. If the work is finished, end with a message that has these sections: ## Request, ## To validate. How to write them is in .agents/skills/wv-finish.md. If you are waiting for the owner, say so and stop: this is said once.',
+    '[weaver] This unit of work has changed files, and your last message does not end it. If the work is finished, end with a message that has these sections: ## Request, ## To validate. How to write them is in .agents/skills/wv-finish.md. If you are waiting for the owner, say so and stop: this is said once unless you change files again.',
   )
   assert.match((await finishWith(session, checks, project, 'I am waiting for your answer.')).systemMessage ?? '', /Checks pending/)
   prompt(session, 'call it b')
-  assert.equal((await finishWith(session, checks, project, 'Done, I think.')).decision, 'block', 'a new request may be told again')
+  assert.equal((await finishWith(session, checks, project, 'Done, I think.')).decision, undefined)
+  prompt(session, 'what do you think?')
+  assert.equal((await finishWith(session, checks, project, 'Let us discuss it.')).decision, undefined)
+  agentWrites(session, { [A_FILE]: 'export const a = 3\n' })
+  assert.equal((await finishWith(session, checks, project, 'Done, I think.')).decision, 'block', 'new work re-arms the reminder')
+  assert.equal((await finishWith(session, checks, project, 'Waiting.')).decision, undefined)
   assert.equal(checks.calls.count, 0)
 
   await finishWith(session, checks, project, '## request\n\ndone\n\n## To Validate ##\n\nnothing\n')

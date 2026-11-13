@@ -58,7 +58,16 @@ export class NoteRecorder {
 
     try {
       const provenance = { ...by, commit: this.repo.head(), at: new Date().toISOString() }
-      const { card, known } = this.registry.note(number, { provenance, conclusion, text })
+      const fileBlobs =
+        conclusion === 'deferred'
+          ? Object.fromEntries(this.repo.hashPaths(this.registry.find(number)?.places.map((place) => place.file) ?? []))
+          : undefined
+      const { card, known } = this.registry.note(number, {
+        provenance,
+        conclusion,
+        text,
+        ...(fileBlobs === undefined ? {} : { fileBlobs }),
+      })
       const name = String(card.number)
 
       return {

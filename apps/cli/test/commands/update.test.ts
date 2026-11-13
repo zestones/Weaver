@@ -187,6 +187,7 @@ test('with the latest release, update brings the project up to date itself: its 
     '    llm/writer.json: added the Codex writer, using its configured model, at four batches of five flags per start',
     '  0004-card-resolution: The project chooses how many cards agents resolve per task, unlimited by default.',
     '    settings.json: cards added, at {"resolvePerTask":null}: all eligible cards are resolved at task end',
+    'Commit the migrated .weaver/ from this tree so worktrees and clones get it.',
     '✓ Claude Code: hooks written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
     '✓ Claude Code: the guide of Weaver written to .claude/skills/weaver/SKILL.md',
     '✓ Claude Code: the mod that shows the end of a task in its chat written to .claude/skills/weaver-status',
@@ -255,9 +256,11 @@ test('a dry run says what an update would do and writes nothing, in the project 
     here.lines.includes('  0004-card-resolution: The project chooses how many cards agents resolve per task, unlimited by default.'),
   )
   assert.ok(here.lines.includes('    settings.json: cards added, at {"resolvePerTask":null}: all eligible cards are resolved at task end'))
+  assert.ok(here.lines.includes('After updating, commit the migrated .weaver/ from this tree so worktrees and clones get it.'))
   assert.equal(here.lines[1], '- .weaver/ would be brought up to date:')
-  assert.deepEqual(here.lines.slice(-3), [
+  assert.deepEqual(here.lines.slice(-4), [
     '- Claude Code: hooks would be written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
+    '- Claude Code: the guide of Weaver would be written to .claude/skills/weaver/SKILL.md',
     '- Claude Code: the mod that shows the end of a task in its chat would be written to .claude/skills/weaver-status',
     'Dry run: nothing was written.',
   ])

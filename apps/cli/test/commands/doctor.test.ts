@@ -397,7 +397,7 @@ test('a project wired to another release is told which one, and which one this i
   )
 })
 
-test('a project whose configuration lacks migrations is told which, and that nothing is checked until weaver update', async () => {
+test('a project read through migrations reports its older format and tells the owner to commit the migrated declaration', async () => {
   writeConfig(top, { settings: { version: 1, checks: { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3 } } })
 
   const { status, lines } = await doctor()
@@ -405,7 +405,7 @@ test('a project whose configuration lacks migrations is told which, and that not
   assert.equal(status, 1)
   assert.equal(
     lines[0],
-    '  X .weaver/ is 3 migrations behind this Weaver (0002-check-commands, 0003-default-writer, 0004-card-resolution): nothing is checked until weaver update brings it up to date.',
+    '  X .weaver/ in this tree is in format 1, read as format 4 in memory. Supervision continues. Tell the owner to run weaver update if needed, then commit the migrated .weaver/ from the tree where weaver update ran so worktrees and clones get it.',
   )
 })
 

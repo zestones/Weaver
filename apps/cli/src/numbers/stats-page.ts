@@ -97,7 +97,7 @@ export class StatsPage {
     return [
       this.row(
         'Verdicts',
-        `${String(verdicts.total)}: ${String(verdicts.passed)} passed, ${String(verdicts.failed)} failed${verdicts.unchecked > 0 ? `, ${String(verdicts.unchecked)} unchecked` : ''}${verdicts.unknown > 0 ? `, ${String(verdicts.unknown)} unknown coverage` : ''}`,
+        `${String(verdicts.total)}: ${String(verdicts.passed)} passed, ${String(verdicts.failed)} failed${verdicts.unchecked > 0 ? `, ${String(verdicts.unchecked)} unchecked` : ''}${verdicts.afterCap > 0 ? `, ${String(verdicts.afterCap)} not re-run after refusal cap` : ''}${verdicts.unknown > 0 ? `, ${String(verdicts.unknown)} unknown coverage` : ''}`,
       ),
       this.row('  time', `${this.spread(verdicts.ms)}, ${this.span(verdicts.ms.total)} in all`),
       this.row('  files changed', this.sizes(verdicts.files)),

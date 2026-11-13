@@ -110,17 +110,6 @@ export class DoctorCommand implements Command {
 
   private configuration(project: Project): Finding {
     try {
-      const behind = project.migrations().pending()
-
-      if (behind.length > 0) {
-        const labels = behind.map((migration) => migration.label).join(', ')
-
-        return {
-          state: 'problem',
-          text: `${project.configName}/ is ${new Counted(behind.length, 'migration').text} behind this Weaver (${labels}): nothing is checked until weaver update brings it up to date.`,
-        }
-      }
-
       const declaration = project.declaration()
 
       if (declaration === null) {
@@ -129,6 +118,10 @@ export class DoctorCommand implements Command {
           text: `No ${project.configName}/settings.json: Weaver does nothing in this project. Run weaver install.`,
         }
       }
+
+      const notice = project.migrations().readingNotice
+
+      if (notice !== null) return { state: 'problem', text: notice }
 
       const { rules, checks, guards } = declaration
 

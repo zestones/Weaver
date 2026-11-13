@@ -16,9 +16,8 @@ import type { Repository } from '../../lib/git/repository.ts'
 import { EngineManifest } from './engine-manifest.ts'
 import type { EventBody, EventSource, JournalEvent } from './journal-event.ts'
 
-// The second shape of the lines: each says which Weaver wrote it, a verdict holds each of its checks, and how the hook
-// ran, what was asked, each end of turn and each warning are kept.
-const SCHEMA_VERSION = 2
+// Version 3 distinguishes submitted answers and verdicts whose checks were deferred after the refusal cap.
+const SCHEMA_VERSION = 3
 const REPO_LOG = 'repo'
 // The journal is never rewritten: a line an earlier Weaver wrote lacks what was kept since, and is read with nothing
 // there. `v` tells a count that was nothing from one that was not kept.
@@ -32,6 +31,7 @@ const UNKNOWN_WEAVER = 'unknown'
 // told to its agent.
 interface Notices {
   readonly sent: Readonly<Record<string, string>>
+  readonly once?: Readonly<Record<string, string>>
   readonly stopFailure: string | null
 }
 
@@ -93,7 +93,7 @@ export class Journal {
 
   // False when the same notice was given to the same side since `since`. What a session was told is kept in a small
   // file beside its log: hooks read it on every call, where the log may be megabytes.
-  notify(source: EventSource, body: Extract<EventBody, { kind: 'notification' }>, since: string): boolean {
+  notify(source: EventSource, body: Extract<EventBody, { kind: 'notification' }>, since: string | null): boolean {
     mkdirSync(this.dir, { recursive: true })
 
     const lock = join(this.dir, `${this.logName(source.session)}.notice-lock`)
@@ -112,13 +112,14 @@ export class Journal {
     try {
       const notices = this.noticesOf(source.session)
       const key = [body.event, body.channel, body.message].join('\n')
-      const told = (notices.sent[key] ?? '') > since
-      const sent = Object.fromEntries(Object.entries(notices.sent).filter(([, at]) => at > since))
+      const previous = since === null ? (notices.once ?? {}) : notices.sent
+      const told = (previous[key] ?? '') > (since ?? '')
+      const sent = Object.fromEntries(Object.entries(previous).filter(([, at]) => at > (since ?? '')))
       // A failed end of task is told to the owner at once, and to the agent at its next request or call.
       const stopFailure = body.event !== 'Stop' ? notices.stopFailure : body.channel === 'owner' ? body.message : null
 
       if (!told) sent[key] = new Date().toISOString()
-      writeFileSync(this.noticesFile(source.session), JSON.stringify({ sent, stopFailure }))
+      writeFileSync(this.noticesFile(source.session), JSON.stringify({ ...notices, [since === null ? 'once' : 'sent']: sent, stopFailure }))
       if (told) return false
       this.append(source, body)
 

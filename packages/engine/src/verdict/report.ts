@@ -35,7 +35,12 @@ export class Report {
   }
 
   get coverage(): CheckCoverage {
-    return new CheckCoverage(this.declaration.checks.length, this.verdict.outcomes, this.verdict.diff.files.length)
+    return new CheckCoverage(
+      this.declaration.checks.length,
+      this.verdict.outcomes,
+      this.verdict.diff.files.length,
+      this.verdict.deferredChecks !== null,
+    )
   }
 
   write(dir: string): string {
@@ -106,13 +111,15 @@ export class Report {
     const { outcomes, diff, unattributed } = this.verdict
     const ran = outcomes.filter((outcome) => outcome.ran).length
     const parts =
-      diff.files.length === 0
-        ? ['[weaver] No file changed in this turn.']
-        : this.coverage.unchecked
-          ? [
-              `[weaver] ${this.coverage.description}. ${counted(diff.files.length, 'changed file')} without automated validation. Tell the owner; configure .weaver/project/checks.json.`,
-            ]
-          : [`[weaver] ${counted(ran, 'check')} passed on ${counted(diff.files.length, 'changed file')}.`]
+      this.verdict.deferredChecks !== null
+        ? [`[weaver] ${this.coverage.description}. ${counted(diff.files.length, 'changed file')} without renewed automated validation.`]
+        : diff.files.length === 0
+          ? ['[weaver] No file changed in this turn.']
+          : this.coverage.unchecked
+            ? [
+                `[weaver] ${this.coverage.description}. ${counted(diff.files.length, 'changed file')} without automated validation. Tell the owner; configure .weaver/project/checks.json.`,
+              ]
+            : [`[weaver] ${counted(ran, 'check')} passed on ${counted(diff.files.length, 'changed file')}.`]
 
     if (diff.excluded.length > 0) {
       parts.push(`Not looked at: ${diff.excluded.map(({ folder, files }) => `${counted(files, 'file')} under ${folder}/`).join(', ')}.`)
@@ -171,7 +178,7 @@ export class Report {
     const { diff } = verdict
 
     return [
-      `# Unit ${String(verdict.unit)}, round ${String(verdict.round)}: ${verdict.passed ? this.coverage.description : 'checks failed'}`,
+      `# Unit ${String(verdict.unit)}, round ${String(verdict.round)}: ${verdict.passed || verdict.deferredChecks !== null ? this.coverage.description : 'checks failed'}`,
       ...this.section(
         `Changed files (${String(diff.files.length)})`,
         diff.files.map((file) => `- ${file.status} ${file.path}`),
@@ -187,6 +194,14 @@ export class Report {
       ...this.section(
         'Checks',
         this.coverage.unchecked ? [this.coverage.description] : verdict.outcomes.flatMap((outcome) => this.checkLines(outcome)),
+      ),
+      ...this.section(
+        'Earlier checks',
+        verdict.deferredChecks === null || verdict.previousReport === null
+          ? []
+          : [
+              `Earlier results and findings are in [the last check report](${verdict.previousReport}); they were not revalidated at this end of turn.`,
+            ],
       ),
       ...this.section('Review', this.reviewSection()),
       ...this.section('To validate', verdict.toValidate().since(verdict.previousValidation, false).lines()),

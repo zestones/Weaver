@@ -50,6 +50,12 @@ export class DeclarationMigrations {
     return this.written !== null && this.written > DeclarationMigrations.LATEST
   }
 
+  get readingNotice(): string | null {
+    return this.isBehind
+      ? `.weaver/ in this tree is in format ${String(this.written)}, read as format ${String(DeclarationMigrations.LATEST)} in memory. Supervision continues. Tell the owner to run weaver update if needed, then commit the migrated .weaver/ from the tree where weaver update ran so worktrees and clones get it.`
+      : null
+  }
+
   // The migrations these files lack, in the order they are applied.
   pending(): Migration[] {
     const { written } = this

@@ -52,6 +52,11 @@ export class CardDesk {
     return this.registry.actor.role === 'owner'
   }
 
+  closeProposed(proposals: readonly { readonly number: number; readonly proposal: ClosingProposal }[]): void {
+    if (!this.canClose) throw new Error("closing a card is the owner's")
+    this.registry.acceptProposals(proposals)
+  }
+
   close(number: number, closing: Closing | null = null, reason: string | null = null, proposal?: ClosingProposal): string {
     if (!this.canClose) throw new Error("closing a card is the owner's")
     if (closing === null) {

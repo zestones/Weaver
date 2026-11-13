@@ -15,6 +15,8 @@ export interface UnitReviewFields {
   readonly content: string
   readonly outcome: ReviewOutcome
   readonly round: number
+  // A failed review retried advances its journal round without spending a refusal.
+  readonly journalRound?: number
   readonly maxRefusals: number
   readonly answers?: readonly FindingAnswer[]
   readonly problems?: readonly string[]
@@ -43,6 +45,7 @@ export class UnitReview {
   readonly answers: readonly FindingAnswer[]
   // What keeps the author's answers from being taken.
   readonly problems: readonly string[]
+  private readonly journalRound: number
   private readonly model: string | null
   private readonly rules: number
 
@@ -51,6 +54,7 @@ export class UnitReview {
     this.content = fields.content
     this.outcome = fields.outcome
     this.round = fields.round
+    this.journalRound = fields.journalRound ?? fields.round
     this.maxRefusals = fields.maxRefusals
     this.answers = fields.answers ?? []
     this.problems = fields.problems ?? []
@@ -130,13 +134,20 @@ export class UnitReview {
     const { runtime, reason, failure, seconds, costUsd } = outcome
 
     if (standing === 'answered') {
-      return outcome.findings.map((finding, index): EventBody => ({
-        kind: 'answer',
-        unit,
-        finding: index + 1,
-        rule: finding.rule,
-        status: this.answerOf(index)?.status ?? 'missing',
-      }))
+      return outcome.findings.flatMap((finding, index): EventBody[] =>
+        this.answerOf(index) !== null
+          ? []
+          : [
+              {
+                kind: 'answer',
+                unit,
+                finding: index + 1,
+                rule: finding.rule,
+                status: 'missing',
+                review: this.content,
+              },
+            ],
+      )
     }
 
     if (!JUST_RUN.has(standing)) return []
@@ -150,7 +161,21 @@ export class UnitReview {
       experiments: outcome.experiments.length,
     }
 
-    return [{ kind: 'review', unit, runtime, model: this.model, reason, standing, ...counts, failure, seconds, costUsd }]
+    return [
+      {
+        kind: 'review',
+        unit,
+        round: this.journalRound,
+        runtime,
+        model: this.model,
+        reason,
+        standing,
+        ...counts,
+        failure,
+        seconds,
+        costUsd,
+      },
+    ]
   }
 
   // Why a finding still waits for the owner once the unit ends; null when the author fixed it.

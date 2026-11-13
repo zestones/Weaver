@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 export type Blob = string | null
@@ -33,6 +33,13 @@ export class Repository {
     this.gitDir = gitDir
     this.commonDir = commonDir
     this.temporaryObjects = temporaryObjects
+
+    if (temporaryObjects !== undefined) {
+      const alternates = [join(this.stateDir, 'objects'), join(this.commonDir, 'objects')].filter((path) => existsSync(path))
+
+      mkdirSync(join(temporaryObjects, 'info'), { recursive: true })
+      writeFileSync(join(temporaryObjects, 'info/alternates'), `${alternates.map((path) => JSON.stringify(path)).join('\n')}\n`)
+    }
   }
 
   static locate(cwd: string): Repository | null {

@@ -1,6 +1,8 @@
 import { CardRegistry, type Card } from '@weaver/memory'
 import type { Session } from '../../unit-of-work/session/session.ts'
 import type { UnitOfWork } from '../../unit-of-work/unit/unit-of-work.ts'
+import { ObsoleteCards } from './obsolete-cards.ts'
+import { ResolutionRelevance } from './resolution-relevance.ts'
 
 export class CardResolution {
   private readonly session: Session
@@ -17,6 +19,16 @@ export class CardResolution {
     const registry = new CardRegistry(session.repo.stateDir)
     const holder = `${session.id}:${String(unit.number)}`
     try {
+      new ObsoleteCards(session.repo).draft(registry, {
+        author: session.agent,
+        role: 'author',
+        session: session.id,
+        subagent: null,
+        unit: unit.number,
+        requests: unit.requests,
+        commit: session.repo.head(),
+        at: new Date().toISOString(),
+      })
       if (unit.cards.resolutionAsked === true || unit.cards.asked.length > 0) {
         this.defer(registry, unit, lastMessage)
         registry.releaseResolution(holder)
@@ -30,6 +42,8 @@ export class CardResolution {
           const by = card.record.provenance
           return (
             card.isWaiting &&
+            card.record.proposal === null &&
+            new ResolutionRelevance(session.repo).changed(card, registry) &&
             card.origin !== 'suspicion' &&
             card.conclusion?.as !== 'fixed' &&
             card.conclusion?.as !== 'refuted' &&
@@ -53,8 +67,11 @@ export class CardResolution {
           selected.map((card) => card.number),
           resolving.map((card) => card.number),
         )
-      )
+      ) {
+        registry.releaseResolution(holder)
         return []
+      }
+      for (const card of selected) registry.rememberOwnerQuestion(card)
       return selected
     } finally {
       registry.close()
@@ -67,11 +84,14 @@ export class CardResolution {
       if (
         card === null ||
         !card.isWaiting ||
+        card.record.proposal !== null ||
         card.decision.kind === 'owner' ||
-        ['fixed', 'refuted', 'deferred'].includes(card.conclusion?.as ?? '')
+        ['fixed', 'refuted'].includes(card.conclusion?.as ?? '') ||
+        (card.conclusion?.as === 'deferred' && card.conclusion.by.session === this.session.id && card.conclusion.by.unit === unit.number)
       )
         continue
       registry.note(number, {
+        fileBlobs: Object.fromEntries(this.session.repo.hashPaths(card.places.map((place) => place.file))),
         conclusion: 'deferred',
         text: `Deferred after the resolution pass. ${lastMessage?.trim() || 'No final explanation was supplied.'}`,
         provenance: {

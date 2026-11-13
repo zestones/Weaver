@@ -201,6 +201,7 @@ export class UpdateCommand implements Command {
 
     this.told(`${project.configName}/ ${dryRun ? 'would be brought' : 'brought'} up to date:`, dryRun)
     for (const change of changes) this.screen.line(`  ${change}`)
+    this.screen.hint(`${dryRun ? 'After updating, commit' : 'Commit'} the migrated .weaver/ from this tree so worktrees and clones get it.`)
 
     return true
   }

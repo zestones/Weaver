@@ -89,7 +89,7 @@ After that, `weaver update` is the one command that keeps things up to date. It 
 - the operations are in `migrating/operations/`: `RenamedField`, `AddedField`. A change none of them expresses is a new operation, with its test;
 - the migration is added to `DeclarationMigrations.ALL`, and the `const` of `version` in the settings schema goes up by one. A test holds the three together: the list, the files and the schema.
 
-A migration is never edited once a release carries it. Files of an earlier version are not read as they are: the hooks and `weaver doctor` tell the owner to run `weaver update`.
+A migration is never edited once a release carries it. Files of an earlier version are migrated in memory when read; hooks never write the migrated declaration. Hooks notify the agent and owner once per session, and `weaver doctor` reports the older format. The owner runs `weaver update` and commits the migrated `.weaver/` from that tree so worktrees and clones receive it. Files of a newer version remain unreadable.
 
 The registry of cards, under `.git/weaver/`, has a schema of its own: one entry for each version in `packages/memory/src/registry/registry-schema.ts`, never edited once a release carries it, and each keeps every card. A later Weaver brings a registry up to date the first time it opens it. An earlier one then refuses to read it, and says so: update a project when no agent works in it.
 

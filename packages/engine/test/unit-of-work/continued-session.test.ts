@@ -129,6 +129,9 @@ test('an exhausted unit keeps its refusals and report when its session continues
   assert.equal(answer.decision, undefined)
   assert.equal(checks.calls.count, 1)
   const report = /Report: (\S+)/.exec(answer.systemMessage ?? '')?.[1] ?? ''
-  assert.match(readFileSync(report, 'utf8'), /checks failed/)
+  assert.match(
+    readFileSync(report, 'utf8'),
+    /Checks not re-run after the refusal cap[\s\S]*\[the last check report\]\(0001-unit-1-round-1\.md\)/,
+  )
   assert.ok(report.startsWith(continued.dir))
 })

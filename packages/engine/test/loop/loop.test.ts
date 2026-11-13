@@ -18,7 +18,7 @@ const DECLARATION = {
   version: 4,
   cards: { resolvePerTask: null },
   finish: { headings: ['Request', 'To validate'] },
-  limits: { maxRefusals: 2 },
+  limits: { maxRefusals: 3 },
   checks: {
     syntax: { judge: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } },
     markers: {
@@ -166,7 +166,7 @@ test('a unit that finishes again without a change is given the same verdict at o
   assert.equal(again.decision, 'block')
   assert.match(
     again.reason ?? '',
-    /refusal 2 of 2\): fix what follows, then finish again\.\n.*\nNot run again, since nothing they read changed after their last run: syntax\./,
+    /refusal 2 of 3\): fix what follows, then finish again\.\n.*\nNot run again, since nothing they read changed after their last run: syntax\./,
   )
   assert.deepEqual(
     second?.checks.map(({ id, status, kept }) => [id, status, kept]),
@@ -328,7 +328,7 @@ process.stdin.on('end', () => {
   const settled = stop(`${FINISHED}\nF1 fixed: the constant now says whose input it holds\n`)
 
   assert.match(settled.systemMessage ?? '', /1 check passed on 1 changed file\. Reviewed by codex: 1 finding, 1 answered fixed\./)
-  assert.deepEqual(kinds(), ['touch', 'check', 'review', 'touch', 'check', 'answer', 'settle'])
+  assert.deepEqual(kinds(), ['touch', 'check', 'review', 'touch', 'answer', 'check', 'settle'])
 })
 
 test('a hook stopped while it waits leaves its review to the next end of turn, which does not start another', async () => {
@@ -629,7 +629,7 @@ test('the journal keeps how Weaver itself ran: what was asked, each run of the h
   )
   assert.ok(checks.every(({ checks: runs }) => runs.every(({ ms, failures }) => ms >= 0 && failures === 0)))
   assert.ok(
-    events.every(({ weaver, v }) => weaver === '0.0.0-dev' && v === 2),
+    events.every(({ weaver, v }) => weaver === '0.0.0-dev' && v === 3),
     'each line says which Weaver wrote it',
   )
 })

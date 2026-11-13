@@ -110,6 +110,7 @@ export interface Occurrence {
 // What is written on a card once it exists: by an agent the owner asked to verify or to fix it, or by the owner.
 export interface CardNote {
   readonly id?: string
+  readonly fileBlobs?: Readonly<Record<string, string | null>>
   readonly provenance: Provenance
   // null for a note that concludes nothing.
   readonly conclusion: Conclusion | null

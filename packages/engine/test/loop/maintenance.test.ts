@@ -158,7 +158,7 @@ test('the owner is reminded when a task ends, whatever ends it, and never while 
   assert.doesNotMatch(`${refusal.reason ?? ''}${refusal.systemMessage ?? ''}`, /still in maintenance/, 'the agent goes back to work')
   assert.match(
     given.systemMessage ?? '',
-    /^\[weaver\] The checks still fail after 1 refusal; the agent may stop\. Failures are left to the owner\.[^\n]*Report: \S+ /,
+    /\[weaver\] After 1 refusal, checks are left to the owner; the agent may stop\.[^\n]*Report: \S+ /,
   )
   assert.equal(given.systemMessage?.endsWith(REMINDER), true)
 })

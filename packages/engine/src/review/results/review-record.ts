@@ -23,6 +23,7 @@ export interface ReviewRecord {
   readonly head: string
   readonly reviewed: Readonly<Record<string, Blob>>
   readonly submittedAnswers?: readonly FindingAnswer[]
+  readonly journaledAnswers?: number
   readonly answers: readonly FindingAnswer[]
   // How many times the author was asked again for its answers.
   readonly asked: number

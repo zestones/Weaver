@@ -107,12 +107,26 @@ test('files in the format this Weaver reads lack no migration, and are left as t
   assert.deepEqual(migrations.run(), { texts: {}, applied: [] })
 })
 
-test('a project in another format is not read: its owner is told which, and that weaver update settles it', () => {
+test('an older project is migrated only in memory, preserving every declared part and project skill', () => {
+  assert.deepEqual(problemsOf(FIRST, 'behind'), [])
+  const folder = DeclarationFolder.in(join(scratch, 'behind'))
+  writeFiles(join(scratch, 'behind'), { '.weaver/skills/wv-finish.md': '---\nheadings:\n  - Result\n---\n' })
+  const before = folder.texts()
+  const declaration = folder.load()
+
+  assert.deepEqual(folder.texts(), before)
+  assert.deepEqual(declaration?.checks[0]?.repair, ['npx', 'prettier', '--write', '{files}'])
+  assert.deepEqual(declaration?.checks[1]?.judge, ['npx', 'tsc', '--noEmit'])
+  assert.equal(declaration?.guards.length, 1)
+  assert.equal(declaration?.writer?.runtime, 'codex')
+  assert.equal(declaration?.cards.resolvePerTask, null)
+  assert.deepEqual(declaration?.finish.headings, ['Result'])
+  assert.match(folder.formatNotice ?? '', /format 1, read as format 4 in memory/)
+})
+
+test('a newer project remains unreadable and directs the owner to a newer Weaver', () => {
   const ahead = { settings: JSON.stringify({ version: DeclarationMigrations.LATEST + 1, checks: {} }) }
 
-  assert.deepEqual(problemsOf(FIRST, 'behind'), [
-    'settings.json: these files are in the format of version 1, and this Weaver reads version 4: run weaver update, which brings them to it',
-  ])
   assert.deepEqual(problemsOf(ahead, 'ahead'), [
     'settings.json: these files are in the format of version 5, and this Weaver reads version 4: run weaver update, which installs the release that reads them',
   ])

@@ -333,6 +333,7 @@ export class CardRegistry {
         const card = new Card(record)
         if (
           !card.isWaiting ||
+          card.record.proposal !== null ||
           card.decision.kind !== 'none' ||
           card.origin === 'suspicion' ||
           card.conclusion?.as === 'fixed' ||
@@ -351,6 +352,22 @@ export class CardRegistry {
   releaseResolution(holder: string): void {
     this.write(() => {
       this.db.prepare('DELETE FROM resolution_claims WHERE holder = ?').run(holder)
+    })
+  }
+
+  ownerQuestionAsked(card: Card): boolean {
+    return this.guarded(() => {
+      const row = this.db.prepare('SELECT question, cycle FROM resolution_questions WHERE card = ?').get(card.number)
+      return row?.question === card.decision.question && row?.cycle === (card.record.lifecycle?.cycle ?? 0)
+    })
+  }
+
+  rememberOwnerQuestion(card: Card): void {
+    if (card.decision.kind !== 'owner') return
+    this.write(() => {
+      this.db
+        .prepare('INSERT OR REPLACE INTO resolution_questions (card, question, cycle) VALUES (?, ?, ?)')
+        .run(card.number, card.decision.question ?? '', card.record.lifecycle?.cycle ?? 0)
     })
   }
 
@@ -443,6 +460,26 @@ export class CardRegistry {
 
   acceptProposal(number: number, proposal: ClosingProposal): Card {
     return this.closeCard(number, proposal.as, proposal.reason, null, proposal)
+  }
+
+  acceptProposals(proposals: readonly { readonly number: number; readonly proposal: ClosingProposal }[]): void {
+    this.write(() => {
+      for (const { number, proposal } of proposals) {
+        const record = this.existing(number)
+        this.validateProposal(record, proposal)
+        const closing: CardClosing = {
+          as: proposal.as,
+          reason: proposal.reason,
+          issue: null,
+          at: this.now(),
+          by: this.actor,
+          proposal,
+        }
+        this.cards.update(
+          this.after(record, 'closed', `${proposal.as}: ${proposal.reason}`, { state: 'closed', closing, seenSinceClosing: false }),
+        )
+      }
+    })
   }
 
   private validateProposal(record: CardRecord, proposal: ClosingProposal): void {

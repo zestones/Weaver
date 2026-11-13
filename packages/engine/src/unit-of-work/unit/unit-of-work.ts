@@ -96,9 +96,8 @@ export class UnitOfWork {
       intents: known ? intents : [...intents, intent],
       check: {
         ...check,
-        reminded: false,
         reviewed: [],
-        ...(/(?:^|\s)#check(?=$|[\s.,;:!?)])/i.test(intent.text) ? { rounds: 0, judged: null, retry: true } : {}),
+        ...(/(?:^|\s)#check(?=$|[\s.,;:!?)])/i.test(intent.text) ? { rounds: 0, judged: null, retry: true, capNotified: false } : {}),
       },
     })
   }
@@ -171,7 +170,18 @@ export class UnitOfWork {
     const unattributed = [...new Set([...this.record.unattributed, ...closed.shown])].filter((path) => !(path in kept))
 
     return {
-      unit: new UnitOfWork({ ...this.record, files: kept, unattributed, returned: this.returnedWith(files, kept) }),
+      unit: new UnitOfWork({
+        ...this.record,
+        files: kept,
+        unattributed,
+        returned: this.returnedWith(files, kept),
+        check: {
+          ...this.record.check,
+          reminded: [...closed.charged].some(([path, change]) => change.before !== change.after && this.files[path]?.last !== change.after)
+            ? false
+            : this.reminded,
+        },
+      }),
       foreign: [...closed.charged.keys()].filter((path) => files[path]?.foreign === true),
     }
   }

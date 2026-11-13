@@ -1,3 +1,4 @@
+import { Journal } from '../../unit-of-work/journal/journal.ts'
 import { ReviewDelivery } from '../delivery/review-delivery.ts'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { isAlive } from '../../lib/process/alive.ts'
@@ -111,7 +112,7 @@ export class ReviewRounds {
         at: new Date().toISOString(),
       },
       maxRefusals: policy.maxRefusals,
-      round: unit.reviewRounds + 1,
+      round: Math.max(unit.reviewRounds, earlier?.round ?? 0) + 1,
       request: {
         rules: declaration.reviewCriteria(diff.paths).map(({ id, statement, evidence }) => ({ id, statement, evidence })),
         files: diff.files,
@@ -159,7 +160,15 @@ export class ReviewRounds {
       experiments: policy.experiments,
     }
 
-    store.keep(content, { ...failed, state: 'running', assignment, startedAt: new Date().toISOString(), worker: null, outcome: null })
+    store.keep(content, {
+      ...failed,
+      round: (failed.round ?? 1) + 1,
+      state: 'running',
+      assignment,
+      startedAt: new Date().toISOString(),
+      worker: null,
+      outcome: null,
+    })
     this.started(session, content)
 
     return this.delivered(store, content, work, policy)
@@ -177,7 +186,14 @@ export class ReviewRounds {
     const record = await this.awaited(store, content, policy.waitSeconds * 1000)
     const { runtime, reason, model } = record.assignment
     const round = work.unit.reviewRounds + 1
-    const about = { content, round, maxRefusals: policy.maxRefusals, model, rules: record.request.rules.length }
+    const about = {
+      content,
+      round,
+      journalRound: record.round ?? round,
+      maxRefusals: policy.maxRefusals,
+      model,
+      rules: record.request.rules.length,
+    }
 
     if (record.state === 'running') {
       const seconds = (Date.now() - Date.parse(record.startedAt)) / 1000
@@ -248,14 +264,43 @@ export class ReviewRounds {
   ): ReviewRecord {
     const given = new AuthorAnswers(work.lastMessage).all(record.outcome?.findings?.length ?? 0)
     const submittedAnswers = [...(record.submittedAnswers ?? record.answers)]
+    const journaled = record.journaledAnswers ?? submittedAnswers.length
     for (const answer of given) {
       const previous = submittedAnswers.findLast((earlier) => earlier.finding === answer.finding)
       if (previous?.status !== answer.status || previous.why !== answer.why) submittedAnswers.push(answer)
     }
-    const captured = { ...record, submittedAnswers }
+    const captured = { ...record, submittedAnswers, journaledAnswers: journaled }
     store.keep(content, captured)
+    const logged = journaled < submittedAnswers.length ? new Journal(work.session.repo).readSession(work.session.id) : []
+    for (const [index, answer] of submittedAnswers.entries()) {
+      if (index < journaled) continue
+      if (
+        logged.some(
+          (event) =>
+            event.kind === 'answer' &&
+            event.unit === work.unit.number &&
+            event.review === content &&
+            event.reviewStartedAt === record.startedAt &&
+            event.submission === index + 1,
+        )
+      )
+        continue
+      const finding = record.outcome?.findings?.[answer.finding - 1]
+      if (finding === undefined) continue
+      work.session.log({
+        kind: 'answer',
+        unit: work.unit.number,
+        review: content,
+        reviewStartedAt: record.startedAt,
+        submission: index + 1,
+        finding: answer.finding,
+        rule: finding.rule,
+        status: answer.status,
+        why: answer.why,
+      })
+    }
     const answers = this.submitted(captured).taken(record.outcome?.findings ?? [], this.since(record, work))
-    const kept = { ...captured, answers }
+    const kept = { ...captured, answers, journaledAnswers: submittedAnswers.length }
     store.keep(content, kept)
     return kept
   }

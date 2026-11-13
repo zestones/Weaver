@@ -12,14 +12,19 @@ export class ClosingDraft {
   }
 
   proposal(conclusion: Conclusion | null, revision: number): ClosingProposal | null {
+    const latest = this.notes.findLast((note) => note.conclusion !== null || this.removed(note.text))
+    const gone =
+      latest !== undefined &&
+      (latest.conclusion === 'no-decision' || latest.conclusion === 'refuted' || latest.conclusion === null) &&
+      this.removed(latest.text)
     if (
       new Card(this.record).decision.kind === 'owner' ||
-      this.record.state !== 'open' ||
-      (conclusion !== 'fixed' && conclusion !== 'refuted')
+      (this.record.state !== 'open' && !(this.record.state === 'raw' && (gone || conclusion === 'refuted'))) ||
+      (!gone && conclusion !== 'fixed' && conclusion !== 'refuted')
     )
       return null
 
-    const last = this.notes.findLast((note) => note.conclusion === conclusion)
+    const last = gone ? latest : this.notes.findLast((note) => note.conclusion === conclusion)
     const investigation = this.notes.findLast(
       (note) => note.conclusion === 'confirmed' || note.conclusion === 'refuted' || note.conclusion === 'unsure',
     )
@@ -33,8 +38,9 @@ export class ClosingDraft {
         ?.text.match(/^Cause:[ \t]*([\s\S]*?)(?=^(?:Changed|Verified|Left|Ran|Read|Shows):|(?![\s\S]))/im)?.[1]
         ?.trim() || null
     const cause = explicitCause ?? field(investigation, 'Shows') ?? 'cause not recorded'
-    const fix =
-      conclusion === 'refuted'
+    const fix = gone
+      ? 'Invalid: the referenced code was removed.'
+      : conclusion === 'refuted'
         ? 'Refuted: no fix proposed.'
         : (field(last, 'Changed') ?? this.record.flag?.fields.didNote ?? 'fix not recorded')
     const verified = field(last, conclusion === 'fixed' ? 'Verified' : 'Ran')
@@ -58,7 +64,7 @@ export class ClosingDraft {
 
     return {
       draftedBy: 'weaver',
-      as: conclusion === 'fixed' ? 'fixed' : 'invalid',
+      as: !gone && conclusion === 'fixed' ? 'fixed' : 'invalid',
       reason,
       by: last?.provenance ?? this.record.provenance,
       revision,
@@ -69,5 +75,18 @@ export class ClosingDraft {
       remaining,
       warning,
     }
+  }
+
+  private removed(text: string): boolean {
+    return text
+      .split(/\n|(?<=[.!?])\s+/)
+      .some(
+        (sentence) =>
+          /\b(?:code|implementation|runtime|engine|module|component|buffer|timeline|transport|interpreter|workers|all (?:referenced )?files)\b/i.test(
+            sentence,
+          ) &&
+          /\b(?:was|were|has been|have been) (?:deleted|removed)\b|\b(?:is|are) gone\b|\bno longer exists?\b/i.test(sentence) &&
+          !/\b(?:if|whether|might|may|could|would|should|not|never|but|however|still)\b|\?/i.test(sentence),
+      )
   }
 }

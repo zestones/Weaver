@@ -97,7 +97,9 @@ test('version 4 upgrades decisions and claims without losing any registry conten
   const records = before.list({ states: ['open', 'closed'] }).map((card) => card.record)
   before.close()
   const old = new DatabaseSync(join(dir, 'registry.sqlite'))
-  old.exec("DROP TABLE resolution_claims; UPDATE cards SET record = json_remove(record, '$.flag.fields.decision'); PRAGMA user_version = 4")
+  old.exec(
+    "DROP TABLE resolution_questions; DROP TABLE resolution_claims; UPDATE cards SET record = json_remove(record, '$.flag.fields.decision'); PRAGMA user_version = 4",
+  )
   old.close()
   const after = new CardRegistry(dir)
   assert.deepEqual(
@@ -108,7 +110,7 @@ test('version 4 upgrades decisions and claims without losing any registry conten
   assert.equal(after.find(2)?.record.closing?.reason, 'Keep the existing behavior')
   assert.equal(after.claimResolution([1], 'later', 2).length, 0)
   const db = new DatabaseSync(join(dir, 'registry.sqlite'))
-  assert.equal(db.prepare('PRAGMA user_version').get()?.user_version, 5)
+  assert.equal(db.prepare('PRAGMA user_version').get()?.user_version, 6)
   assert.equal(db.prepare('SELECT count(*) AS total FROM review_deliveries').get()?.total, 1)
   db.close()
   after.close()
@@ -142,3 +144,43 @@ for (const limit of [null, 1, 0]) {
     }
   })
 }
+
+test('stored writer decisions remain claimable after reopening a registry without changing explicit decisions', () => {
+  const dir = registries.folder()
+  const first = new CardRegistry(dir)
+  for (const [index, kind] of ['unknown', 'owner', 'none'].entries()) {
+    const flag = flagOf({ callId: `writer-${String(index)}`, text: `Writer ${String(index)}` })
+    first.flag({
+      ...flag,
+      fields: { ...flag.fields, decision: { kind: kind as 'unknown' | 'owner' | 'none', question: kind === 'owner' ? 'Which?' : null } },
+    })
+    first.written(
+      index + 1,
+      writtenOf({ decision: { kind: index === 2 ? 'owner' : 'none', question: index === 2 ? 'Suggestion only' : null } }),
+    )
+  }
+  first.close()
+  const older = new DatabaseSync(join(dir, 'registry.sqlite'))
+  older.exec('DROP TABLE resolution_questions; PRAGMA user_version = 5')
+  older.close()
+  const registry = new CardRegistry(dir)
+  assert.deepEqual(
+    registry.claimResolution([1, 2, 3], 'next-session', null).map((card) => card.number),
+    [1, 3],
+  )
+  assert.equal(registry.find(1)?.record.flag?.fields.decision?.kind, 'unknown')
+  assert.equal(registry.find(1)?.record.written?.decision?.kind, 'none')
+  assert.equal(registry.find(2)?.decision.kind, 'owner')
+  const owner = registry.find(2)
+  assert.ok(owner)
+  assert.equal(registry.ownerQuestionAsked(owner), false)
+  registry.rememberOwnerQuestion(owner)
+  registry.close()
+  const next = new CardRegistry(dir)
+  assert.equal(next.ownerQuestionAsked(owner), true)
+  next.note(2, { provenance: provenanceOf(), conclusion: 'needs-owner', text: 'A different question?' })
+  const changed = next.find(2)
+  assert.ok(changed)
+  assert.equal(next.ownerQuestionAsked(changed), false)
+  next.close()
+})

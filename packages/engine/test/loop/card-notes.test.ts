@@ -137,7 +137,7 @@ test('there is only one card prompt per unit, even when later work touches anoth
   assert.deepEqual(held(), ['cards', null])
 })
 
-test('pending owner questions and unknown decisions are documented but never claimed for resolution', async () => {
+test('documented owner questions are not re-asked and unknown decisions are never claimed for resolution', async () => {
   refusalOf(session, bashCall('weaver note 1 needs-owner "Which expiry?"'))
   const other = new Session(session.repo, 'unknown', 'claude')
   refusalOf(other, bashCall(flagCommand([A_FILE], FLAG_BODY.replace('no call of refresh()', 'no call of clear()'))))
@@ -145,7 +145,7 @@ test('pending owner questions and unknown decisions are documented but never cla
   prompt(session, 'change a')
   edits(A_FILE, 'export const a = 2\n')
   const asked = await finishWith(session, stubChecks([PASSING]))
-  assert.match(asked.reason ?? '', /owner decision: Which expiry/)
+  assert.doesNotMatch(asked.reason ?? '', /owner decision: Which expiry/)
   assert.match(asked.reason ?? '', /decision unknown/)
   assert.doesNotMatch(asked.reason ?? '', /; claimed for resolution/)
   assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
@@ -261,3 +261,62 @@ for (const limit of [null, 1, 0]) {
     })
   })
 }
+
+test('a deferral from another session suppresses the pass until its saved files change', async () => {
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  const other = new Session(session.repo, 'other-session', 'claude')
+  refusalOf(other, bashCall('weaver note 1 deferred "Requires a broader redesign"'))
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
+  const note = cardsOf(session.repo)[0]?.record.notes.at(-1)
+  assert.ok(note?.fileBlobs?.[A_FILE])
+})
+
+test('a writer suggestion of none is claimed in the resolution pass', async () => {
+  const other = new Session(session.repo, 'unknown-writer', 'claude')
+  refusalOf(other, bashCall(flagCommand([A_FILE], FLAG_BODY.replace('no call of refresh()', 'missing clear()'))))
+  withRegistry(session.repo, (registry) =>
+    registry.written(2, {
+      title: 'Missing clear',
+      labels: {},
+      sections: [],
+      look: { verdict: 'agrees', note: 'Read it' },
+      decision: { kind: 'none', question: null },
+      writer: { runtime: 'claude', model: null, seconds: 1, costUsd: null },
+      at: new Date().toISOString(),
+    }),
+  )
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  const asked = await finishWith(session, stubChecks([PASSING]))
+  assert.match(asked.reason ?? '', /#2 .*claimed for resolution/)
+})
+
+test('a changed deferred card gets a fresh snapshot when the next pass defers it again', async () => {
+  const earlier = new Session(session.repo, 'deferring', 'claude')
+  refusalOf(earlier, bashCall('weaver note 1 deferred "Requires a redesign"'))
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, 'block')
+  assert.equal((await finishWith(session, stubChecks([PASSING]))).decision, undefined)
+  const card = cardsOf(session.repo)[0]
+  assert.equal(card?.record.notes.length, 2)
+  assert.equal(card?.record.notes.at(-1)?.provenance.session, session.id)
+  assert.equal(card?.record.notes.at(-1)?.fileBlobs?.[A_FILE], session.repo.hashPaths([A_FILE]).get(A_FILE))
+})
+
+test('an explicit owner question is presented only once across sessions even without an answer', async () => {
+  const earlier = new Session(session.repo, 'explicit-owner', 'claude')
+  refusalOf(
+    earlier,
+    bashCall(flagCommand([A_FILE], `${FLAG_BODY.replace('no call of refresh()', 'missing expiry')}Decision: owner Which expiry?\n`)),
+  )
+  prompt(session, 'change a')
+  edits(A_FILE, 'export const a = 2\n')
+  assert.match((await finishWith(session, stubChecks([PASSING]))).reason ?? '', /owner decision: Which expiry/)
+  await finishWith(session, stubChecks([PASSING]))
+  session = new Session(session.repo, 'later-owner', 'claude')
+  prompt(session, 'change a again')
+  edits(A_FILE, 'export const a = 3\n')
+  assert.doesNotMatch((await finishWith(session, stubChecks([PASSING]))).reason ?? '', /owner decision: Which expiry/)
+})

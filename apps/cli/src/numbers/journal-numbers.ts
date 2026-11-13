@@ -60,11 +60,12 @@ export interface JournalFigures {
     readonly heldByReminder: number
     readonly heldByCards: number
   }
-  // One verdict is one run of the checks at the end of a task.
+  // One verdict is one judgement at the end of a task, including checks deferred after the cap.
   readonly verdicts: {
     readonly total: number
     readonly passed: number
     readonly failed: number
+    readonly afterCap: number
     readonly unchecked: number
     readonly unknown: number
     readonly toValidate: number
@@ -180,7 +181,8 @@ export class JournalNumbers {
       unchecked: verdicts.filter((verdict) => verdict.passed && verdict.v >= 2 && !verdict.checks.some((check) => check.status !== 'skip'))
         .length,
       unknown: verdicts.filter((verdict) => verdict.passed && verdict.v < 2).length,
-      failed: verdicts.filter((verdict) => !verdict.passed).length,
+      failed: verdicts.filter((verdict) => !verdict.passed && verdict.afterCap !== true).length,
+      afterCap: verdicts.filter((verdict) => verdict.afterCap === true).length,
       toValidate: this.sum(verdicts.map((verdict) => verdict.toValidate)),
       repaired: this.sum(verdicts.map((verdict) => verdict.repaired)),
       ms: this.spread(verdicts.map((verdict) => verdict.ms)),
@@ -248,7 +250,14 @@ export class JournalNumbers {
 
   private reviews(): JournalFigures['reviews'] {
     const reviews = this.of('review')
-    const answers = this.of('answer')
+    const seen = new Set<string>()
+    const answers = this.of('answer').filter((answer) => {
+      if (answer.review === undefined || answer.submission === undefined) return true
+      const key = JSON.stringify([answer.session, answer.unit, answer.review, answer.reviewStartedAt, answer.submission])
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
     const answered = (status: EventOf<'answer'>['status'], among = answers): number =>
       among.filter((answer) => answer.status === status).length
     const rules = [...new Set([...reviews.flatMap((review) => review.findingRules), ...answers.map((answer) => answer.rule)])]

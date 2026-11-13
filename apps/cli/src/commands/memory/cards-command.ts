@@ -238,7 +238,7 @@ export class CardsCommand implements Command {
       this.screen.line()
       this.screen.hint(
         this.caller.agent() === null
-          ? 'Read one with weaver cards <number>; accept its proposal with weaver close <number>.'
+          ? 'Read one with weaver cards <number>; accept its proposal with weaver close <number>, or all proposals with weaver close --proposed.'
           : 'Read one with weaver cards <number>, and write on it with weaver note <number>: closing it is the owner’s.',
       )
 

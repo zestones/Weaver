@@ -192,3 +192,67 @@ test('issue attempts survive interruption, require reconciliation, and reuse a s
   assert.equal(second.find(1)?.state, 'raw', 'reconciliation never closes a card')
   second.close()
 })
+
+test('legacy deletion notes draft invalid proposals without closing cards or overriding owner decisions', () => {
+  const registry = new CardRegistry(registries.folder())
+  registry.flag(flagOf())
+  registry.written(1, writtenOf())
+  registry.note(1, { provenance: provenanceOf(), conclusion: 'confirmed', text: 'The old engine leaks listeners' })
+  const card = registry.note(1, {
+    provenance: provenanceOf(),
+    conclusion: 'no-decision',
+    text: 'The runtime this question is about was deleted on 2026-11-11 with the old engine.',
+  }).card
+  assert.equal(card.state, 'open')
+  assert.equal(card.record.proposal?.as, 'invalid')
+  assert.match(card.record.proposal?.reason ?? '', /was deleted on 2026-11-11/)
+  assert.equal(card.record.proposal?.warning, true)
+  assert.deepEqual(registry.claimResolution([1], 'next', null), [])
+  registry.note(1, { provenance: provenanceOf(), conclusion: null, text: 'Ready for the owner to close.' })
+  assert.equal(registry.find(1)?.record.proposal?.as, 'invalid')
+  registry.note(1, { provenance: provenanceOf(), conclusion: 'confirmed', text: 'The replacement still has the same defect' })
+  assert.equal(registry.find(1)?.record.proposal, null)
+  registry.note(1, { provenance: provenanceOf(), conclusion: 'no-decision', text: 'The code was not deleted.' })
+  assert.equal(registry.find(1)?.record.proposal, null)
+  registry.note(1, { provenance: provenanceOf(), conclusion: 'needs-owner', text: 'Should we keep the replacement?' })
+  registry.note(1, { provenance: provenanceOf(), conclusion: null, text: 'The old code was deleted.' })
+  assert.equal(registry.find(1)?.record.proposal, null)
+  registry.close()
+})
+
+test('bulk acceptance is atomic when one displayed proposal changes', () => {
+  const dir = registries.folder()
+  const registry = new CardRegistry(dir)
+  registry.open(findingOf())
+  registry.open(findingOf({ review: 'second/F1', message: 'Second finding' }, { places: [{ file: 'second.ts', line: 1 }] }))
+  for (const number of [1, 2]) registry.note(number, { provenance: provenanceOf(), conclusion: 'refuted', text: 'The code was removed.' })
+  const proposals = registry.list().map((card) => {
+    assert.ok(card.record.proposal)
+    return { number: card.number, proposal: card.record.proposal }
+  })
+  const other = new CardRegistry(dir)
+  other.note(2, { provenance: provenanceOf(), conclusion: null, text: 'New evidence' })
+  assert.throws(() => registry.acceptProposals(proposals), /stale/)
+  assert.deepEqual(
+    registry.list().map((card) => card.state),
+    ['open', 'open'],
+  )
+  other.close()
+  registry.close()
+})
+
+for (const text of [
+  'The temporary log was deleted.',
+  'The old engine was not deleted.',
+  'If the old engine was deleted, this would be obsolete.',
+  'Was the runtime removed?',
+]) {
+  test(`a deletion note does not invent a conclusion from: ${text}`, () => {
+    const registry = new CardRegistry(registries.folder())
+    registry.flag(flagOf())
+    registry.written(1, writtenOf())
+    registry.note(1, { provenance: provenanceOf(), conclusion: 'no-decision', text })
+    assert.equal(registry.find(1)?.record.proposal, null)
+    registry.close()
+  })
+}

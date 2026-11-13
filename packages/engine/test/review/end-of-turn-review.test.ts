@@ -229,6 +229,10 @@ test('work that goes beyond the findings is new work, reviewed on its own, with 
   assert.match(handed.systemMessage ?? '', /Reviewed by codex: 1 finding left to you\. 1 item to validate\./)
   assert.match(reportOf(handed.systemMessage ?? ''), /\(found by the last review, which the agent has not seen\)/)
   assert.deepEqual(standings(), ['sent-back', 'sent-back', 'for-owner'])
+  assert.deepEqual(
+    eventsOf(session, 'review').map(({ round }) => round),
+    [1, 1, 2],
+  )
 })
 
 test('the project says how many times the review may send the author back for one request', async () => {
@@ -338,6 +342,10 @@ test('answers are persisted before the 40-line routing decision and survive a ne
   await finish(reviewer, reviewed(), saying('F1 fixed: split the function in two'))
   assert.deepEqual(new ReviewStore(session.dir).find(content)?.answers, [{ finding: 1, status: 'fixed', why: 'split the function in two' }])
   assert.equal(reviewer.requests.length, 2)
+  assert.deepEqual(
+    eventsOf(session, 'answer').map(({ review, submission, status }) => ({ review, submission, status })),
+    [{ review: content, submission: 1, status: 'fixed' }],
+  )
   assert.match(reviewer.requests[1]?.prompt(null) ?? '', /answered fixed: split the function in two/)
 })
 
@@ -349,9 +357,17 @@ test('partial and unvalidated answers are kept even while the existing reminders
   const store = new ReviewStore(session.dir)
   assert.deepEqual(store.find(content)?.submittedAnswers, [{ finding: 1, status: 'fixed', why: 'attempted the split' }])
   assert.deepEqual(store.find(content)?.answers, [], 'unvalidated answers are not treated as accepted fixes')
+  assert.deepEqual(
+    eventsOf(session, 'answer').map(({ finding, status, why }) => ({ finding, status, why })),
+    [{ finding: 1, status: 'fixed', why: 'attempted the split' }],
+  )
   await finish(reviewer, reviewed(), saying('F2 not fixed: waiting for the owner choice'))
   assert.deepEqual(
     store.find(content)?.submittedAnswers?.map((answer) => answer.finding),
+    [1, 2],
+  )
+  assert.deepEqual(
+    eventsOf(session, 'answer').map(({ finding }) => finding),
     [1, 2],
   )
 })
@@ -364,6 +380,7 @@ test('a later check failure cannot discard answers to an earlier review', async 
   await finishWith(session, stubChecks([FAILING]), reviewed(), saying('F1 fixed: split the function in two'), reviewer)
   assert.deepEqual(new ReviewStore(session.dir).find(content)?.answers, [{ finding: 1, status: 'fixed', why: 'split the function in two' }])
   assert.equal(reviewer.requests.length, 1)
+  assert.equal(eventsOf(session, 'answer')[0]?.review, content)
 })
 
 test('revised answers remain in history, including a return to an earlier answer', async () => {
@@ -383,4 +400,51 @@ test('revised answers remain in history, including a return to an earlier answer
     ['the owner asked for one function', 'the code needs more investigation', 'the owner asked for one function'],
   )
   assert.equal(record?.answers[0]?.why, 'the owner asked for one function')
+  assert.deepEqual(
+    eventsOf(session, 'answer').map(({ submission, why }) => ({ submission, why })),
+    [
+      { submission: 1, why: 'the owner asked for one function' },
+      { submission: 2, why: 'the code needs more investigation' },
+      { submission: 3, why: 'the owner asked for one function' },
+    ],
+  )
+})
+
+test('a retry after saving a submission journals it once even if the last capture was interrupted', async () => {
+  await finish(stubReviewer([found]))
+  const unit = session.unit()
+  const content = unit.lastReviewed ?? ''
+  const rounds = new ReviewRounds({ start: () => undefined })
+  const store = new ReviewStore(session.dir)
+  const record = store.find(content)
+  assert.ok(record)
+  const answer = { finding: 1, status: 'not-fixed', why: 'the owner will decide' } as const
+  store.keep(content, { ...record, submittedAnswers: [answer], journaledAnswers: 0 })
+  rounds.keepAnswers(session, unit, 'F1 not fixed: the owner will decide')
+  assert.equal(eventsOf(session, 'answer').length, 1)
+  const captured = store.find(content)
+  assert.ok(captured)
+  store.keep(content, { ...captured, journaledAnswers: 0 })
+  rounds.keepAnswers(session, unit, 'F1 not fixed: the owner will decide')
+  assert.equal(eventsOf(session, 'answer').length, 1)
+  assert.equal(store.find(content)?.journaledAnswers, 1)
+})
+
+test('a fresh review of the same content journals its own submissions', async () => {
+  await finish(stubReviewer([found]))
+  const unit = session.unit()
+  const content = unit.lastReviewed ?? ''
+  const rounds = new ReviewRounds({ start: () => undefined })
+  const store = new ReviewStore(session.dir)
+  const message = 'F1 not fixed: the owner will decide'
+  rounds.keepAnswers(session, unit, message)
+  const record = store.find(content)
+  assert.ok(record)
+  store.keep(content, { ...record, startedAt: '2099-01-01T00:00:00Z', submittedAnswers: [], answers: [], journaledAnswers: 0 })
+  rounds.keepAnswers(session, unit, message)
+  assert.equal(eventsOf(session, 'answer').length, 2)
+  assert.deepEqual(
+    eventsOf(session, 'answer').map(({ submission }) => submission),
+    [1, 1],
+  )
 })

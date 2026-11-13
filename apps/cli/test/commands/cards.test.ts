@@ -7,7 +7,8 @@ import { afterAll, beforeEach, test } from 'vitest'
 import { cardOf, contextOf, finding, flag, inRegistry, note, write } from '../fixtures/cards.ts'
 import { makeProject, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
 
-const HINT = 'Read one with weaver cards <number>; accept its proposal with weaver close <number>.'
+const HINT =
+  'Read one with weaver cards <number>; accept its proposal with weaver close <number>, or all proposals with weaver close --proposed.'
 const USAGE = [
   'Usage: weaver cards [<number>...] [--all] [--closed [fixed|wontfix|issue|invalid]] [--file <path>] [--label <family:value>]... [--since <day>|<n>d] [--answered] [--search <words>] [--sort newest|level]',
   'Run weaver help cards for what each word means.',

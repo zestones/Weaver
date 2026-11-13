@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
+import { stripVTControlCharacters } from 'node:util'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeEach, test } from 'vitest'
-import { cardOf, finding, flag, note, write } from '../fixtures/cards.ts'
+import { afterAll, beforeEach, test, vi } from 'vitest'
+import { Confirmation } from '../../src/input/confirmation.ts'
+import { cardOf, finding, flag, inRegistry, note, write } from '../fixtures/cards.ts'
 import { makeProject, SETTINGS, weaver, writeConfig } from '../fixtures/project.ts'
 
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-cli-close-'))
@@ -87,7 +89,10 @@ test('every error of the registry is shown as it says, and the card stays as it 
 })
 
 test('close says how it is written when a word is missing or unknown', async () => {
-  const usage = ['Usage: weaver close <number> [fixed|wontfix|issue|invalid] [reason]', 'Run weaver help close for what each word means.']
+  const usage = [
+    'Usage: weaver close <number> [fixed|wontfix|issue|invalid] [reason] | close --proposed [--yes]',
+    'Run weaver help close for what each word means.',
+  ]
 
   assert.deepEqual(await weaver(top, ['close']), { status: 2, lines: usage })
   assert.equal((await weaver(top, ['close', '1'])).status, 1)
@@ -166,4 +171,78 @@ test('a declaration that cannot be read files nothing and closes nothing', async
   assert.equal(status, 1)
   assert.match(lines[0] ?? '', /^X \.weaver is not a valid project declaration: settings\.json: chekcs is not a known field$/)
   assert.equal(cardOf(top, 1).state, 'open')
+})
+
+test('bulk closing lists proposals and requires explicit approval without a terminal', async () => {
+  note(top, 1, { conclusion: 'fixed', text: 'Changed: refreshed tokens\nVerified: expiry test passed\nLeft: nothing' })
+  note(top, 2, { conclusion: 'refuted', text: 'Ran: checked HEAD\nRead: user.ts\nShows: the parser already validates users' })
+  const refused = await weaver(top, ['close', '--proposed'])
+  assert.equal(refused.status, 1)
+  assert.match(refused.lines.join('\n'), /#1 Nothing refreshes the token — fixed/)
+  assert.match(refused.lines.join('\n'), /refreshed tokens/)
+  assert.match(refused.lines.join('\n'), /#2 .* — invalid/)
+  assert.match(refused.lines.join('\n'), /--yes/)
+  assert.equal(cardOf(top, 1).state, 'open')
+  assert.equal(cardOf(top, 2).state, 'open')
+  const accepted = await weaver(top, ['close', '--proposed', '--yes'])
+  assert.equal(accepted.status, 0)
+  assert.equal(accepted.lines.at(-1), '✓ 2 cards closed.')
+  for (const number of [1, 2]) {
+    assert.equal(cardOf(top, number).state, 'closed')
+    assert.ok(cardOf(top, number).record.closing?.proposal)
+    assert.equal(cardOf(top, number).record.closing?.by?.role, 'owner')
+    assert.ok(inRegistry(top, (registry) => registry.shownProposal(number)))
+  }
+  assert.deepEqual(await weaver(top, ['close', '--proposed']), { status: 0, lines: ['No closing proposals wait for you.'] })
+})
+
+for (const answer of [false, true]) {
+  test(`bulk closing asks once on a terminal and honors ${String(answer)}`, async () => {
+    note(top, 1, { conclusion: 'fixed', text: 'Changed: refreshed tokens\nVerified: passed\nLeft: nothing' })
+    const available = vi.spyOn(Confirmation.prototype, 'available', 'get').mockReturnValue(true)
+    const ask = vi.spyOn(Confirmation.prototype, 'ask').mockReturnValue(answer)
+    try {
+      const result = await weaver(top, ['close', '--proposed', '--no-color'], { terminal: 80 })
+      assert.equal(result.status, 0)
+      assert.equal(ask.mock.calls.length, 1)
+      assert.match(result.lines.join('\n'), /Accept 1 closing proposal\? \[y\/N\]/)
+      assert.equal(stripVTControlCharacters(result.lines.at(-1) ?? ''), answer ? '✓ 1 card closed.' : '- No cards closed.')
+      assert.equal(cardOf(top, 1).state, answer ? 'closed' : 'open')
+      assert.equal(cardOf(top, 2).state, 'open')
+    } finally {
+      available.mockRestore()
+      ask.mockRestore()
+    }
+  })
+}
+
+test('a proposal changed during bulk confirmation leaves the whole batch open', async () => {
+  for (const number of [1, 2]) note(top, number, { conclusion: 'fixed', text: 'Changed: corrected\nVerified: passed\nLeft: nothing' })
+  const available = vi.spyOn(Confirmation.prototype, 'available', 'get').mockReturnValue(true)
+  const ask = vi.spyOn(Confirmation.prototype, 'ask').mockImplementation(() => {
+    note(top, 2, { conclusion: null, text: 'New evidence arrived' })
+    return true
+  })
+  try {
+    const result = await weaver(top, ['close', '--proposed'], { terminal: 80 })
+    assert.equal(result.status, 1)
+    assert.match(result.lines.join('\n'), /stale/)
+    assert.equal(cardOf(top, 1).state, 'open')
+    assert.equal(cardOf(top, 2).state, 'open')
+  } finally {
+    available.mockRestore()
+    ask.mockRestore()
+  }
+})
+
+test('bulk closing stays owner-only and rejects mixed card arguments', async () => {
+  note(top, 1, { conclusion: 'fixed', text: 'Fixed' })
+  for (const under of ['claude', 'codex']) {
+    const result = await weaver(top, ['close', '--proposed', '--yes'], { under })
+    assert.equal(result.status, 1)
+    assert.match(result.lines.join('\n'), /owner/)
+    assert.equal(cardOf(top, 1).state, 'open')
+  }
+  assert.equal((await weaver(top, ['close', '--proposed', '1', 'fixed', '--yes'])).status, 2)
+  assert.equal((await weaver(top, ['close', '--yes'])).status, 2)
 })

@@ -222,3 +222,55 @@ test('empty or skipped check lists are unchecked, and old verdicts without check
 
   assert.match(text, /1 passed, 0 failed, 2 unchecked, 1 unknown coverage/)
 })
+
+test('version 3 submissions count alongside legacy answers and replayed submissions count once', () => {
+  const submission = {
+    ...BASE,
+    v: 3,
+    kind: 'answer',
+    unit: 2,
+    review: 'content',
+    submission: 1,
+    finding: 1,
+    rule: 'N1',
+    status: 'fixed',
+    why: 'split the function',
+  } as const
+  const { reviews } = new JournalNumbers([
+    ...EVENTS,
+    submission,
+    submission,
+    { ...submission, submission: 2, status: 'not-fixed', why: 'owner decision' },
+    { ...submission, reviewStartedAt: 'new attempt' },
+  ]).figures
+  assert.deepEqual(reviews.answers, { fixed: 3, notFixed: 2, missing: 0 })
+  assert.deepEqual(reviews.byRule['N1'], { findings: 1, fixed: 3, notFixed: 1, missing: 0 })
+})
+
+test('verdicts after the refusal cap count separately from failed, passed and unchecked runs', () => {
+  const deferred = {
+    ...BASE,
+    v: 3,
+    kind: 'check',
+    unit: 1,
+    round: 3,
+    passed: false,
+    afterCap: true,
+    failed: [],
+    toValidate: 1,
+    files: 2,
+    lines: 4,
+    repaired: 0,
+    ms: 2,
+    checks: [],
+  } as const
+  const journal = new JournalNumbers([deferred]).figures
+  assert.equal(journal.verdicts.total, 1)
+  assert.equal(journal.verdicts.afterCap, 1)
+  assert.equal(journal.verdicts.passed, 0)
+  assert.equal(journal.verdicts.failed, 0)
+  assert.equal(journal.verdicts.unchecked, 0)
+  assert.deepEqual(journal.checks, {})
+  const text = drawn((screen) => new StatsPage({ since: null, journal, cards: null }, '/journal').print(screen)).join('\n')
+  assert.match(text, /0 passed, 0 failed, 1 not re-run after refusal cap/)
+})

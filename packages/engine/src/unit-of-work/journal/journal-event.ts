@@ -36,6 +36,7 @@ interface CheckEvent {
   readonly unit: number
   readonly round: number
   readonly passed: boolean
+  readonly afterCap?: boolean
   readonly failed: readonly string[]
   readonly toValidate: number
   readonly files: number
@@ -140,6 +141,7 @@ interface MaintenanceEvent {
 interface ReviewEvent {
   readonly kind: 'review'
   readonly unit: number
+  readonly round?: number
   readonly runtime: string
   readonly model: string | null
   // Why this runtime reviewed, or why no review was run.
@@ -164,6 +166,11 @@ interface AnswerEvent {
   readonly finding: number
   readonly rule: string
   readonly status: 'fixed' | 'not-fixed' | 'missing'
+  // Version 3 records submissions, independently of whether they are accepted.
+  readonly review?: string
+  readonly reviewStartedAt?: string
+  readonly submission?: number
+  readonly why?: string
 }
 
 interface FlagEvent {

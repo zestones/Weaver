@@ -16,6 +16,7 @@ export interface VerdictFields {
   readonly repaired: readonly string[]
   readonly review: UnitReview | null
   readonly ms: number
+  readonly deferredChecks?: readonly string[]
 }
 
 // The one rule the engine brings itself: the declaration that says what is checked is the owner's.
@@ -26,6 +27,8 @@ const MAINTENANCE_RULE = 'weaver:maintenance'
 const WRITTEN = /^Writing (.+)$/
 
 export class UnitVerdict {
+  readonly deferredChecks: readonly string[] | null
+  readonly previousReport: string | null
   readonly previousValidation: readonly string[]
   readonly unit: number
   readonly round: number
@@ -42,9 +45,11 @@ export class UnitVerdict {
   readonly ms: number
 
   constructor(fields: VerdictFields) {
+    this.deferredChecks = fields.deferredChecks ?? null
+    this.previousReport = fields.unit.record.check.judged?.report ?? null
     this.previousValidation = fields.unit.record.check.validation
     this.unit = fields.unit.number
-    this.round = fields.unit.rounds + 1
+    this.round = fields.unit.rounds + (this.deferredChecks === null ? 1 : 0)
     this.maxRefusals = fields.maxRefusals
     this.diff = fields.diff
     this.unattributed = fields.unit.unattributed
@@ -60,7 +65,7 @@ export class UnitVerdict {
   }
 
   get passed(): boolean {
-    return this.blocking.length === 0
+    return this.deferredChecks === null && this.blocking.length === 0
   }
 
   // What waits for the owner, a file at a time.
@@ -75,7 +80,17 @@ export class UnitVerdict {
       ? [this.unplaced(DECLARATION_RULE, `${DeclarationFolder.NAME}: the unit changed the project's declaration`)]
       : []
 
-    return new ValidationList([...findings, ...advisory, ...this.liftedItems(), ...declaration, ...this.reviewItems()])
+    const deferred =
+      this.deferredChecks === null
+        ? []
+        : [
+            this.unplaced(
+              'weaver:checks',
+              `Checks not re-run after ${counted(this.maxRefusals, 'refusal')}; left to the owner: ${this.deferredChecks.join(', ')}. Request #check or run weaver check to run them again.`,
+            ),
+          ]
+
+    return new ValidationList([...deferred, ...findings, ...advisory, ...this.liftedItems(), ...declaration, ...this.reviewItems()])
   }
 
   // A write is about its file; anything else a guard refuses is about the change.
@@ -120,6 +135,7 @@ export class UnitVerdict {
       unit: this.unit,
       round: this.round,
       passed: this.passed,
+      ...(this.deferredChecks === null ? {} : { afterCap: true }),
       failed: this.blocking.map((outcome) => outcome.id),
       toValidate: this.toValidate().items.length,
       files: this.diff.files.length,

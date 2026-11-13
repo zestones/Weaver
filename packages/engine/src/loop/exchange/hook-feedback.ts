@@ -19,6 +19,21 @@ export class HookFeedback {
     return this.tell(event, event, reason, answer)
   }
 
+  notice(event: string, message: string | null, answer: Answer): Answer {
+    if (message === null) return answer
+
+    for (const channel of event === 'Stop' ? (['owner'] as const) : (['owner', 'agent'] as const)) {
+      try {
+        if (!this.journal.notify(this.source, { kind: 'notification', event: 'declaration-format', message, channel }, null)) continue
+      } catch {
+        // A notice must not interrupt supervision when its receipt cannot be written.
+      }
+      answer = channel === 'owner' ? answer.before(`[weaver] ${message}`) : answer.context(event, `[weaver] ${message}`)
+    }
+
+    return answer
+  }
+
   // A failed end of task is told to the agent at its next request or call: the Stop hook has no channel to it.
   pending(event: string, answer: Answer): Answer {
     if (event !== 'UserPromptSubmit' && event !== 'PostToolUse') return answer

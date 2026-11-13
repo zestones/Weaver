@@ -248,7 +248,17 @@ export class Session {
     return new UnitOfWork(this.reconciled((record) => ({ ...record, lastReply: lastMessage })).unit)
   }
 
-  // True the first time for the request in progress: the agent is told once how to end its work.
+  capNotice(validation?: readonly string[]): boolean {
+    return this.store.transact((latest) => ({
+      record: {
+        ...latest,
+        unit: { ...latest.unit, check: { ...latest.unit.check, capNotified: true, ...(validation === undefined ? {} : { validation }) } },
+      },
+      value: latest.unit.check.capNotified !== true,
+    })).value
+  }
+
+  // True once per unit, until the agent changes files again.
   remind(): boolean {
     return this.store.transact((latest) => {
       const unit = new UnitOfWork(latest.unit)

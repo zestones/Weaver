@@ -12,6 +12,7 @@ export class DeclarationFolder {
   static readonly NAME = '.weaver'
 
   readonly path: string
+  formatNotice: string | null = null
 
   constructor(path: string) {
     this.path = path
@@ -26,24 +27,25 @@ export class DeclarationFolder {
   }
 
   load(): Declaration | null {
+    this.formatNotice = null
     if (!existsSync(this.settings)) return null
 
     const texts = this.texts()
+    const migrations = new DeclarationMigrations(texts)
 
-    this.failOnAnotherFormat(texts)
+    this.failOnNewerFormat(migrations)
 
-    return new DeclarationParts(DeclarationFolder.NAME, texts, (path) => this.projectFile(path)).declaration()
+    const readable = migrations.isBehind ? { ...texts, ...migrations.run().texts } : texts
+    const declaration = new DeclarationParts(DeclarationFolder.NAME, readable, (path) => this.projectFile(path)).declaration()
+
+    this.formatNotice = migrations.readingNotice
+
+    return declaration
   }
 
-  // Files written for another format are not read against this one: every field that moved would read as a mistake.
-  private failOnAnotherFormat(texts: PartTexts): void {
-    const migrations = new DeclarationMigrations(texts)
+  private failOnNewerFormat(migrations: DeclarationMigrations): void {
     const written = `${DeclarationParts.FILES.settings}: these files are in the format of version ${String(migrations.written)}`
     const read = `this Weaver reads version ${String(DeclarationMigrations.LATEST)}`
-
-    if (migrations.isBehind) {
-      throw new DeclarationError(DeclarationFolder.NAME, [`${written}, and ${read}: run weaver update, which brings them to it`])
-    }
 
     if (migrations.isAhead) {
       throw new DeclarationError(DeclarationFolder.NAME, [
