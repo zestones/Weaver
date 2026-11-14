@@ -219,18 +219,26 @@ export class EndOfTurn implements Moment {
 
     progress.checking()
 
+    const work = { session, declaration, unit, diff, lastMessage, candidates: [] }
+    const alongside = declaration.review?.start === 'with-checks' ? this.reviews.start(work) : null
+    if (alongside?.standing === 'running') progress.reviewing(true)
+
     const outcomes = unit.isEmpty
       ? []
       : await this.checks.judge(declaration, diff, deadline, new CheckMemory(session.dir, unit.record.check.retry), progress)
-    // The reviewer judges what the checks let through: a change they refuse will be rewritten anyway.
     const blocked = outcomes.some((outcome) => outcome.blocking)
     const candidates = outcomes.flatMap((outcome) => outcome.candidates)
 
     if (!blocked) progress.reviewing()
 
-    const review = blocked ? null : await this.reviews.next({ session, declaration, unit, diff, lastMessage, candidates })
+    const review = blocked
+      ? alongside
+      : alongside !== null && alongside.standing !== 'running'
+        ? alongside
+        : await this.reviews.next({ ...work, unit: session.unit(), candidates })
 
-    if (!blocked)
+    if (blocked) this.reviews.detach(session, review)
+    if (!blocked || review !== null)
       progress.reviewed(review?.standing ?? 'none due', review === null || review.outcome.runtime === '' ? null : review.outcome.runtime)
 
     const verdict = new UnitVerdict({
@@ -240,6 +248,8 @@ export class EndOfTurn implements Moment {
       outcomes,
       repaired,
       review,
+      unseenCandidates: this.reviews.unseenCandidates(session, review, candidates),
+      reviewStart: alongside?.standing === 'running' ? 'with-checks' : review === null ? null : 'after-checks',
       ms: Date.now() - startedAt,
     })
     const report = new Report(declaration, verdict)
@@ -250,14 +260,14 @@ export class EndOfTurn implements Moment {
 
     for (const event of review?.events(unit.number) ?? []) session.log(event)
 
-    if (review?.holds === true) {
+    if (!blocked && review?.holds === true) {
       progress.over('the review sends the agent back')
 
       return this.ended(turn, 'review', Answer.blocking(report.reviewRefusal(review, reportPath)))
     }
 
     // The review goes on by itself: the unit stays open for it, and the agent is not kept waiting.
-    if (review?.standing === 'running') {
+    if (!blocked && review?.standing === 'running') {
       progress.over(`${report.coverage.description}; the review goes on by itself`)
 
       return this.ended(turn, null, Answer.saying(report.summary(reportPath)))

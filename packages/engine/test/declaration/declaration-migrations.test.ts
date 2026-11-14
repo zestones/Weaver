@@ -69,7 +69,7 @@ test('files of an earlier format are brought to the one this Weaver reads, one m
   assert.equal(migrations.isBehind, true)
   assert.deepEqual(
     migrations.pending().map((migration) => migration.label),
-    ['0002-check-commands', '0003-default-writer', '0004-card-resolution'],
+    ['0002-check-commands', '0003-default-writer', '0004-card-resolution', '0005-review-start'],
   )
   assert.deepEqual(applied.slice(0, 1), [
     {
@@ -121,14 +121,14 @@ test('an older project is migrated only in memory, preserving every declared par
   assert.equal(declaration?.writer?.runtime, 'codex')
   assert.equal(declaration?.cards.resolvePerTask, null)
   assert.deepEqual(declaration?.finish.headings, ['Result'])
-  assert.match(folder.formatNotice ?? '', /format 1, read as format 4 in memory/)
+  assert.match(folder.formatNotice ?? '', /format 1, read as format 5 in memory/)
 })
 
 test('a newer project remains unreadable and directs the owner to a newer Weaver', () => {
   const ahead = { settings: JSON.stringify({ version: DeclarationMigrations.LATEST + 1, checks: {} }) }
 
   assert.deepEqual(problemsOf(ahead, 'ahead'), [
-    'settings.json: these files are in the format of version 5, and this Weaver reads version 4: run weaver update, which installs the release that reads them',
+    'settings.json: these files are in the format of version 6, and this Weaver reads version 5: run weaver update, which installs the release that reads them',
   ])
   assert.equal(new DeclarationMigrations(ahead).isAhead, true)
   assert.deepEqual(new DeclarationMigrations(ahead).run(), { texts: {}, applied: [] }, 'a format it does not know is not touched')
@@ -140,7 +140,7 @@ test('a file that is not JSON is left to the reading of the declaration, which s
   assert.deepEqual(Object.keys(texts), ['settings', 'writer'])
   assert.deepEqual(
     applied.map((migration) => migration.label),
-    ['0002-check-commands', '0003-default-writer', '0004-card-resolution'],
+    ['0002-check-commands', '0003-default-writer', '0004-card-resolution', '0005-review-start'],
   )
   assert.equal(new DeclarationMigrations({ settings: 'not json' }).written, null)
 })
@@ -209,8 +209,8 @@ test('version 4 adds unlimited card resolution while preserving settings and exp
   const original = JSON.stringify(settings)
   const added = new DeclarationMigrations({ settings: original }).run()
   assert.deepEqual(Object.keys(added.texts), ['settings'])
-  assert.deepEqual(JSON.parse(added.texts.settings ?? ''), { ...settings, version: 4, cards: { resolvePerTask: null } })
-  assert.deepEqual(added.applied, [
+  assert.deepEqual(JSON.parse(added.texts.settings ?? ''), { ...settings, version: 5, cards: { resolvePerTask: null } })
+  assert.deepEqual(added.applied.slice(0, 1), [
     {
       label: '0004-card-resolution',
       summary: 'The project chooses how many cards agents resolve per task, unlimited by default.',
@@ -221,6 +221,36 @@ test('version 4 adds unlimited card resolution while preserving settings and exp
   assert.deepEqual(new DeclarationMigrations(added.texts).run(), { texts: {}, applied: [] })
   for (const resolvePerTask of [null, 0, 1]) {
     const kept = new DeclarationMigrations({ settings: JSON.stringify({ ...settings, cards: { resolvePerTask } }) }).run()
-    assert.deepEqual(JSON.parse(kept.texts.settings ?? ''), { ...settings, version: 4, cards: { resolvePerTask } })
+    assert.deepEqual(JSON.parse(kept.texts.settings ?? ''), { ...settings, version: 5, cards: { resolvePerTask } })
   }
+})
+
+test('version 5 adds concurrent review start, preserves an explicit sequence and leaves absent reviewers absent', () => {
+  const settings = {
+    version: 4,
+    cards: { resolvePerTask: null },
+    checks: { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 },
+  }
+  const reviewers = { runtime: 'codex', experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
+  const before = { settings: JSON.stringify(settings), reviewers: JSON.stringify(reviewers) }
+  const migrated = new DeclarationMigrations(before).run()
+  assert.deepEqual(JSON.parse(migrated.texts.reviewers ?? ''), { ...reviewers, start: 'with-checks' })
+  assert.deepEqual(JSON.parse(migrated.texts.settings ?? ''), { ...settings, version: 5 })
+  assert.deepEqual(migrated.applied, [
+    {
+      label: '0005-review-start',
+      summary: 'Reviews start beside the checks by default, after repairs.',
+      changes: ['llm/reviewers.json: start added, at "with-checks": the review runs beside the checks'],
+    },
+  ])
+  assert.equal(new DeclarationParts('.weaver', { ...before, ...migrated.texts }).declaration().review?.start, 'with-checks')
+  assert.deepEqual(new DeclarationMigrations({ ...before, ...migrated.texts }).run(), { texts: {}, applied: [] })
+  for (const start of ['with-checks', 'after-checks']) {
+    const explicit = { ...before, reviewers: JSON.stringify({ ...reviewers, start }) }
+    const kept = new DeclarationMigrations(explicit).run()
+    assert.equal(kept.texts.reviewers, undefined)
+    assert.equal(new DeclarationParts('.weaver', { ...explicit, ...kept.texts }).declaration().review?.start, start)
+  }
+  const absent = new DeclarationMigrations({ settings: before.settings }).run()
+  assert.equal(absent.texts.reviewers, undefined)
 })

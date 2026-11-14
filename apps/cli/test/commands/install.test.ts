@@ -64,7 +64,7 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
   }
 
   assert.deepEqual(readJson<{ finish: unknown }>(top, CONFIG).finish, { skill: SKILL })
-  assert.equal(readJson<{ version: number }>(top, CONFIG).version, 4)
+  assert.equal(readJson<{ version: number }>(top, CONFIG).version, 5)
   assert.deepEqual(readJson<{ cards: unknown }>(top, CONFIG).cards, { resolvePerTask: null })
   assert.deepEqual(
     readJson<{ checks: unknown }>(top, CONFIG).checks,
@@ -77,6 +77,7 @@ test('install wires each runtime to the events it fires and the tools Weaver rea
     timeoutSeconds: 300,
     batches: 4,
   })
+  assert.equal(DeclarationFolder.in(top).load()?.review?.start, 'with-checks')
   assert.deepEqual(readJson(top, '.weaver/project/labels.json'), { $schema: link.schemaOf('labels') })
   assert.deepEqual(DeclarationFolder.in(top).load()?.labels, {})
   assert.equal(existsSync(join(top, '.weaver/skills/wv-card.md')), false, 'a project that names no writer gets no skill for one')
@@ -170,7 +171,7 @@ test('the command install writes is one the runtime can run as it is', async () 
 
 test('install twice wires once, and leaves what the owner put in the files', async () => {
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine', timeout: 5 }] }
-  const declared = JSON.stringify({ version: 4, cards: { resolvePerTask: null }, checks: { ...LIMITS, maxRefusals: 5 } })
+  const declared = JSON.stringify({ version: 5, cards: { resolvePerTask: null }, checks: { ...LIMITS, maxRefusals: 5 } })
 
   writeJson(top, CLAUDE, { permissions: { deny: ['Read(.env)'] }, hooks: { PreToolUse: [mine], Notification: [mine] } })
   writeJson(top, CONFIG, JSON.parse(declared))
@@ -295,7 +296,7 @@ test('install leaves a project whose configuration is in another format to weave
   ])
   assert.deepEqual(readJson(top, CONFIG), { version: 1, checks: { maxRefusals: 5, totalTimeoutSeconds: 600, parallel: 2 } })
 
-  writeJson(top, CONFIG, { version: 5, checks: LIMITS })
+  writeJson(top, CONFIG, { version: SETTINGS.version + 1, checks: LIMITS })
 
   const ahead = await weaver(top, ['install', 'claude'])
 

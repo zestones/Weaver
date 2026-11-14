@@ -65,10 +65,38 @@ export class ReviewRounds {
     if (record !== null) this.capture(store, unit.lastReviewed, record, { session, unit, lastMessage })
   }
 
+  start(work: ReviewedWork): UnitReview | null {
+    const policy = work.declaration.review
+    const review = policy === null ? null : this.stage(work, policy, true)
+    if (review?.standing === 'running') new ReviewStore(work.session.dir).wait(review.content, process.pid)
+    return review
+  }
+
+  detach(session: Session, review: UnitReview | null): void {
+    if (review?.standing !== 'running') return
+    const store = new ReviewStore(session.dir)
+    store.stopWaiting(review.content, process.pid)
+    const record = store.find(review.content)
+    if (record !== null) new ReviewDelivery(session.repo).finished(session.id, review.content, record)
+  }
+
+  unseenCandidates(session: Session, review: UnitReview | null, candidates: readonly Finding[]): Finding[] {
+    const seen = review === null ? [] : (new ReviewStore(session.dir).find(review.content)?.request.candidates ?? [])
+    return candidates.filter((finding) => !seen.includes(this.candidate(finding)))
+  }
+
+  private candidate({ rule, file, line, message }: Finding): string {
+    return `${rule} ${line === undefined ? file : `${file}:${String(line)}`}: ${message}`
+  }
+
   // null when nothing is to be reviewed: no reviewer declared, or no rule for one on these paths.
   async next(work: ReviewedWork): Promise<UnitReview | null> {
     const policy = work.declaration.review
-    const review = policy === null ? null : await this.stage(work, policy)
+    const staged = policy === null ? null : this.stage(work, policy)
+    const review =
+      staged?.standing === 'running' && policy !== null
+        ? await this.delivered(new ReviewStore(work.session.dir), staged.content, work, policy)
+        : staged
 
     if (review?.standing === 'sent-back') work.session.reviewRound(review.content)
     if (review?.standing === 'failed' || review?.standing === 'interrupted') work.session.reviewFailed(review.content)
@@ -76,17 +104,18 @@ export class ReviewRounds {
     return review
   }
 
-  private stage(work: ReviewedWork, policy: ReviewPolicy): Promise<UnitReview | null> | UnitReview | null {
+  private stage(work: ReviewedWork, policy: ReviewPolicy, starting = false): UnitReview | null {
     const { session, declaration, unit, diff } = work
     const store = new ReviewStore(session.dir)
     const directives = new OwnerDirectives(unit.requests)
     let given = unit.lastReviewed === null ? null : store.find(unit.lastReviewed)
 
     // A review that is no longer kept cannot be waited for: the unit is reviewed as if none had started.
-    if (unit.reviewing !== null && store.find(unit.reviewing) !== null) return this.delivered(store, unit.reviewing, work, policy)
+    const running = unit.reviewing === null ? null : store.find(unit.reviewing)
+    if (unit.reviewing !== null && running !== null) return this.running(unit.reviewing, running, work, policy)
     if (given !== null && unit.lastReviewed !== null) {
       given = this.capture(store, unit.lastReviewed, given, work)
-      if (!this.isNewWork(given, work)) return this.answered(store, unit.lastReviewed, given, work, policy)
+      if (!this.isNewWork(given, work)) return starting ? null : this.answered(store, unit.lastReviewed, given, work, policy)
     }
     if (unit.isEmpty)
       return directives.review && session.failedReview !== null ? this.retried(store, session.failedReview, work, policy) : null
@@ -95,11 +124,11 @@ export class ReviewRounds {
     return directives.skipsReview ? this.skipped(unit, policy, '#no-review in the request') : this.asked(store, given, work, policy)
   }
 
-  private asked(store: ReviewStore, earlier: ReviewRecord | null, work: ReviewedWork, policy: ReviewPolicy): Promise<UnitReview> {
+  private asked(store: ReviewStore, earlier: ReviewRecord | null, work: ReviewedWork, policy: ReviewPolicy): UnitReview {
     const { session, declaration, unit, diff, candidates } = work
     const content = unit.content()
 
-    store.keep(content, {
+    const record: ReviewRecord = {
       state: 'running',
       origin: {
         author: session.agent,
@@ -120,9 +149,7 @@ export class ReviewRounds {
         skill: policy.skill,
         requests: unit.requests,
         earlier: earlier === null ? [] : this.earlierLines(earlier),
-        candidates: candidates.map(
-          ({ rule, file, line, message }) => `${rule} ${line === undefined ? file : `${file}:${String(line)}`}: ${message}`,
-        ),
+        candidates: candidates.map((finding) => this.candidate(finding)),
         history: new ReviewCards(session.repo).about(diff.paths),
       },
       assignment: new ReviewRouting(policy, new OwnerDirectives(unit.requests)).assign(session.agent, diff),
@@ -133,14 +160,15 @@ export class ReviewRounds {
       reviewed: Object.fromEntries(session.repo.hashPaths(Object.keys(unit.files))),
       answers: [],
       asked: 0,
-    })
+    }
+    store.keep(content, record)
     this.started(session, content)
 
-    return this.delivered(store, content, work, policy)
+    return this.running(content, record, work, policy)
   }
 
   // The same request is asked again, of the reviewer the project names today, if the work it covers is still there.
-  private retried(store: ReviewStore, content: string, work: ReviewedWork, policy: ReviewPolicy): Promise<UnitReview> | UnitReview | null {
+  private retried(store: ReviewStore, content: string, work: ReviewedWork, policy: ReviewPolicy): UnitReview | null {
     const { session, unit } = work
     const failed = store.find(content)
 
@@ -160,7 +188,7 @@ export class ReviewRounds {
       experiments: policy.experiments,
     }
 
-    store.keep(content, {
+    const record: ReviewRecord = {
       ...failed,
       round: (failed.round ?? 1) + 1,
       state: 'running',
@@ -168,10 +196,11 @@ export class ReviewRounds {
       startedAt: new Date().toISOString(),
       worker: null,
       outcome: null,
-    })
+    }
+    store.keep(content, record)
     this.started(session, content)
 
-    return this.delivered(store, content, work, policy)
+    return this.running(content, record, work, policy)
   }
 
   // The unit points at its review from the moment it starts, and the review at the end of turn that waits for it, before
@@ -180,6 +209,20 @@ export class ReviewRounds {
     session.reviewRunning(content)
     new ReviewStore(session.dir).wait(content, process.pid)
     this.launcher.start(session.repo, session.dir, content)
+  }
+
+  private running(content: string, record: ReviewRecord, work: ReviewedWork, policy: ReviewPolicy): UnitReview {
+    const { runtime, reason, model } = record.assignment
+    return new UnitReview({
+      content,
+      standing: 'running',
+      round: work.unit.reviewRounds + 1,
+      journalRound: record.round ?? work.unit.reviewRounds + 1,
+      maxRefusals: policy.maxRefusals,
+      model,
+      rules: record.request.rules.length,
+      outcome: new ReviewOutcome({ runtime, reason, seconds: (Date.now() - Date.parse(record.startedAt)) / 1000 }),
+    })
   }
 
   private async delivered(store: ReviewStore, content: string, work: ReviewedWork, policy: ReviewPolicy): Promise<UnitReview> {

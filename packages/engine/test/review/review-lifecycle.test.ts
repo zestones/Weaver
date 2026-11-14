@@ -398,7 +398,7 @@ test('the places a program of the project lists under a rule of the review reach
     candidates: [{ rule: 'N1', file: A_FILE, line: 1, message: 'new function: a' }],
   })
 
-  await finishWith(session, stubChecks([PASSING, listing]), reviewed(), undefined, reviewer)
+  await finishWith(session, stubChecks([PASSING, listing]), reviewed({ start: 'after-checks' }), undefined, reviewer)
 
   assert.match(reviewer.requests[0]?.prompt(null) ?? '', /## Places to judge\n\n[^\n]*\n\n- N1 src\/a\.ts:1: new function: a/)
 })

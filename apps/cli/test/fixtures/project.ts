@@ -124,8 +124,8 @@ export async function weaver(cwd: string, args: readonly string[], around: Aroun
 
 // The limits every project writes, with the values a new project starts with.
 export const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 }
-export const SETTINGS = { version: 4, cards: { resolvePerTask: null }, checks: LIMITS }
-export const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
+export const SETTINGS = { version: 5, cards: { resolvePerTask: null }, checks: LIMITS }
+export const REVIEW = { start: 'with-checks', experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
 
 // What a project declares, each part in the file Weaver reads it from.
 export function writeConfig(top: string, parts: Readonly<Partial<Record<PartName, unknown>>>): void {

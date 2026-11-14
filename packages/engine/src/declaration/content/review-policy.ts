@@ -6,6 +6,7 @@ export interface ReviewerSettings {
 }
 
 export interface ReviewFields {
+  readonly start: 'with-checks' | 'after-checks'
   readonly runtime: ReviewerName | 'same' | 'other'
   readonly reviewers: Readonly<Record<ReviewerName, ReviewerSettings>>
   readonly criticalPaths: readonly string[]
@@ -18,6 +19,7 @@ export interface ReviewFields {
 }
 
 export class ReviewPolicy {
+  readonly start: 'with-checks' | 'after-checks'
   // `same` is the runtime that wrote the change, `other` the one that did not.
   readonly runtime: ReviewerName | 'same' | 'other'
   readonly reviewers: Readonly<Record<ReviewerName, ReviewerSettings>>
@@ -33,6 +35,7 @@ export class ReviewPolicy {
   readonly skill: string | null
 
   constructor(fields: ReviewFields) {
+    this.start = fields.start
     this.runtime = fields.runtime
     this.reviewers = fields.reviewers
     this.criticalPaths = fields.criticalPaths

@@ -32,7 +32,7 @@ interface DocumentReviewer {
 // What each file of `.weaver/` holds. Every limit Weaver applies is written in the file; what may be left out is what
 // means "none" when it is. A file that names its schema carries a `$schema` line, which is no entry of the file.
 export interface SettingsDocument {
-  readonly version: 4
+  readonly version: 5
   readonly cards: { readonly resolvePerTask: number | null }
   readonly finish: { readonly skill?: string }
   readonly checks: {
@@ -61,6 +61,7 @@ export interface IssuesDocument {
 }
 
 export interface ReviewersDocument {
+  readonly start: 'with-checks' | 'after-checks'
   readonly runtime: 'claude' | 'codex' | 'same' | 'other'
   readonly reviewers: { readonly claude?: DocumentReviewer; readonly codex?: DocumentReviewer }
   readonly critical: { readonly paths: readonly string[]; readonly lines?: number }

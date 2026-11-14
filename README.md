@@ -61,6 +61,7 @@ Every rule of a project has one of three levels, which says who judges it and wh
 
 A few things the diagram leaves out:
 
+- **Reviews run beside checks after repairs.** Passing checks wait for the review for up to `waitSeconds`; `timeoutSeconds` still limits the reviewer from launch. Blocking checks return immediately without spending a review refusal, and the review continues through the usual late delivery and cards.
 - **A review is due** when a rule of level `llm` applies to the change, the project declares a reviewer, and your request does not say `#no-review`. `#review` in a request runs again a review that broke or that you stopped, and `#critical` gives the review to the runtime that did not write the change.
 - **A finding needs an answer, not obedience.** The agent writes `F1 fixed: …` or `F1 not fixed: …` in its final message. An answer `fixed` is refused while the file has not changed, unless it names another file that did, as a test added for a finding about the code. What it does not fix waits for you, with its reason.
 - **A suspicion is for you alone.** For a rule about what the code does, a finding must carry the experiment that shows it. Without one it is a suspicion: you read it, the agent never does.
@@ -204,7 +205,7 @@ When no checks are declared, a task still settles, but its summary, report and p
 
 Hook failures tell the agent to notify you and run `weaver doctor`, naming the journal. The same notice is limited to once per session per ten minutes. A Stop failure is shown to you and delivered to the agent with its next request or tool result. Both `weaver status` and `weaver doctor` show hook errors from the last seven days; doctor treats them as problems, as it does a previously used runtime whose wiring is missing or flags waiting without a writer. Missing wiring is repaired with `weaver install <runtime>`.
 
-The end of a task runs the checks, then the review, and may take long. `weaver status`, from a terminal of your own, says where it is: the checks that ended and how long each took, the one running and for how long, the ones still waiting, then the review, each beside the time it usually takes in the project. With no end of task running, it says how the last one ended, or that it was stopped before its end. `--watch` draws it again every second, until Ctrl+C.
+The end of a task runs repairs, then starts the checks and any due review together. In `.weaver/llm/reviewers.json`, `start` defaults to `"with-checks"`; `"after-checks"` restores the sequential behavior. Checks that fail return at once while the review continues, and its findings arrive later. Check candidates absent from the review request are listed in To validate for you. `weaver status`, from a terminal of your own, says where it is: the checks that ended and how long each took, those running and for how long, the ones still waiting, and the review, each beside the time it usually takes in the project. With no end of task running, it says how the last one ended, or that it was stopped before its end. `--watch` draws it again every second, until Ctrl+C.
 
 ```sh
 $ weaver status

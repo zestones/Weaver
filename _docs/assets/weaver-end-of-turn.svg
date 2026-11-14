@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 644" width="880" height="644" role="img" aria-labelledby="t d">
   <title id="t">What happens when the agent says it has finished</title>
-  <desc id="d">When the agent says it has finished, the programs of the project repair, then check. A broken gate rule refuses the end; a broken human rule is listed for you. When nothing is broken and a review is due, another agent judges the change: its findings refuse the end until the agent has answered each one. Then the unit is settled, and what the review leaves becomes cards.</desc>
+  <desc id="d">When the agent says it has finished, repairs run first, then checks and any due review run together. A broken gate rule refuses the end immediately while the review continues; a broken human rule is listed for you. Passing checks wait for the review: its findings refuse the end until the agent has answered each one. Then the unit is settled, and what the review leaves becomes cards.</desc>
   <style>
     text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 12.5px; }
     .code { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace; font-size: 12px; }
@@ -63,8 +63,8 @@
   <path d="M 440 64 L 440 88" class="wire" marker-end="url(#tip)"/>
   <g class="w">
     <rect x="330" y="88" width="220" height="50" rx="6"/>
-    <text x="440" y="109" class="head" text-anchor="middle">Repairs, then checks</text>
-    <text x="440" y="125" class="sub" text-anchor="middle">by the programs of the project</text>
+    <text x="440" y="109" class="head" text-anchor="middle">Repairs, then checks + review</text>
+    <text x="440" y="125" class="sub" text-anchor="middle">together, on the same diff</text>
   </g>
   <path d="M 440 138 L 440 164" class="wire" marker-end="url(#tip)"/>
   <g class="w">
@@ -78,7 +78,7 @@
     <rect x="40" y="174" width="220" height="64" rx="6"/>
     <text x="150" y="194" class="head" text-anchor="middle">The end is refused</text>
     <text x="150" y="210" class="sub" text-anchor="middle">the agent fixes it</text>
-    <text x="150" y="226" class="sub" text-anchor="middle">and comes back</text>
+    <text x="150" y="226" class="sub" text-anchor="middle">the review continues</text>
   </g>
   <path d="M 560 206 L 620 206" class="wire" marker-end="url(#tip)"/>
   <text x="590" y="198" class="lbl" text-anchor="middle">human</text>
@@ -94,13 +94,13 @@
   <!-- Another agent judges -->
   <g class="w">
     <polygon points="440,284 560,326 440,368 320,326"/>
-    <text x="440" y="330" class="head" text-anchor="middle">Is a review due?</text>
+    <text x="440" y="330" class="head" text-anchor="middle">Was a review started?</text>
   </g>
   <path d="M 560 326 L 620 326" class="wire" marker-end="url(#tip)"/>
   <text x="590" y="318" class="lbl" text-anchor="middle">yes</text>
   <g class="w">
     <rect x="620" y="294" width="220" height="64" rx="6"/>
-    <text x="730" y="314" class="head" text-anchor="middle">A review</text>
+    <text x="730" y="314" class="head" text-anchor="middle">Wait for the review</text>
     <text x="730" y="330" class="sub" text-anchor="middle">another agent judges</text>
     <text x="730" y="346" class="sub" text-anchor="middle">the change</text>
   </g>

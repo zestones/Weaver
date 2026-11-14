@@ -52,7 +52,8 @@ export class EndOfTaskView {
           ? `${only.id} ${this.since(only.startedAt, only.usualMs)}`
           : running.map((check) => check.id).join(', ')
 
-    return `${WEAVER} ${what} · ${String(done)} of ${String(checks.length)} checks done`
+    const alongside = review?.status === 'running' ? ` · review ${this.since(review.startedAt, review.usualMs)}` : ''
+    return `${WEAVER} ${what} · ${String(done)} of ${String(checks.length)} checks done${alongside}`
   }
 
   get heading(): string {

@@ -203,7 +203,13 @@ export class Report {
               `Earlier results and findings are in [the last check report](${verdict.previousReport}); they were not revalidated at this end of turn.`,
             ],
       ),
-      ...this.section('Review', this.reviewSection()),
+      ...this.section('Review', [
+        ...this.reviewSection(),
+        ...(verdict.reviewStart === 'with-checks' ? ['The review ran beside the checks.'] : []),
+        ...(verdict.unseenCandidates.length === 0
+          ? []
+          : ['Check candidates absent from the review request are listed in To validate for the owner; the reviewer did not see them.']),
+      ]),
       ...this.section('To validate', verdict.toValidate().since(verdict.previousValidation, false).lines()),
       ...this.section('To validate — already listed', verdict.toValidate().since(verdict.previousValidation, true).lines()),
       ...this.section(

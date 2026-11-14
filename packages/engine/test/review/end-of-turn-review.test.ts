@@ -313,13 +313,16 @@ test('the owner’s words in a request decide the review of its work: none, or b
   assert.deepEqual([reviewer.assignments[1]?.runtime, reviewer.assignments[1]?.reason], ['claude', 'the runtime that wrote the change'])
 })
 
-test('no review is asked when the checks fail, when no rule of the review applies, or when the project declares no review', async () => {
+test('after-checks asks no review when the checks fail, when no rule of the review applies, or when the project declares no review', async () => {
   const reviewer = stubReviewer([found, found, found])
   const sqlOnly = declaration({
     review: { runtime: 'codex', rules: { N2: { statement: 'SQL is formatted the house way.', scope: ['**/*.sql'] } } },
   })
 
-  assert.equal((await finishWith(session, stubChecks([FAILING]), reviewed(), undefined, reviewer)).decision, 'block')
+  assert.equal(
+    (await finishWith(session, stubChecks([FAILING]), reviewed({ start: 'after-checks' }), undefined, reviewer)).decision,
+    'block',
+  )
   assert.equal(reviewer.requests.length, 0, 'failing checks come first')
 
   await finish(reviewer, sqlOnly)

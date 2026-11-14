@@ -32,6 +32,7 @@ interface TouchEvent {
 }
 
 interface CheckEvent {
+  readonly reviewStart?: 'with-checks' | 'after-checks'
   readonly kind: 'check'
   readonly unit: number
   readonly round: number

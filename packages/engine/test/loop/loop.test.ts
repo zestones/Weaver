@@ -15,7 +15,7 @@ const HOOK = join(import.meta.dirname, '../../src/bin/hook.ts')
 const scratch = mkdtempSync(join(tmpdir(), 'weaver-loop-'))
 
 const DECLARATION = {
-  version: 4,
+  version: 5,
   cards: { resolvePerTask: null },
   finish: { headings: ['Request', 'To validate'] },
   limits: { maxRefusals: 3 },
@@ -260,7 +260,7 @@ for (const file of judging ? rest : [mode, ...rest]) {
 process.exitCode = judging && untidy ? 1 : 0
 `
   const declared = {
-    version: 4,
+    version: 5,
     cards: { resolvePerTask: null },
     checks: {
       tidy: {
@@ -305,7 +305,7 @@ process.stdin.on('end', () => {
 })
 `
   const declared = {
-    version: 4,
+    version: 5,
     cards: { resolvePerTask: null },
     review: { runtime: 'codex', rules: { N1: { statement: 'A name says what it holds.', scope: ['src/**'] } } },
     checks: { syntax: { judge: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },
@@ -347,7 +347,7 @@ process.stdin.on('end', () => {
 })
 `
   const declared = {
-    version: 4,
+    version: 5,
     cards: { resolvePerTask: null },
     review: { runtime: 'codex', rules: { N1: { statement: 'A name says what it holds.', scope: ['src/**'] } } },
     checks: { syntax: { judge: ['node', 'tools/parse.mjs', '{files}'], when: ['src/**/*.js'], rules: { S1: 'Source files parse.' } } },

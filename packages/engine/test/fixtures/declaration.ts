@@ -20,7 +20,7 @@ const CARD_SKILL = '.weaver/skills/wv-card.md'
 // A file writes every limit Weaver applies. A test gives the ones it is about, and these stand for the others.
 const LIMITS = { maxRefusals: 3, totalTimeoutSeconds: 1200, parallel: 3, warnTimeoutSeconds: 30 }
 const CHECK = { cwd: '.', reads: 'exit', timeoutSeconds: 600 }
-const REVIEW = { experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
+const REVIEW = { start: 'with-checks', experiments: false, timeoutSeconds: 900, waitSeconds: 1500, maxRefusals: 1 }
 const WRITER = { timeoutSeconds: 600 }
 
 function header(name: string, listed: readonly string[]): string {
@@ -40,7 +40,7 @@ function split(project: Raw): Split {
   const cardSkill = sections === undefined ? writes.skill : (writes.skill ?? CARD_SKILL)
   const parts: Partial<Record<PartName, unknown>> = {
     settings: {
-      version: 4,
+      version: 5,
       cards: cards ?? { resolvePerTask: null },
       ...(skill === undefined ? {} : { finish: { skill } }),
       checks: { ...LIMITS, ...(limits as Raw | undefined) },

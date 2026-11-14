@@ -52,7 +52,7 @@ for (const runtime of ['claude', 'codex']) {
 
     assert.doesNotMatch((await run('PreToolUse', 'session', 'child')).print(), /read as format/)
     const first = await run('PreToolUse')
-    assert.match(first.body?.systemMessage ?? '', /format 2, read as format 4 in memory/)
+    assert.match(first.body?.systemMessage ?? '', /format 2, read as format 5 in memory/)
     assert.match(first.body?.hookSpecificOutput?.additionalContext ?? '', /commit the migrated \.weaver\/.*worktrees and clones/)
     assert.equal(
       (first.body?.hookSpecificOutput as { permissionDecision?: string }).permissionDecision,
@@ -64,7 +64,7 @@ for (const runtime of ['claude', 'codex']) {
     }
     assert.match((await run('UserPromptSubmit', 'another')).print(), /read as format/)
     assert.deepEqual(folder.texts(), before)
-    assert.equal(new DeclarationMigrations(migrated.texts()).written, 4)
+    assert.equal(new DeclarationMigrations(migrated.texts()).written, 5)
     const notices = new Journal(repo).readSession('session').filter((entry) => entry.kind === 'notification')
     assert.deepEqual(notices.map((entry) => entry.channel).sort(), ['agent', 'owner'])
   })

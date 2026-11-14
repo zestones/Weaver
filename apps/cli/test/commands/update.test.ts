@@ -187,6 +187,7 @@ test('with the latest release, update brings the project up to date itself: its 
     '    llm/writer.json: added the Codex writer, using its configured model, at four batches of five flags per start',
     '  0004-card-resolution: The project chooses how many cards agents resolve per task, unlimited by default.',
     '    settings.json: cards added, at {"resolvePerTask":null}: all eligible cards are resolved at task end',
+    '  0005-review-start: Reviews start beside the checks by default, after repairs.',
     'Commit the migrated .weaver/ from this tree so worktrees and clones get it.',
     '✓ Claude Code: hooks written again in .claude/settings.local.json, which were those of Weaver v0.1.0',
     '✓ Claude Code: the guide of Weaver written to .claude/skills/weaver/SKILL.md',
@@ -353,7 +354,7 @@ test('update says so where there is no supervised project, and refuses a configu
   assert.equal(nowhere.status, 0)
   assert.equal(nowhere.lines.at(-1), '- No supervised project here: weaver install puts Weaver on a project.')
 
-  writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: 5 })
+  writeJson(top, '.weaver/settings.json', { ...SETTINGS, version: SETTINGS.version + 1 })
 
   const ahead = await weaver(top, ['update'], { channel: channel('9.9.9') })
 

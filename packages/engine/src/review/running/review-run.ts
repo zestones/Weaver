@@ -50,8 +50,7 @@ export class ReviewRun {
       const ended = interrupted ? this.interrupted(asked, outcome) : this.ended(asked, outcome)
       store.keep(content, ended)
       // Give the waiting hook the result; a released or dead waiter cannot deliver it.
-      const handoffUntil = Date.now() + 5000
-      while (store.waiter(content) !== null && isAlive(store.waiter(content) ?? 0) && Date.now() < handoffUntil) await sleep(this.watchMs)
+      while (store.waiter(content) !== null && isAlive(store.waiter(content) ?? 0)) await sleep(this.watchMs)
       await sleep(20)
       new ReviewDelivery(repo).finished(asked.origin?.session ?? basename(sessionDir), content, ended)
     } finally {

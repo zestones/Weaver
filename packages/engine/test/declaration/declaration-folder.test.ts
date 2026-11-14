@@ -31,7 +31,7 @@ const problemsIn = (texts: PartTexts) => problemsOf(() => new DeclarationParts('
 
 // The settings every project writes: its limits, with the values a new project starts with.
 const SETTINGS =
-  '{"version":4,"cards":{"resolvePerTask":null},"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
+  '{"version":5,"cards":{"resolvePerTask":null},"checks":{"maxRefusals":3,"totalTimeoutSeconds":1200,"parallel":3,"warnTimeoutSeconds":30}}'
 
 const VALID = {
   scope: { exclude: ['design/lab'] },
@@ -178,6 +178,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
       checks: JSON.stringify({ c: { judge: [], cwd: '.', reads: 'stdout', timeoutSeconds: 1.5, after: 'd' } }),
       reviewers: JSON.stringify({
         runtime: 'gemini',
+        start: 'with-checks',
         experiments: false,
         timeoutSeconds: 900,
         waitSeconds: 1500,
@@ -187,7 +188,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
     }),
     [
       'settings.json: chekcs is not a known field',
-      'settings.json: version must be 4',
+      'settings.json: version must be 5',
       'settings.json: checks.maxRefusals must be at least 1',
       'project/guards.json: 9x is not a valid name',
       'project/guards.json: 9x.statement is missing',
@@ -215,7 +216,7 @@ test('everything wrong with the shape of the files is reported at once, each wit
 
 test('a file writes every limit Weaver applies: one left out is a problem, never a value the file does not show', () => {
   const written = {
-    settings: '{"version":4,"cards":{"resolvePerTask":null},"checks":{}}',
+    settings: '{"version":5,"cards":{"resolvePerTask":null},"checks":{}}',
     checks: JSON.stringify({ c: { judge: ['true'], rules: { plain: 'x', owner: { statement: 'y' } } } }),
     reviewers: '{"runtime":"codex"}',
   }
@@ -233,6 +234,7 @@ test('a file writes every limit Weaver applies: one left out is a problem, never
     'llm/reviewers.json: timeoutSeconds is missing',
     'llm/reviewers.json: waitSeconds is missing',
     'llm/reviewers.json: maxRefusals is missing',
+    'llm/reviewers.json: start is missing',
   ])
   assert.deepEqual(
     problemsIn({ settings: SETTINGS, guards: '{"g":{"statement":"x","runs":["git commit"]}}', rules: '{}' }),

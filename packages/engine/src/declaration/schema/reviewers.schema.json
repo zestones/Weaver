@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Weaver reviewers",
-  "description": "Who reviews a unit of work, and with what means. An agent that did not write the change judges it against the rules of `llm/rules.json` once the checks pass, and the agent that wrote it answers each finding, fixed or not fixed with a reason. A finding never holds the change by itself. The owner has four words for a request: `#no-review` asks for no review of that work, `#review` takes it back and has a review that failed tried again, `#critical` asks for the runtime that did not write the change, `#simple` for the one that did.",
+  "description": "Who reviews a unit of work, and with what means. An agent that did not write the change judges it against the rules of `llm/rules.json` beside the checks by default, and the agent that wrote it answers each finding, fixed or not fixed with a reason. A finding never holds the change by itself. The owner has four words for a request: `#no-review` asks for no review of that work, `#review` takes it back and has a review that failed tried again, `#critical` asks for the runtime that did not write the change, `#simple` for the one that did.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["runtime", "experiments", "timeoutSeconds", "waitSeconds", "maxRefusals"],
+  "required": ["runtime", "experiments", "timeoutSeconds", "waitSeconds", "maxRefusals", "start"],
   "properties": {
     "$schema": {
       "type": "string",
@@ -62,7 +62,7 @@
     "waitSeconds": {
       "type": "integer",
       "minimum": 1,
-      "description": "How long the end of a turn waits for a review. A review that runs longer goes on by itself: the unit of work stays open, and the next end of turn gives its findings."
+      "description": "How long the end of a turn waits for a review after checks pass. A review that runs longer goes on by itself: the unit of work stays open, and the next end of turn gives its findings."
     },
     "maxRefusals": {
       "type": "integer",
@@ -73,6 +73,10 @@
       "type": "string",
       "minLength": 1,
       "description": "The file that tells the reviewer how this project wants its changes reviewed, relative to the repository root. Weaver guards it."
+    },
+    "start": {
+      "enum": ["with-checks", "after-checks"],
+      "description": "When to start the review after repairs: with-checks runs it beside the checks (the default for new and migrated declarations); after-checks waits for passing checks. Check failures return immediately, leaving an already started review to deliver its findings later. Candidates absent from its request are left to the owner in To validate."
     }
   },
   "definitions": {

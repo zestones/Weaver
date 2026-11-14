@@ -222,7 +222,9 @@ export class DoctorCommand implements Command {
         ? { state: 'note', text: `The review is by ${who}, and it has no rule: it has nothing to judge` }
         : { state: 'ok', text: `The review: by ${who}, for ${new Counted(judged, 'rule').text}${where}` }
 
-    return [review, ...REVIEWERS.flatMap((name) => this.reviewer(name, policy, routed || policy.runtime === name))]
+    return judged === 0
+      ? [review]
+      : [review, ...REVIEWERS.flatMap((name) => this.reviewer(name, policy, routed || policy.runtime === name))]
   }
 
   private reviewer(name: ReviewerName, policy: ReviewPolicy, expected: boolean): Finding[] {

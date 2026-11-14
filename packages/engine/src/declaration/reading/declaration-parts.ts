@@ -174,6 +174,7 @@ export class DeclarationParts {
       experiments: review.experiments,
       timeoutSeconds: review.timeoutSeconds,
       waitSeconds: review.waitSeconds,
+      start: review.start,
       maxRefusals: review.maxRefusals,
       skill: review.skill ?? null,
     })

@@ -73,6 +73,15 @@ test('an end of task that runs says each check, how long it has run, and how lon
   assert.deepEqual(lines.slice(3), ['  - types   waiting', '  - review  waiting', '', 'Follow it with weaver status --watch.'])
 })
 
+test('status shows checks and review running together', async () => {
+  const progress = new EndOfTaskProgress(DIR, { unit: 2, checks: ['syntax'], reviewed: true, usual: usual() })
+  progress.started('syntax')
+  progress.reviewing(true)
+  const { lines } = await weaver(top, ['status'])
+  assert.ok(lines.some((line) => /^ {2}\* syntax/.test(line)))
+  assert.ok(lines.some((line) => /^ {2}\* review/.test(line)))
+})
+
 test('an end of task whose hook is gone was stopped before its end: what it had not done is said not to have run', async () => {
   const progress = new EndOfTaskProgress(DIR, { unit: 3, checks: ['syntax', 'types'], reviewed: true, usual: usual() })
 

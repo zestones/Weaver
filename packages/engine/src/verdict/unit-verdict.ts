@@ -1,3 +1,4 @@
+import type { Finding } from '../declaration/rules/finding.ts'
 import { counted } from '../lib/text/counted.ts'
 import { DeclarationFolder } from '../declaration/reading/declaration-folder.ts'
 import type { UnitDiff } from '../unit-of-work/diff/unit-diff.ts'
@@ -16,6 +17,8 @@ export interface VerdictFields {
   readonly repaired: readonly string[]
   readonly review: UnitReview | null
   readonly ms: number
+  readonly unseenCandidates?: readonly Finding[]
+  readonly reviewStart?: 'with-checks' | 'after-checks' | null
   readonly deferredChecks?: readonly string[]
 }
 
@@ -27,6 +30,8 @@ const MAINTENANCE_RULE = 'weaver:maintenance'
 const WRITTEN = /^Writing (.+)$/
 
 export class UnitVerdict {
+  readonly unseenCandidates: readonly Finding[]
+  readonly reviewStart: 'with-checks' | 'after-checks' | null
   readonly deferredChecks: readonly string[] | null
   readonly previousReport: string | null
   readonly previousValidation: readonly string[]
@@ -45,6 +50,8 @@ export class UnitVerdict {
   readonly ms: number
 
   constructor(fields: VerdictFields) {
+    this.unseenCandidates = fields.unseenCandidates ?? []
+    this.reviewStart = fields.reviewStart ?? null
     this.deferredChecks = fields.deferredChecks ?? null
     this.previousReport = fields.unit.record.check.judged?.report ?? null
     this.previousValidation = fields.unit.record.check.validation
@@ -90,7 +97,17 @@ export class UnitVerdict {
             ),
           ]
 
-    return new ValidationList([...deferred, ...findings, ...advisory, ...this.liftedItems(), ...declaration, ...this.reviewItems()])
+    const candidates = this.unseenCandidates.map(({ rule, file, line, message }) => ({ file, rule, line: line ?? null, message }))
+
+    return new ValidationList([
+      ...deferred,
+      ...findings,
+      ...candidates,
+      ...advisory,
+      ...this.liftedItems(),
+      ...declaration,
+      ...this.reviewItems(),
+    ])
   }
 
   // A write is about its file; anything else a guard refuses is about the change.
@@ -132,6 +149,7 @@ export class UnitVerdict {
   event(): EventBody {
     return {
       kind: 'check',
+      ...(this.reviewStart === null ? {} : { reviewStart: this.reviewStart }),
       unit: this.unit,
       round: this.round,
       passed: this.passed,

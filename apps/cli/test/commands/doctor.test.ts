@@ -67,13 +67,14 @@ test('after install everything is alive; a runtime left out is only noted', asyn
 
   const { status, lines, sections, closing } = await doctor()
 
-  assert.deepEqual(sections, ['Project', 'Cards', 'Runtimes'], 'nothing is said of a part of Weaver the project does not use')
+  assert.deepEqual(sections, ['Project', 'Review', 'Cards', 'Runtimes'])
   assert.equal(closing, '✓ Weaver is alive in this project.')
 
   assert.equal(status, 0, lines.join('\n'))
   assert.deepEqual(lines, [
     '  ✓ .weaver: 0 rules, 0 checks, 0 guards',
     '  ✓ The finish skill: .weaver/skills/wv-finish.md',
+    '  - The review is by the runtime that did not write the change, and it has no rule: it has nothing to judge',
     '  ✓ The writer codex starts',
     `  ✓ The hook starts: ${link.hook}`,
     '  ✓ Claude Code: wired in .claude/settings.local.json',
@@ -405,7 +406,7 @@ test('a project read through migrations reports its older format and tells the o
   assert.equal(status, 1)
   assert.equal(
     lines[0],
-    '  X .weaver/ in this tree is in format 1, read as format 4 in memory. Supervision continues. Tell the owner to run weaver update if needed, then commit the migrated .weaver/ from the tree where weaver update ran so worktrees and clones get it.',
+    '  X .weaver/ in this tree is in format 1, read as format 5 in memory. Supervision continues. Tell the owner to run weaver update if needed, then commit the migrated .weaver/ from the tree where weaver update ran so worktrees and clones get it.',
   )
 })
 

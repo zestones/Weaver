@@ -119,6 +119,15 @@ export class Project {
       checks: {},
       scripts: {},
       labels: {},
+      reviewers: {
+        start: 'with-checks',
+        runtime: 'other',
+        experiments: false,
+        timeoutSeconds: 900,
+        waitSeconds: 1500,
+        maxRefusals: 1,
+      },
+      rules: {},
     }
 
     if (existsSync(folder.settings)) return false

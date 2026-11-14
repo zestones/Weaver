@@ -78,13 +78,14 @@ export class EndOfTaskProgress implements CheckWatcher {
     this.changeCheck(outcome.id, { status: outcome.status, ms: outcome.ms, kept: outcome.keptFrom !== null })
   }
 
-  reviewing(): void {
-    this.changeReview({ status: 'running', startedAt: new Date().toISOString() })
-    this.change({ step: 'review' })
+  reviewing(withChecks = false): void {
+    this.changeReview({ status: 'running', startedAt: this.record.review?.startedAt ?? new Date().toISOString() })
+    this.change({ step: withChecks ? 'checks' : 'review' })
   }
 
   reviewed(standing: string, reviewer: string | null): void {
     this.changeReview({ status: 'over', endedAt: new Date().toISOString(), standing, reviewer })
+    this.write()
   }
 
   over(outcome: string): void {
